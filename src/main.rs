@@ -33,16 +33,6 @@ pub struct State{
     route_table: Vec<Route>,
 }
 
-pub fn init(route_table: Vec<Route>) -> tide::Server<State> {
-	let mut server = tide::with_state(State{route_table});
-
-    server.at("*route").get(handler);
-    server.at("").get(handler);
-    return server
-}
-
-
-
 #[derive(Clone)]
 pub struct Route{
     path: String,
