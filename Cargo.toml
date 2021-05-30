@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 tide="0.16.0"
 async-std={version="1.6.2", features=["attributes"]}
+async-process="1.1.0"
