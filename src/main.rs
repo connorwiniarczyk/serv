@@ -4,7 +4,10 @@ use tide::Request;
 use tide::Response;
 
 mod resolver;
+mod config;
+
 use resolver::Resolver;
+use config::Config;
 
 pub async fn handler(request: Request<State>) -> tide::Result {
     let state = request.state();
@@ -20,7 +23,7 @@ pub async fn handler(request: Request<State>) -> tide::Result {
         if path == &route {
             println!("{:#?}", path);
             
-            let out = resolver.resolve().await;
+            let out = resolver.resolve(&state.config).await;
             return out
         }
     }
@@ -31,6 +34,7 @@ pub async fn handler(request: Request<State>) -> tide::Result {
 #[derive(Clone, Debug)]
 pub struct State{
     route_table: Vec<Route>,
+    config: Config,
 }
 
 #[derive(Clone)]
@@ -72,16 +76,23 @@ impl fmt::Display for Route {
 #[async_std::main]
 async fn main() {
 
+    let config = Config {
+        root: "/home/connor/projects/serv/public".to_string(),
+        port: 8080,
+    };
+
     let mut route_table: Vec<Route> = vec![];
-    route_table.push(Route::new("/", Resolver::File{ path: "/home/connor/projects/serv/public/index.html".to_string() }));
-    route_table.push(Route::new("/shell", Resolver::Exec{ path: "/home/connor/projects/serv/public/shell_example".to_string() }));
+    route_table.push(Route::new("/", Resolver::File{ path: "index.html".to_string() }));
+    route_table.push(Route::new("/shell", Resolver::Exec{ path: "shell_example".to_string() }));
     route_table.push(Route::new("/date", Resolver::Exec{ path: "date".to_string() }));
 
+    let listen_addr = format!("0.0.0.0:{}", &config.port);
+
     println!("{:#?}", route_table);
-	let mut server = tide::with_state(State{route_table});
+	let mut server = tide::with_state(State{route_table, config});
 
     // let server_instance = server::init(route_table);
     server.at("*route").get(handler);
     server.at("").get(handler);
-    server.listen("0.0.0.0:8080").await;
+    server.listen(listen_addr).await;
 }
