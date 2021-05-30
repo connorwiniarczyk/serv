@@ -1232,6 +1232,7 @@ dependencies = [
 name = "serv"
 version = "0.1.0"
 dependencies = [
+ "async-process",
  "async-std",
  "tide",
 ]

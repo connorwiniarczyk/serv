@@ -51,6 +51,7 @@ impl fmt::Debug for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let resolver_desc = match &self.resolver {
             Resolver::File{ path } => format!("file: {}", path),
+            _ => "other".to_string(),
         };
 
         write!(f, "{} --> {}", self.path, resolver_desc)
@@ -61,6 +62,7 @@ impl fmt::Display for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let resolver_desc = match &self.resolver {
             Resolver::File{ path } => "file",
+            _ => "other",
         };
 
         write!(f, "({} --> {})", self.path, resolver_desc)
@@ -72,8 +74,10 @@ async fn main() {
 
     let mut route_table: Vec<Route> = vec![];
     route_table.push(Route::new("/", Resolver::File{ path: "/home/connor/projects/serv/public/index.html".to_string() }));
+    route_table.push(Route::new("/shell", Resolver::Exec{ path: "/home/connor/projects/serv/public/shell_example".to_string() }));
+    route_table.push(Route::new("/date", Resolver::Exec{ path: "date".to_string() }));
 
-    println!("{:?}", route_table);
+    println!("{:#?}", route_table);
 	let mut server = tide::with_state(State{route_table});
 
     // let server_instance = server::init(route_table);
