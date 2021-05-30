@@ -55,10 +55,11 @@ impl fmt::Debug for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let resolver_desc = match &self.resolver {
             Resolver::File{ path } => format!("file: {}", path),
+            Resolver::Exec{ path } => format!("exec: *{}", path),
             _ => "other".to_string(),
         };
 
-        write!(f, "{} --> {}", self.path, resolver_desc)
+        write!(f, "{:<8} {:^5} {}", self.path, "-->", resolver_desc)
     }
 }
 
@@ -66,6 +67,7 @@ impl fmt::Display for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let resolver_desc = match &self.resolver {
             Resolver::File{ path } => "file",
+            Resolver::Exec{ path } => "exec",
             _ => "other",
         };
 
