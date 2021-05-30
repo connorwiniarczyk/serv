@@ -4,15 +4,19 @@
 use tide::Request;
 use tide::Response;
 use std::fs;
+use async_process::Command;
+
+use crate::config::Config;
 
 #[derive(Debug, Clone)]
 pub enum Resolver {
     File { path: String },
     Exec { path: String },
-    // Exec { path: String, args: Vec<String> }, TODO
+    // Dir  { path: String },
 }
-pub fn resolve_file(path: &str) -> tide::Result {
-    let text = fs::read_to_string(path)?;
+pub fn resolve_file(file: &str, config: &Config ) -> tide::Result {
+    let path = format!("{}/{}", config.root, file);
+    let text = fs::read_to_string(&path)?;
     let response = Response::builder(200)
         .body(text)
         .header("content-type", "text")
@@ -20,8 +24,8 @@ pub fn resolve_file(path: &str) -> tide::Result {
     Ok(response)
 }
 
-use async_process::Command;
-pub async fn resolve_exec(path: &str, args: &Vec<String>) -> tide::Result {
+pub async fn resolve_exec(file: &str, args: &Vec<String>, config: &Config) -> tide::Result {
+    let path = format!("{}/{}", config.root, file);
     let output_raw = Command::new(path).args(args).output().await?;
     let output = std::str::from_utf8(&output_raw.stdout)?;
 
@@ -32,11 +36,18 @@ pub async fn resolve_exec(path: &str, args: &Vec<String>) -> tide::Result {
     Ok(response)
 }
 
+// Resolving full directories is complicated, I should brainstorm more before deciding on an
+// implementation
+// pub fn resolve_dir(path: &str, config: &Config) -> tide::Result {
+//     resolve_file(path, config)
+// }
+
 impl Resolver {
-    pub async fn resolve(&self) -> tide::Result {
+    pub async fn resolve(&self, config: &Config) -> tide::Result {
         match self {
-            Self::File { path } => resolve_file(path),
-            Self::Exec { path } => resolve_exec(path, &vec![]).await,
+            Self::File { path } => resolve_file(path, config),
+            Self::Exec { path } => resolve_exec(path, &vec![], config).await,
+            // Self::Dir  { path } => resolve_dir(path, config),
         }
     }
 }
