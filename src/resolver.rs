@@ -14,9 +14,13 @@ pub enum Resolver {
     Exec { path: String },
     // Dir  { path: String },
 }
+
 pub fn resolve_file(file: &str, config: &Config ) -> tide::Result {
-    let path = format!("{}/{}", config.root, file);
-    let text = fs::read_to_string(&path)?;
+    let mut path = config.root.clone();
+    path.push(file);
+    
+    // let path = format!("{}/{}", config.root, file);
+    let text = fs::read_to_string(path)?;
     let response = Response::builder(200)
         .body(text)
         .header("content-type", "text")
@@ -25,7 +29,9 @@ pub fn resolve_file(file: &str, config: &Config ) -> tide::Result {
 }
 
 pub async fn resolve_exec(file: &str, args: &Vec<String>, config: &Config) -> tide::Result {
-    let path = format!("{}/{}", config.root, file);
+    let mut path = config.root.clone();
+    path.push(file);
+
     let output_raw = Command::new(path).args(args).output().await?;
     let output = std::str::from_utf8(&output_raw.stdout)?;
 
