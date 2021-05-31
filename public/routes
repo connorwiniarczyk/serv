@@ -1,0 +1,4 @@
+# comments are ignored
+
+/	index.html
+/shell	shell_example # comments can come after a route

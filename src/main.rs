@@ -5,6 +5,7 @@ use tide::Response;
 
 mod resolver;
 mod config;
+mod routes_parser;
 
 use resolver::Resolver;
 use config::Config;
@@ -83,10 +84,13 @@ async fn main() {
         port: 8080,
     };
 
-    let mut route_table: Vec<Route> = vec![];
-    route_table.push(Route::new("/", Resolver::File{ path: "index.html".to_string() }));
-    route_table.push(Route::new("/shell", Resolver::Exec{ path: "shell_example".to_string() }));
-    route_table.push(Route::new("/date", Resolver::Exec{ path: "date".to_string() }));
+    let routefile = format!("{}/{}", &config.root, "routes");
+    let mut route_table = routes_parser::parse(&routefile);
+
+    // add extra routes manually
+    route_table.push(Route::new("/",        Resolver::file("index.html")));
+    route_table.push(Route::new("/shell",   Resolver::exec("shell_example")));
+    route_table.push(Route::new("/date",    Resolver::exec("date")));
 
     let listen_addr = format!("0.0.0.0:{}", &config.port);
 

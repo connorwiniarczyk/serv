@@ -50,5 +50,13 @@ impl Resolver {
             // Self::Dir  { path } => resolve_dir(path, config),
         }
     }
+
+    pub fn file(path: &str) -> Self {
+        Self::File{ path: path.to_string() }
+    }
+
+    pub fn exec(path: &str) -> Self {
+        Self::Exec{ path: path.to_string() }
+    }
 }
 
