@@ -5,8 +5,9 @@ use tide::Response;
 
 mod resolver;
 mod config;
-mod routes_parser;
+mod route_table;
 
+use route_table::Route;
 use resolver::Resolver;
 use config::Config;
 
@@ -38,64 +39,35 @@ pub struct State{
     config: Config,
 }
 
-#[derive(Clone)]
-pub struct Route{
-    path: String,
-    resolver: Resolver,
-}
-
-impl Route {
-    fn new(path: &str, resolver: Resolver) -> Self {
-        Self{ path: path.to_string(), resolver }
-    }
-}
-
-use std::fmt;
-
-impl fmt::Debug for Route {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let resolver_desc = match &self.resolver {
-            Resolver::File{ path } => format!("file: {}", path),
-            Resolver::Exec{ path } => format!("exec: *{}", path),
-            _ => "other".to_string(),
-        };
-
-        write!(f, "{:<8} {:^5} {}", self.path, "-->", resolver_desc)
-    }
-}
-
-impl fmt::Display for Route {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let resolver_desc = match &self.resolver {
-            Resolver::File{ path } => "file",
-            Resolver::Exec{ path } => "exec",
-            _ => "other",
-        };
-
-        write!(f, "({} --> {})", self.path, resolver_desc)
-    }
-}
 
 #[async_std::main]
 async fn main() {
 
+    let path = "/home/connor/projects/serv/public";
+    let path_absolute = std::fs::canonicalize(path).unwrap();
+
     let config = Config {
-        root: "/home/connor/projects/serv/public".to_string(),
+        root: path_absolute,
         port: 8080,
     };
 
-    let routefile = format!("{}/{}", &config.root, "routes");
-    let mut route_table = routes_parser::parse(&routefile);
+    let mut routefile = config.root.clone();
+    routefile.push("routes");
+
+    // let routefile = format!("{}/{}", &config.root, "routes");
+
+    // let mut route_table = route_table::RouteTable::with_root(&config.root);
+    let route_table = route_table::RouteTable::from_file(&routefile);
 
     // add extra routes manually
-    route_table.push(Route::new("/",        Resolver::file("index.html")));
-    route_table.push(Route::new("/shell",   Resolver::exec("shell_example")));
-    route_table.push(Route::new("/date",    Resolver::exec("date")));
+    // route_table.add(Route::new("/",        Resolver::file("index.html")));
+    // route_table.add(Route::new("/shell",   Resolver::exec("shell_example")));
+    // route_table.add(Route::new("/date",    Resolver::exec("date")));
 
     let listen_addr = format!("0.0.0.0:{}", &config.port);
 
-    println!("{:#?}", route_table);
-	let mut server = tide::with_state(State{route_table, config});
+    println!("{:#?}", route_table.table);
+	let mut server = tide::with_state(State{route_table: route_table.table, config});
 
     // let server_instance = server::init(route_table);
     server.at("*route").get(handler);
