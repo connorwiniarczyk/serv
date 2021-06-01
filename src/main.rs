@@ -23,7 +23,7 @@ pub async fn handler(request: Request<State>) -> tide::Result {
     for Route { path, resolver } in &state.route_table {
         println!("{:#?}", path);
         if path == &route {
-            println!("{:#?}", path);
+            println!("{:#?}", resolver);
             
             let out = resolver.resolve(&state.config).await;
             return out
@@ -54,15 +54,8 @@ async fn main() {
     let mut routefile = config.root.clone();
     routefile.push("routes");
 
-    // let routefile = format!("{}/{}", &config.root, "routes");
-
     // let mut route_table = route_table::RouteTable::with_root(&config.root);
     let route_table = route_table::RouteTable::from_file(&routefile);
-
-    // add extra routes manually
-    // route_table.add(Route::new("/",        Resolver::file("index.html")));
-    // route_table.add(Route::new("/shell",   Resolver::exec("shell_example")));
-    // route_table.add(Route::new("/date",    Resolver::exec("date")));
 
     let listen_addr = format!("0.0.0.0:{}", &config.port);
 
