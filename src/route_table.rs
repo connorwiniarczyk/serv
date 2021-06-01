@@ -8,7 +8,8 @@ use std::io::{BufRead, BufReader};
 use regex::Regex;
 use lazy_static::lazy_static;
 
-use std::path::PathBuf;
+use std::fmt;
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Route{
@@ -18,20 +19,16 @@ pub struct Route{
 
 impl Route {
     pub fn new(path: &str, resolver: Resolver) -> Self {
-        Self{ path: path.to_string(), resolver }
+        Self { path: path.to_string(), resolver }
     }
 }
 
 pub struct RouteTable {
-    pub root: PathBuf, // the root path
+    // pub root: PathBuf, // the root path
     pub table: Vec<Route>,
 }
 
 impl RouteTable {
-    pub fn with_root (root: PathBuf) -> Self {
-        Self { root, table: vec![] }
-    }
-
     pub fn add(&mut self, route: Route ) {
        self.table.push( route ); 
     }
@@ -53,28 +50,19 @@ impl RouteTable {
         }
     }
 
-    pub fn from_file(routefile: &PathBuf) -> Self {
+    pub fn from_file(path: &Path) -> Self {
 
-        let file = File::open(routefile).unwrap();    
+        let file = File::open(path).unwrap();    
         let reader = BufReader::new(file);
 
-        let mut root = routefile.clone();
-        root.pop();
+        let mut output = Self { table: vec![] };
 
-        let mut output = Self {
-            root: root,
-            table: vec![],
-        };
+        for(index, line) in reader.lines().enumerate() {
 
-        for ( index, line ) in reader.lines().enumerate() {
+            let line = line.unwrap_or(String::new());
 
-            // TODO: make these math expressions prettier, preferably one liners
-            let line = match line {
-                Ok(line) => line,
-                Err(_) => continue,
-            };
-
-            let ( mut route, mut handler, flags ) = match Self::parse_line(&line, index){
+            // TODO: make this match expression prettier, preferably a one liner
+            let ( route, handler, flags ) = match Self::parse_line(&line, index){
                 Some(value) => value,
                 None => continue,
             };
@@ -82,18 +70,17 @@ impl RouteTable {
             let resolver = match flags.as_str() {
                 "f" => Resolver::file(&handler),
                 "x" => Resolver::exec(&handler),
-                _   => Resolver::file(&handler),
+                 _  => Resolver::file(&handler),
             };
 
             let new_route = Route { path: route, resolver };
-            output.table.push(new_route);
+            output.add(new_route);
         }
 
-        output
+        return output
     }
 }
 
-use std::fmt;
 
 impl fmt::Debug for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
