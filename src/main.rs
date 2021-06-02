@@ -6,6 +6,7 @@ use tide::Response;
 mod resolver;
 mod config;
 mod route_table;
+mod path;
 
 use route_table::Route;
 use resolver::Resolver;
