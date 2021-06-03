@@ -45,6 +45,17 @@ impl PartialEq<&str> for PathNode {
 
 impl PartialEq<&str> for Path {
     fn eq(&self, other: &&str) -> bool {
+
+        // Immediately return false if their lengths do not match
+        // prevents /one/two from equaling /one/two/three because of the 
+        // way the zip function works
+        //
+        // TODO: this needs to be cleaned up
+        // I should try switching to the itertools crate at some point
+        if other.split("/").collect::<Vec<&str>>().len() != self.inner_path().len() {
+            return false;
+        }
+
         self.inner_path().iter()
             .zip(other.split("/"))
             .all(|(x, y)| x == &y)
@@ -67,7 +78,7 @@ impl fmt::Display for PathNode {
 impl fmt::Display for Path {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let out = self.inner_path().iter().skip(1)
-            .fold("/".to_string(), |acc, x| format!("{}/{}", acc, x));
+            .fold(String::new(), |acc, x| format!("{}/{}", acc, x));
 
         write!(f, "{}", out)
     }
@@ -90,6 +101,12 @@ mod tests {
     }
 
     #[test]
+    fn string_conversion() {
+        let test_path = "/abcd/*/test";
+        assert_eq!(test_path, Path::new(test_path).to_string());
+    }
+
+    #[test]
     fn node_equality() {
         assert_eq!(PathNode::Wild, "abcd");
         assert_eq!(PathNode::Defined("abcd".to_string()), "abcd");
@@ -107,5 +124,14 @@ mod tests {
         assert_eq!(Path::new("/*/abcd"), "/test/abcd");
         assert_eq!(Path::new("/*/*"), "/test/abcd");
         assert_ne!(Path::new("/*/abcd"), "/test/test");
+
+    }
+
+    #[test]
+    /// More specific paths should not be considered equal to less specific
+    /// ones with the same prefix.
+    fn specificity() {
+        assert_ne!(Path::new("/one/two/three"), "/one/two");
+        assert_ne!(Path::new("/one/two"), "/one/two/three");
     }
 }
