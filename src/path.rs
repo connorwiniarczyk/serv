@@ -8,9 +8,10 @@
 
 #[derive(Debug)]
 pub enum PathNode {
-    Some(String),
+    Defined(String),
     Wild,
 }
+
 
 #[derive(Debug)]
 pub struct Path (Vec<PathNode>);
@@ -19,36 +20,36 @@ impl Path {
     pub fn new(path: &str) -> Self {
         let mut output: Vec<PathNode> = vec![];
         for node in path.split("/") {
-            println!("{}", node); 
-
             output.push( match node {
                 "*" => PathNode::Wild,
-                value  => PathNode::Some(value.to_string()),
+                value  => PathNode::Defined(value.to_string()),
             })
         }
 
-        println!(""); 
-
         Path(output)
+    }
+
+    pub fn inner_path(&self) -> &Vec<PathNode> {
+        return &self.0;
+    }
+}
+
+// Implements Equality between Paths and Strings, with special cases
+// for Wildcards included
+impl PartialEq<&str> for PathNode {
+    fn eq(&self, other: &&str) -> bool {
+        match self {
+            PathNode::Defined(path_node) => path_node == other, 
+            PathNode::Wild => true,
+        }
     }
 }
 
 impl PartialEq<&str> for Path {
     fn eq(&self, other: &&str) -> bool {
-
-        let nodes = self.0.iter().zip(other.split("/"));
-        
-        for ( path_node, str_node ) in nodes {
-            
-            let eq: bool = match path_node {
-               PathNode::Some(path_node) => path_node == str_node, 
-               PathNode::Wild => true,
-            };
-
-            if !eq { return false; }
-        }
-
-        return true;
+        self.inner_path().iter()
+            .zip(other.split("/"))
+            .all(|(x, y)| x == &y)
     }
 
 }
@@ -67,6 +68,14 @@ mod tests {
     }
 
     #[test]
+    fn node_equality() {
+        assert_eq!(PathNode::Wild, "abcd");
+        assert_eq!(PathNode::Defined("abcd".to_string()), "abcd");
+        assert_eq!(PathNode::Wild, "abcd");
+        assert_eq!(PathNode::Wild, "abcd");
+    }
+
+    #[test]
     fn equality() {
         assert_eq!(Path::new("/test/abcd"), "/test/abcd");
         assert_ne!(Path::new("/test/abc"), "/test/abcd");
@@ -76,8 +85,5 @@ mod tests {
         assert_eq!(Path::new("/*/abcd"), "/test/abcd");
         assert_eq!(Path::new("/*/*"), "/test/abcd");
         assert_ne!(Path::new("/*/abcd"), "/test/test");
-
-        assert_ne!(Path::new("/"), "");
-           
     }
 }
