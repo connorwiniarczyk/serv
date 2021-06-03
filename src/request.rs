@@ -6,14 +6,13 @@
 ///
 /// The type implements PartialEq<&str> in order to facilitate matching
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PathNode {
     Defined(String),
     Wild,
 }
 
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Path (Vec<PathNode>);
 
 impl Path {
@@ -28,7 +27,6 @@ impl Path {
 
         Path(output)
     }
-
     pub fn inner_path(&self) -> &Vec<PathNode> {
         return &self.0;
     }
@@ -53,6 +51,30 @@ impl PartialEq<&str> for Path {
     }
 
 }
+
+use std::fmt;
+
+// Implement Display for Paths and PathNodes
+impl fmt::Display for PathNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Defined(value) => write!(f, "{}", value),
+            Self::Wild => write!(f, "*"),
+        }
+    }
+}
+
+impl fmt::Display for Path {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let out = self.inner_path().iter().skip(1)
+            .fold("/".to_string(), |acc, x| format!("{}/{}", acc, x));
+
+        write!(f, "{}", out)
+    }
+}
+
+
+
 
 
 #[cfg(test)]

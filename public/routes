@@ -1,5 +1,3 @@
 # comments are ignored
 
-/			index.html    	f
-/shell		shell_example 	x   # comments can come after a route
-/js			js				x
+/*			index.html    	f

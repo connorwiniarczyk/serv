@@ -6,7 +6,7 @@ use tide::Response;
 mod resolver;
 mod config;
 mod route_table;
-mod path;
+mod request;
 
 use route_table::Route;
 use resolver::Resolver;
@@ -21,9 +21,9 @@ pub async fn handler(request: Request<State>) -> tide::Result {
     route = ["/", &route].join("");
 
     // look for a route in the route table that satisfies the request
-    for Route { path, resolver } in &state.route_table {
-        println!("{:#?}", path);
-        if path == &route {
+    for Route { request, resolver } in &state.route_table {
+        println!("{:#?}", request);
+        if request == &route.as_str() {
             println!("{:#?}", resolver);
             
             let out = resolver.resolve(&state.config).await;
