@@ -11,15 +11,17 @@ use lazy_static::lazy_static;
 use std::fmt;
 use std::path::Path;
 
+use crate::request;
+
 #[derive(Clone)]
-pub struct Route{
-    pub path: String,
+pub struct Route {
+    pub request: request::Path,
     pub resolver: Resolver,
 }
 
 impl Route {
     pub fn new(path: &str, resolver: Resolver) -> Self {
-        Self { path: path.to_string(), resolver }
+        Self { request: request::Path::new(path), resolver }
     }
 }
 
@@ -62,10 +64,12 @@ impl RouteTable {
             let line = line.unwrap_or(String::new());
 
             // TODO: make this match expression prettier, preferably a one liner
-            let ( route, handler, flags ) = match Self::parse_line(&line, index){
+            let ( request_path, handler, flags ) = match Self::parse_line(&line, index){
                 Some(value) => value,
                 None => continue,
             };
+
+            let request = request::Path::new(&request_path);
 
             let resolver = match flags.as_str() {
                 "f" => Resolver::file(&handler),
@@ -73,14 +77,13 @@ impl RouteTable {
                  _  => Resolver::file(&handler),
             };
 
-            let new_route = Route { path: route, resolver };
+            let new_route = Route { request, resolver };
             output.add(new_route);
         }
 
         return output
     }
 }
-
 
 impl fmt::Debug for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -90,7 +93,7 @@ impl fmt::Debug for Route {
             _ => "other".to_string(),
         };
 
-        write!(f, "{:<8} {:^5} {}", self.path, "-->", resolver_desc)
+        write!(f, "{:<8} {:^5} {}", self.request, "-->", resolver_desc)
     }
 }
 
@@ -102,7 +105,7 @@ impl fmt::Display for Route {
             _ => "other".to_string(),
         };
 
-        write!(f, "{:<8} {:^5} {}", self.path, "-->", resolver_desc)
+        write!(f, "{:<8} {:^5} {}", self.request, "-->", resolver_desc)
     }
 }
 
