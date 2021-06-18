@@ -6,4 +6,5 @@ use std::path::PathBuf;
 pub struct Config {
     pub root: PathBuf,    
     pub port: u32,
+    pub host: String,
 }
