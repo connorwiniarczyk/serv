@@ -11,8 +11,8 @@ system, followed by a preprocessor.
 
 Preprocessors can be one of:
 
-- f (file): serve this as is
-- x (exec): attempt to execute this file and return whatever the result is
+- `f (file)`: serve this as is
+- `x (exec)`: attempt to execute this file and return whatever the result is
 
 With the idea that this list could be added to as needed. I eventually want to
 add preprocessors for Markdown and Handlebars rendering, serving full
