@@ -11,17 +11,17 @@ use lazy_static::lazy_static;
 use std::fmt;
 use std::path::Path;
 
-use crate::request;
+use crate::path_expression::PathExpr;
 
 #[derive(Clone)]
 pub struct Route {
-    pub request: request::Path,
+    pub request: PathExpr,
     pub resolver: Resolver,
 }
 
 impl Route {
     pub fn new(path: &str, resolver: Resolver) -> Self {
-        Self { request: request::Path::new(path), resolver }
+        Self { request: PathExpr::new(path), resolver }
     }
 }
 
@@ -69,7 +69,7 @@ impl RouteTable {
                 None => continue,
             };
 
-            let request = request::Path::new(&request_path);
+            let request = PathExpr::new(&request_path);
 
             let resolver = match flags.as_str() {
                 "f" => Resolver::file(&handler),
