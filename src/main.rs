@@ -8,7 +8,7 @@ use std::path::Path;
 mod resolver;
 mod config;
 mod route_table;
-mod request;
+mod path_expression;
 
 use route_table::Route;
 use resolver::Resolver;
