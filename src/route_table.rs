@@ -54,7 +54,7 @@ impl RouteTable {
 
     pub fn from_file(path: &Path) -> Self {
 
-        let file = File::open(path).unwrap();    
+        let file = File::open(path).expect("There is no `routes` file in this directory");    
         let reader = BufReader::new(file);
 
         let mut output = Self { table: vec![] };

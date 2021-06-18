@@ -1,7 +1,9 @@
 #![allow(dead_code, unused_results, unused_must_use, unused_variables)]
 use async_std;
 use tide::Request;
-use tide::Response;
+use clap::clap_app;
+use std::env::current_dir;
+use std::path::Path;
 
 mod resolver;
 mod config;
@@ -44,21 +46,42 @@ pub struct State{
 #[async_std::main]
 async fn main() {
 
-    let path = "/home/connor/projects/serv/public";
-    let path_absolute = std::fs::canonicalize(path).unwrap();
+    // Define this programs arguments
+    let matches = clap_app!(serv =>
+        (version: "0.1")
+        (author: "")
+        (about: "A Web Server")
+        (@arg port: -p --port +takes_value "which tcp port to listen on")
+        (@arg host: -h --host +takes_value "which ip addresses to accept connections from")
+        (@arg debug: -d ... "Sets the level of debugging information")
+        (@arg PATH: "the directory to serve files from")
+    ).get_matches();
+
+    let port = matches.value_of("port").unwrap_or("4000");
+    let host = matches.value_of("host").unwrap_or("0.0.0.0");
+
+    // Determine the local path to serve files out of 
+    let path = Path::new(matches.value_of("PATH").unwrap_or("."));
+
+    // if the path given has a root, ie. /home/www/public, use it as is,
+    // if not, ie. server/public join it to the end of the current directory
+    let path_abs = match path.has_root() {
+        true => path.to_path_buf(),
+        false => current_dir().unwrap().join(path),
+    }.canonicalize().unwrap();
+
+    println!("{:?}", path_abs);
 
     let config = Config {
-        root: path_absolute,
-        port: 8080,
+        root: path_abs,
+        port: port.parse().unwrap(), // parse port value into an integer
+        host: host.to_string(),
     };
 
-    let mut routefile = config.root.clone();
-    routefile.push("routes");
-
-    // let mut route_table = route_table::RouteTable::with_root(&config.root);
+    let routefile = config.root.join("routes");
     let route_table = route_table::RouteTable::from_file(&routefile);
 
-    let listen_addr = format!("0.0.0.0:{}", &config.port);
+    let listen_addr = format!("{}:{}", &config.host, &config.port);
 
     println!("{:#?}", route_table.table);
 	let mut server = tide::with_state(State{route_table: route_table.table, config});
