@@ -41,7 +41,7 @@ impl PathMatch {
                 Node::Defined(node) => node,
                 Node::Wild => wilds.next().unwrap(),
             })
-            .fold(String::new(), |acc, x| acc + x + "/");
+            .fold(String::new(), |acc, x| acc + "/" + x);
             
         println!("{:?}", out);
         PathBuf::from(out)
