@@ -21,15 +21,14 @@ pub async fn handler(request: Request<State>) -> tide::Result {
     // let mut path = request.param("route").unwrap().to_string();
     let mut route = request.param("route").unwrap_or("").to_string();
     route = ["/", &route].join("");
+    println!("{:?}", route);
 
     // look for a route in the route table that satisfies the request
     for Route { request, resolver } in &state.route_table {
-        println!("{:#?}", request);
-        if request == &route.as_str() {
-            println!("{:#?}", resolver);
-            
-            let out = resolver.resolve(&state.config).await;
-            return out
+        // println!("{:?},{:?}", request, resolver);
+        if let Some(path_match) = request.match_request(&route.as_str()){
+            println!("{:?}", path_match);
+            return resolver.resolve(path_match, &state.config).await;
         }
     }
 
