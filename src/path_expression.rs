@@ -8,10 +8,44 @@
 ///
 /// The type implements PartialEq<&str> in order to facilitate matching
 
+use std::path::{Path, PathBuf};
+
+
 #[derive(Debug, Clone)]
 pub enum Node {
     Defined(String),
     Wild,
+}
+
+impl Node {
+    pub fn from_str(input: &str) -> Self {
+        match input {
+            "*" => Self::Wild,
+            value => Self::Defined(value.to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PathMatch {
+    wildcards: Vec<String>,
+}
+
+impl PathMatch {
+    pub fn to_path(self, template: &PathExpr) -> PathBuf {
+
+        let mut wilds = self.wildcards.iter();
+
+        let out: String = template.inner.iter()
+            .map(|node| match node {
+                Node::Defined(node) => node,
+                Node::Wild => wilds.next().unwrap(),
+            })
+            .fold(String::new(), |acc, x| acc + x + "/");
+            
+        println!("{:?}", out);
+        PathBuf::from(out)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -21,19 +55,36 @@ pub struct PathExpr {
 
 impl PathExpr {
     pub fn new(path: &str) -> Self {
-        let mut output: Vec<Node> = vec![];
-        for node in path.split("/") {
-            output.push( match node {
-                "*" => Node::Wild,
-                value  => Node::Defined(value.to_string()),
-            })
-        }
 
-        PathExpr{ inner: output }
+        let mut inner: Vec<Node> = path.split("/").map(Node::from_str).collect(); 
+        // if inner[0] == "" { inner[0] = Node::Defined("/".to_string()) };
+        Self { inner }
     }
 
     pub fn inner_path(&self) -> &Vec<Node> {
         return &self.inner;
+    }
+
+    // TODO: this should return a Result type with error information
+    pub fn match_request( &self, request: &str ) -> Option<PathMatch> {
+
+        let mut wildcards: Vec<String> = vec![];
+
+        let path_nodes = request.split("/");
+        let zipped_nodes = self.inner.iter().zip(path_nodes);
+
+        for ( left, right ) in zipped_nodes {
+            println!("{:?}, {:?}", left, right);
+
+            match left {
+                Node::Defined( left ) => {
+                    if left != right { return None; }
+                },
+                Node::Wild => { wildcards.push(right.to_string()) },
+            }
+        };
+
+        return Some(PathMatch{ wildcards })
     }
 }
 
@@ -45,12 +96,6 @@ impl PartialEq<&str> for Node {
             Node::Defined(path_node) => path_node == other, 
             Node::Wild => true,
         }
-    }
-}
-
-impl PartialEq<Self> for Node {
-    fn eq(&self, other: &Self) -> bool {
-        true
     }
 }
 
@@ -95,7 +140,30 @@ impl fmt::Display for PathExpr {
     }
 }
 
+#[cfg(test)]
+mod path_matching {
+    use super::*;
 
+    #[test]
+    fn one() {
+        let expr = PathExpr::new("/one/two/*");
+        let out = expr.match_request("/one/two/three").unwrap();
+        let new_path = out.to_path(&PathExpr::new("/*/one/two"));
+
+        assert_eq!(new_path, PathBuf::from("/three/one/two"));
+    }
+
+    #[test]
+    fn two() {
+        let left = PathExpr::new("/one/*/two")
+            .match_request("/one/test/two").unwrap()
+            .to_path(&PathExpr::new("*"));
+
+        let right = PathBuf::from("test");
+        assert_eq!(left, right);
+    }
+
+}
 
 
 
