@@ -12,21 +12,51 @@ use std::fmt;
 use std::path::Path;
 
 use crate::path_expression::PathExpr;
+use crate::resolver::Access;
+use crate::resolver::Options;
+
 
 #[derive(Clone)]
 pub struct Route {
     pub request: PathExpr,
-    pub resolver: Resolver,
+    pub resource: PathExpr,
+    pub options: Options,
 }
 
 impl Route {
-    pub fn new(path: &str, resolver: Resolver) -> Self {
-        Self { request: PathExpr::new(path), resolver }
+    pub fn new(request: &str, resource: &str, options: &str) -> Self {
+        Self {
+            request: PathExpr::new(request),
+            resource: PathExpr::new(resource),
+            options: Options::from_str(options),
+        }
     }
+
+    fn from_line(line: &str) -> Option<Self> {
+
+        lazy_static! {
+           static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
+           static ref LINE: Regex = Regex::new(r"([^\s]+)\s+([^\s]+)\s+(.*?)$").unwrap();
+        }
+         
+        // remove comments
+        let stripped_line = COMMENT.replace(line, "");
+
+        let captures = LINE.captures(&stripped_line)?;
+
+        println!("{:?}", &captures[3]);
+        let out = Self::new(
+            &captures[1],
+            &captures[2],
+            &captures[3],
+        );
+
+        Some(out)
+    }
+
 }
 
 pub struct RouteTable {
-    // pub root: PathBuf, // the root path
     pub table: Vec<Route>,
 }
 
@@ -35,77 +65,42 @@ impl RouteTable {
        self.table.push( route ); 
     }
 
-    fn parse_line(line: &str, index: usize) -> Option<(String, String, String)> {
-
-        lazy_static! {
-           static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
-           static ref LINE: Regex = Regex::new(r"([^\s]+)\s+([^\s]+)\s+([x,f]?)").unwrap();
-        }
-         
-        // remove comments
-        let stripped_line = COMMENT.replace(line, "");
-
-        if let Some(captures) = LINE.captures(&stripped_line) {
-            return Some((captures[1].to_string(), captures[2].to_string(), captures[3].to_string())); 
-        } else {
-            return None
-        }
-    }
-
     pub fn from_file(path: &Path) -> Self {
 
         let file = File::open(path).expect("There is no `routes` file in this directory");    
         let reader = BufReader::new(file);
 
-        let mut output = Self { table: vec![] };
+        let output = reader.lines()
+            .map(|x| x.unwrap_or(String::new()))
+            .map(|x| Route::from_line(&x))
+            .filter_map(|x| x) // this is a concise way of stripping None values while unwrapping the Some values
+            .collect();
 
-        for(index, line) in reader.lines().enumerate() {
-
-            let line = line.unwrap_or(String::new());
-
-            // TODO: make this match expression prettier, preferably a one liner
-            let ( request_path, handler, flags ) = match Self::parse_line(&line, index){
-                Some(value) => value,
-                None => continue,
-            };
-
-            let request = PathExpr::new(&request_path);
-
-            let resolver = match flags.as_str() {
-                "f" => Resolver::file(&handler),
-                "x" => Resolver::exec(&handler),
-                 _  => Resolver::file(&handler),
-            };
-
-            let new_route = Route { request, resolver };
-            output.add(new_route);
-        }
-
-        return output
+        Self { table: output }
     }
 }
 
 impl fmt::Debug for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let resolver_desc = match &self.resolver {
-            Resolver::File{ path } => format!("file: {}", path),
-            Resolver::Exec{ path } => format!("exec: *{}", path),
-            _ => "other".to_string(),
-        };
-
-        write!(f, "{:<8} {:^5} {}", self.request, "-->", resolver_desc)
+        write!(f, "{:<8} {:^5} {}", self.request, "-->", self.resource)
     }
 }
 
 impl fmt::Display for Route {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let resolver_desc = match &self.resolver {
-            Resolver::File{ path } => format!("file: {}", path),
-            Resolver::Exec{ path } => format!("exec: *{}", path),
-            _ => "other".to_string(),
-        };
-
-        write!(f, "{:<8} {:^5} {}", self.request, "-->", resolver_desc)
+        write!(f, "{:<8} {:^5} {}", self.request, "-->", self.resource)
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_line() {
+       panic!(); 
+    }
+
 }
 

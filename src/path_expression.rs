@@ -28,7 +28,7 @@ impl Node {
 
 #[derive(Debug, Clone)]
 pub struct PathMatch {
-    wildcards: Vec<String>,
+    pub wildcards: Vec<String>,
 }
 
 impl PathMatch {
