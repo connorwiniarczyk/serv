@@ -11,6 +11,7 @@ clap="2.33"
 tide="0.16.0"
 async-std={version="1.6.2", features=["attributes"]}
 async-process="1.1.0"
+http="0.2.4"
 
 regex="1"
 lazy_static="1"

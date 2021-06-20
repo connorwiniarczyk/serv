@@ -1,7 +1,14 @@
-# comments are ignored
 
-/         index.html      f
-/shell    shell_example   x   # comments can come after a route
-/js       js              x
+/         index.html      read
+/shell    shell_example   exec(test)
+/js       js             f 
 
-/media/* *	f
+
+# param example
+/test/*/*	 shell_echo	exec(query:first wild:0)
+
+# root path
+/root	/home/connor/projects/serv/public/index.html
+
+
+/media/* *  f
