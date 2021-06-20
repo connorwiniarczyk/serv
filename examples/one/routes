@@ -1,0 +1,7 @@
+# Serve HTML, CSS, JS files
+/           index.html      read
+/styles/*   css/*           read
+/scripts/*  javascript/*	read
+
+# Markdown Renderer
+/content/*	render.sh	exec(wild:0)
