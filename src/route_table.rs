@@ -12,8 +12,8 @@ use std::fmt;
 use std::path::Path;
 
 use crate::path_expression::PathExpr;
-use crate::resolver::Access;
-use crate::resolver::Options;
+use crate::options::Access;
+use crate::options::Options;
 
 
 #[derive(Clone)]

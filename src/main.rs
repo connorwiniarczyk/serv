@@ -6,7 +6,7 @@ use std::env::current_dir;
 use std::path::Path;
 use async_process::Command;
 
-mod resolver;
+mod options;
 mod config;
 mod route_table;
 mod path_expression;
@@ -15,9 +15,9 @@ use route_table::Route;
 use config::Config;
 
 use tide::Response;
-use resolver::Access;
+use options::Access;
 use std::fs;
-use resolver::Arg;
+use options::Arg;
 
 use tide::http::Url;
 use std::collections::HashMap;
