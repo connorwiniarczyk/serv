@@ -5,7 +5,7 @@ in Rust, but this one is mine. My goal for it is to have an HTTP server that
 expresses routes as concisely as possible, while still being flexible enough
 to produce complex APIs with arbitrary behavior.
 
-Routes are defined with a single line in a file called `routes`. `routes` is a
+Each route is defined with a line in a file called `routes`. `routes` is a
 whitespace separated values file where the first column represents potential
 HTTP requests, the second column represents the corresponding resource on the
 host system, and the remaining columns are a list of zero or more options.
