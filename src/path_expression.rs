@@ -26,65 +26,91 @@ impl Node {
     }
 }
 
+macro_rules! replace_if_wild {
+    ($value:ident, take_from=$wilds:ident) => { match $value {
+        Node::Defined(val) => val,
+        Node::Wild => $wilds.next().unwrap(),
+    }} 
+}
+
 #[derive(Debug, Clone)]
-pub struct PathMatch {
+pub struct PathMatch<'a> {
+    pub path: &'a PathExpr, // the path that was used to generate this PathMatch
+    pub request: &'a str, // the input that was used
     pub wildcards: Vec<String>,
 }
 
-impl PathMatch {
-    pub fn to_path(self, template: &PathExpr) -> PathBuf {
+impl PathMatch<'_>{
+    pub fn to_path(&self, template: &PathExpr) -> PathBuf {
 
         let mut wilds = self.wildcards.iter();
 
-        let out: String = template.inner.iter()
-            .map(|node| match node {
-                Node::Defined(node) => node,
-                Node::Wild => wilds.next().unwrap(),
-            })
-            .fold(String::new(), |acc, x| acc + "/" + x);
-            
-        println!("{:?}", out);
-        PathBuf::from(out)
+        // if the PathExpr template is global, make the resulting PathBuf global as well by
+        // prefixing it with "/", otherwise, just use ""
+        let prefix = match template.is_global {
+            true => Path::new("/").to_path_buf(),
+            false => Path::new("").to_path_buf(),
+        };
+
+        template.iter()
+            .map(|node| replace_if_wild!(node, take_from=wilds))
+            .fold(prefix, |acc, x| acc.join(&x))
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct PathExpr {
+    is_global: bool,
     inner: Vec<Node>,
 }
 
 impl PathExpr {
     pub fn new(path: &str) -> Self {
-
-        let mut inner: Vec<Node> = path.split("/").map(Node::from_str).collect(); 
-        // if inner[0] == "" { inner[0] = Node::Defined("/".to_string()) };
-        Self { inner }
+        let is_global = path.starts_with("/"); // paths are global if they start with "/"
+        let local_path = path.strip_prefix("/").unwrap_or(path); // remove the leading "/" if it exists
+        let inner: Vec<Node> = local_path.split("/").map(Node::from_str).collect(); 
+        Self { is_global, inner }
     }
 
     pub fn inner_path(&self) -> &Vec<Node> {
         return &self.inner;
     }
 
+    pub fn iter(&self) -> std::slice::Iter<Node> {
+        self.inner.iter()
+    }
+
     // TODO: this should return a Result type with error information
-    pub fn match_request( &self, request: &str ) -> Option<PathMatch> {
+    // TODO: I think PathMatch should work exclusively with &str and take a lifetime parameter
+    /// Match an http request against a PathExpr
+    /// If the paths match, returns a PathMatch struct with the corresponding vec of wildcards,
+    /// returns None otherwise
+    pub fn match_request<'a>(&'a self, request: &'a str) -> Option<PathMatch<'a>> {
 
-        let mut wildcards: Vec<String> = vec![];
+        let mut wildcards: Vec<&str> = vec![];
 
-        let path_nodes = request.split("/");
-        let zipped_nodes = self.inner.iter().zip(path_nodes);
+        println!("{}", request);
 
-        for ( left, right ) in zipped_nodes {
-            println!("{:?}, {:?}", left, right);
+        let path_nodes = request.strip_prefix("/").unwrap_or(request).split("/");
+        let zipped_nodes = self.iter().zip(path_nodes);
 
+        // if any left and right pair do not match, return None,
+        // if the left element is a Wild, add the corresponding right element to the wildcards vec
+        for (left, right) in zipped_nodes {
+            println!("{:?} {:?}", left, right);
             match left {
-                Node::Defined( left ) => {
-                    if left != right { return None; }
-                },
-                Node::Wild => { wildcards.push(right.to_string()) },
+                Node::Defined(left) => if left != right { return None; },
+                Node::Wild => { wildcards.push(right) },
             }
         };
 
-        return Some(PathMatch{ wildcards })
+        // convert wildcards to a vec of owned Strings
+        let owned_wildcards = wildcards
+            .into_iter()
+            .map(|x| x.to_string())
+            .collect();
+
+        return Some(PathMatch{ wildcards: owned_wildcards, request: &request, path: &self })
     }
 }
 
@@ -99,6 +125,7 @@ impl PartialEq<&str> for Node {
     }
 }
 
+// deprecated
 impl PartialEq<&str> for PathExpr {
     fn eq(&self, other: &&str) -> bool {
 
@@ -133,12 +160,19 @@ impl fmt::Display for Node {
 
 impl fmt::Display for PathExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let out = self.inner_path().iter().skip(1)
-            .fold(String::new(), |acc, x| format!("{}/{}", acc, x));
+        let prefix = match self.is_global { true => "/", false => "" };
+        let mut nodes = self.inner_path().iter();
 
-        write!(f, "{}", out)
+        let first = nodes.next().unwrap();
+        let path = nodes.fold(first.to_string(), |acc, x| format!("{}/{}", acc, x));
+
+        write!(f, "{}{}", prefix, path)
     }
 }
+
+// ----------
+// UNIT TESTS
+// ----------
 
 #[cfg(test)]
 mod path_matching {
@@ -165,8 +199,6 @@ mod path_matching {
 
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,8 +213,9 @@ mod tests {
 
     #[test]
     fn string_conversion() {
-        let test_path = "/abcd/*/test";
-        assert_eq!(test_path, PathExpr::new(test_path).to_string());
+        assert_eq!("/one/two", PathExpr::new("/one/two").to_string());
+        assert_eq!("two/three", PathExpr::new("two/three").to_string());
+        assert_ne!("/two/three", PathExpr::new("two/three").to_string());
     }
 
     #[test]
@@ -191,19 +224,6 @@ mod tests {
         assert_eq!(Node::Defined("abcd".to_string()), "abcd");
         assert_eq!(Node::Wild, "abcd");
         assert_eq!(Node::Wild, "abcd");
-    }
-
-    #[test]
-    fn equality() {
-        assert_eq!(PathExpr::new("/test/abcd"), "/test/abcd");
-        assert_ne!(PathExpr::new("/test/abc"), "/test/abcd");
-
-        // wildcards
-        assert_eq!(PathExpr::new("/test/*"), "/test/abcd");
-        assert_eq!(PathExpr::new("/*/abcd"), "/test/abcd");
-        assert_eq!(PathExpr::new("/*/*"), "/test/abcd");
-        assert_ne!(PathExpr::new("/*/abcd"), "/test/test");
-
     }
 
     #[test]
