@@ -69,17 +69,17 @@ implemented as a proof of concept:
 ### Options with Arguments
 
 Options can take arguments, which can sometimes have values. The syntax for
-this is as follows `<option>(<arg1>:<value1> <arg2>:<value2>)`. So for example:
+this is as follows `<option>(<arg1>:<value1> <arg2>:<value2>)`. So for example
+all of the following are valid options:
 ```
 exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 ```
-are all valid options. 
 
-The list of valid arguments for each option is outlined below:
+The valid arguments for each option are listed below below:
 
 `exec` : arguments to exec map parts of the http query to arguments that will
          get passed to the program being executed. The first argument will
-		 become $1, the second $2, etc.
+         become $1, the second $2, etc.
 
 - `query:<key>`  : Get the part of the http query string with the given key
 - `wild:<index>` : Get the part matched wildcard at the given index
