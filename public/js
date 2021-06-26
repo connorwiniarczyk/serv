@@ -1,9 +1,0 @@
-#!/usr/bin/node
-
-
-function print_test(amount) {
-		const nums = [1,2,3,4,5];
-		nums.map( console.log );
-}
-
-print_test(10)

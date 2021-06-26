@@ -1,5 +1,0 @@
-#!/bin/sh
-
-echo "global executables like 'date' no longer work. Use custom scripts or symbolic links instead"
-
-date
