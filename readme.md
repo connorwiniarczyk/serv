@@ -1,4 +1,4 @@
-## Serv
+# Serv
 
 Serv is a web server written in Rust. There are a lot of web servers written
 in Rust, but this one is mine. My goal for it is to have an HTTP server that
@@ -46,7 +46,7 @@ serv -p 3000 .
 curl localhost:3000
 ```
 
-### Options
+## Options
 
 The first option in the list is special and is referred to as the access type.
 There are two access type:
@@ -64,7 +64,7 @@ implemented as a proof of concept:
 - `header` : add a list of http headers to the response
 - `cors`   : add specific CORS related headers to the response
 
-#### Options with Arguments
+### Options with Arguments
 
 Options can take arguments, which can sometimes have values. The syntax for
 this is as follows `<option>(<arg1>:<value1> <arg2>:<value2>)`. So for example:
@@ -86,7 +86,7 @@ The list of valid arguments for each option is outlined below:
            in the response
 
 
-### Path Expressions
+## Path Expressions
 
 Both the request and resource paths can contain wildcards. ie. `/one/*/two`.
 In the request path, this indicates that it will match any request with the
@@ -99,7 +99,7 @@ will route the request `/styles/main.css` to `css/main.css`.
 
 
 
-### Routes Example 
+## Routes Example 
 
 ```
 # Routes example
