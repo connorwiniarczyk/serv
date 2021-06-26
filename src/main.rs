@@ -52,6 +52,8 @@ pub async fn handler(http_request: Request<State>) -> tide::Result {
     let mut route = http_request.param("route").unwrap_or("").to_string();
     route = ["/", &route].join("");
 
+    println!("{:?}", route);
+
     for route in state.route_table.iter() {
         if let Some(result) = route.resolve(&http_request).await {
             let mut output = Response::builder(200).body(result.body);

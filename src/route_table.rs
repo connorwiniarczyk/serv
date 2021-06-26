@@ -53,7 +53,7 @@ impl Route {
 
     pub async fn resolve(&self, request: &Request<State>) -> Option<Response> {
 
-        let path_match = self.request.match_request(request.param("route").ok()?)?;
+        let path_match = self.request.match_request(request.param("route").unwrap_or(""))?;
         let mut rendered_path = path_match.to_path(&self.resource);
 
         // prepend working directory if path is local
@@ -62,7 +62,7 @@ impl Route {
         }
 
         // debug information
-        println!("serving resource at path: \n{:?}", rendered_path);
+        println!("serving resource at path: {:?}", rendered_path);
 
         let mut output = match &self.options.access_type {
             Access::Read => std::fs::read_to_string(rendered_path).ok()?,
@@ -74,6 +74,7 @@ impl Route {
                     (_, _) => "",
                 }).collect();
 
+                // debug information
                 println!("executing with args: {:?}", rendered_args);
 
                 let output_raw = Command::new(&rendered_path).args(rendered_args).output().await.ok()?;
