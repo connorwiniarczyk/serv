@@ -25,6 +25,14 @@ C if it is important that they run fast, etc.
 
 ## Usage
 
+You'll need rust installed on your system in order to install serv. It can be 
+installed from [here](https://rustup.rs/) and by then running
+
+```bash
+rustup default nightly
+rustup update
+```
+
 ```bash
 # install using cargo
 cargo install --git https://github.com/connorwiniarczyk/serv.git
