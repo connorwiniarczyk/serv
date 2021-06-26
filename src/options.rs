@@ -117,6 +117,23 @@ pub enum Access {
     Exec(Vec<Arg>),
 }
 
+use crate::State;
+use crate::path_expression::PathMatch;
+use tide::Request;
+
+impl Access {
+
+    // TODO: I think it would be useful to move some code from the Route::resolve method to here,
+    // but I'm not sure how to do it best
+    fn exec(path: &PathMatch, args: &Vec<Arg>, request: &Request<State>) -> Option<Response> {
+        todo!();
+    }
+
+    pub fn apply(&self, path_match: &PathMatch, request: &Request<State>) -> Option<Response> {
+        todo!();
+    }
+}
+
 #[derive(Clone)]
 pub struct Options {
     pub access_type: Access,
