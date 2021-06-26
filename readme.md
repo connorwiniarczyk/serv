@@ -10,7 +10,7 @@ whitespace separated values file where the first column represents potential
 HTTP requests, the second column represents the corresponding resource on the
 host system, and the remaining columns are a list of zero or more options.
 
-Serv derives its flexibility from these options, which give the use much more
+Serv derives its flexibility from these options, which give the user much more
 control over the behavior of individual routes than would be possible in a more
 traditional static file server. Of particular importance is the `exec` option,
 which tells serv to treat the specified file as a program and execute it,
