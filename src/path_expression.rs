@@ -34,12 +34,14 @@ macro_rules! replace_if_wild {
 }
 
 #[derive(Debug, Clone)]
-pub struct PathMatch {
+pub struct PathMatch<'a> {
+    pub path: &'a PathExpr, // the path that was used to generate this PathMatch
+    pub request: &'a str, // the input that was used
     pub wildcards: Vec<String>,
 }
 
-impl PathMatch {
-    pub fn to_path(self, template: &PathExpr) -> PathBuf {
+impl PathMatch<'_>{
+    pub fn to_path(&self, template: &PathExpr) -> PathBuf {
 
         let mut wilds = self.wildcards.iter();
 
@@ -83,7 +85,7 @@ impl PathExpr {
     /// Match an http request against a PathExpr
     /// If the paths match, returns a PathMatch struct with the corresponding vec of wildcards,
     /// returns None otherwise
-    pub fn match_request(&self, request: &str) -> Option<PathMatch> {
+    pub fn match_request<'a>(&'a self, request: &'a str) -> Option<PathMatch<'a>> {
 
         let mut wildcards: Vec<&str> = vec![];
 
@@ -105,7 +107,7 @@ impl PathExpr {
             .map(|x| x.to_string())
             .collect();
 
-        return Some(PathMatch{ wildcards: owned_wildcards })
+        return Some(PathMatch{ wildcards: owned_wildcards, request: &request, path: &self })
     }
 }
 
