@@ -1,13 +1,69 @@
 ## Serv
 
 Serv is a web server written in Rust. There are a lot of web servers written
-in Rust, but this one is mine. It's goal is to be extremely easy to use and
-flexible for rapid prototyping of websites and apis.
+in Rust, but this one is mine. My goal for it is to have an HTTP server that
+expresses routes as concisely as possible, while still being flexible enough
+to produce complex APIs with arbitrary behavior.
 
-It assigns routes by reading from a file called `routes` in the target
-directory. `routes` is a whitespace separated values file with each line
-containing an http request, followed by a path to a resource on the host
-system, followed by a list of options.
+Routes are defined with a single line in a file called `routes`. `routes` is a
+whitespace separated values file where the first column represents potential
+HTTP requests, the second column represents the corresponding resource on the
+host system, and the remaining columns are a list of zero or more options.
+
+Serv derives its flexibility from these options, which give the use much more
+control over the behavior of individual routes than would be possible in a more
+traditional static file server. Of particular importance is the `exec` option,
+which tells serv to treat the specified file as a program and execute it,
+returning its output, instead of just its contents. The `exec` function also
+allows you to specify different parts of the http request that can be passed
+to the program as arguments, allowing for APIs with very complex behavior to
+be written in fewer lines of code than I've seen in any other http framework.
+
+Exec also makes serv API's language agnostic. Endpoints can be written in bash
+for maximum convenience, javascript or python if they require complex logic,
+C if it is important that they run fast, etc.
+
+### Options
+
+The first option in the list is special and is referred to as the access type.
+There are two access type:
+
+- `read` : read the file directly and serve the contents as is 
+- `exec` : attempt to execute the file and return the output generated
+
+If the option in the list is neither of these, than serv will automatically
+insert the `read` access type, so it is only necessary to specify when you
+intend on executing the file.
+
+Options that are not the access type are called post processors. I have two
+implemented as a proof of concept:
+
+- `header` : add a list of http headers to the response
+- `cors`   : add specific CORS related headers to the response
+
+#### Options with Arguments
+
+Options can take arguments, which can sometimes have values. The syntax for
+this is as follows `<option>(<arg1>:<value1> <arg2>:<value2>)`. So for example:
+```
+exec exec() exec(query) exec(query:key) exec(query:key query:key2)
+```
+are all valid options. 
+
+The list of valid arguments for each option is outlined below:
+
+`exec` : arguments to exec map parts of the http query to arguments that will
+         get passed to the program being executed. The first argument will
+		 become $1, the second $2, etc.
+
+- `query:<key>`  : Get the part of the http query string with the given key
+- `wild:<index>` : Get the part matched wildcard at the given index
+
+`header` : arguments to header become the key and value pairs of http headers
+           in the response
+
+
+### Path Expressions
 
 Both the request and resource paths can contain wildcards. ie. `/one/*/two`.
 In the request path, this indicates that it will match any request with the
@@ -18,19 +74,9 @@ wildcards in the request path. For example, the route
 `/styles/*     css/*    read`
 will route the request `/styles/main.css` to `css/main.css`.
 
-Options can be either `read`, or `exec` 
 
-- `read` : read the file directly and serve the contents as is 
-- `exec` : attempt to execute the file and return the text generated
 
-The `exec` option can take additional arguments, with the syntax
-`exec(param1:value1, param2:value2, etc.)` which can be used to send
-information about the http request to the program being executed. I currently
-have two parameters implemented:
-
-- `query:key` : pass the part of the url query with key `key` as an argument
-- `wild:index` : send the wildcard at index `index` as an argument
-
+### Routes Example 
 
 ```
 # Routes example
