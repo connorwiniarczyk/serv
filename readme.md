@@ -23,6 +23,21 @@ Exec also makes serv API's language agnostic. Endpoints can be written in bash
 for maximum convenience, javascript or python if they require complex logic,
 C if it is important that they run fast, etc.
 
+## Usage
+
+```bash
+# install using cargo
+cargo install --git https://github.com/connorwiniarczyk/serv.git
+
+# run an example
+git clone https://github.com/connorwiniarczyk/serv.git
+cd serv/examples/content-management-system
+serv -p 3000 .
+
+# test the server
+curl localhost:3000
+```
+
 ### Options
 
 The first option in the list is special and is referred to as the access type.
