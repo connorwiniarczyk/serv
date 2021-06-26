@@ -89,12 +89,15 @@ impl PathExpr {
 
         let mut wildcards: Vec<&str> = vec![];
 
+        println!("{}", request);
+
         let path_nodes = request.strip_prefix("/").unwrap_or(request).split("/");
         let zipped_nodes = self.iter().zip(path_nodes);
 
         // if any left and right pair do not match, return None,
         // if the left element is a Wild, add the corresponding right element to the wildcards vec
         for (left, right) in zipped_nodes {
+            println!("{:?} {:?}", left, right);
             match left {
                 Node::Defined(left) => if left != right { return None; },
                 Node::Wild => { wildcards.push(right) },
