@@ -29,21 +29,23 @@ You'll need rust installed on your system in order to install serv. It can be
 installed from [here](https://rustup.rs/) and by then running
 
 ```bash
+# install rust and cargo, tell cargo to use the nightly version of the compiler
 rustup default nightly
 rustup update
-```
 
-```bash
-# install using cargo
+# install serv using cargo
 cargo install --git https://github.com/connorwiniarczyk/serv.git
 
 # run an example
 git clone https://github.com/connorwiniarczyk/serv.git
 cd serv/examples/content-management-system
-serv -p 3000 .
+
+# serv takes a port argument (the default is 4000) and path to a directory.
+# The directory must contain a valid routes file
+serv -p 4000 .
 
 # test the server
-curl localhost:3000
+curl localhost:4000
 ```
 
 ## Options
