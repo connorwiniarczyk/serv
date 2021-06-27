@@ -108,13 +108,13 @@ will route the request `/styles/main.css` to `css/main.css`.
 # <request path> <resource path> <options>
 
 # Normal Stuff
-/               index.html              read
-/css/*          public/styles/*         read
-/js/*           public/scripts/*        read
+/               index.html              header(content-type:text/html)
+/css/*          public/styles/*         header(content-type:text/css)
+/js/*           public/scripts/*        header(content-type:text/javascript)
 
 # Images/Media
-/splash         media/background.jpg    read
-/images/*       media/images/*/large    read
+/splash         media/background.jpg    read # the read option can be stated explicitly or ignored
+/images/*       media/images/*/large    
 
 # API
 /api/date       api/get_date.sh         exec
@@ -126,3 +126,14 @@ will route the request `/styles/main.css` to `css/main.css`.
 
 ```
 
+## To Do / Known Issues:
+
+- Binary files don't work at the moment because of the way the Response Body is stored. I'm using a String, but the `fs::read_to_string()` function fails when called on binary files like images and videos. I'm thinking to switch to some kind of BufRead or Stream type.
+
+- I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
+
+- `exec` needs an argument that just accepts a constant string and passes that as an arg. It also needs access to the rest of the http request for stuff like post bodies, the path, etc.
+
+- A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that into information about the headers and/or status code
+
+- Better debug information for stuff like explaining whether/why a route is valid or not or when requests fail.
