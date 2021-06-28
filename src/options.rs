@@ -26,15 +26,16 @@ macro_rules! capture_get {
 
 pub struct Response {
     pub headers: HashMap<String, String>,
-    pub body: String,
+    // pub body: String,
+    pub body: Vec<u8>,
     pub status: u32,
 }
 
 impl Response {
-    pub fn new(body: &str) -> Self {
+    pub fn new(body: &Vec<u8>) -> Self {
         Self {
             headers: HashMap::new(),
-            body: body.to_string(),
+            body: body.clone(),
             status: 200
         }
     }
