@@ -19,14 +19,19 @@ allows you to specify different parts of the http request that can be passed
 to the program as arguments, allowing for APIs with very complex behavior to
 be written in fewer lines of code than I've seen in any other http framework.
 
-Exec also makes serv API's language agnostic. Endpoints can be written in bash
-for maximum convenience, javascript or python if they require complex logic,
-C if it is important that they run fast, etc.
+Exec also makes serv API's language agnostic. Endpoints can be written in bash,
+javascript, python, c, rust, lisp, fortran, or any other language that you can
+find a compiler or interpreter for.
 
-## Usage
+## Installation / Usage
 
 You'll need rust installed on your system in order to install serv. It can be 
-installed from [here](https://rustup.rs/) and by then running
+installed from [here](https://rustup.rs/) and by then running `rustup default nightly`
+and `rustup update`.
+
+Most of the examples will have dependencies on external programs. In the case
+of the CMS example, you will need `pandoc` installed in order to render 
+markdown files.
 
 ```bash
 # install rust and cargo, tell cargo to use the nightly version of the compiler
@@ -38,7 +43,7 @@ cargo install --git https://github.com/connorwiniarczyk/serv.git
 
 # run an example
 git clone https://github.com/connorwiniarczyk/serv.git
-cd serv/examples/content-management-system
+cd serv/examples/cms
 
 # serv takes a port argument (the default is 4000) and path to a directory.
 # The directory must contain a valid routes file
@@ -127,8 +132,6 @@ will route the request `/styles/main.css` to `css/main.css`.
 ```
 
 ## To Do / Known Issues:
-
-- Binary files don't work at the moment because of the way the Response Body is stored. I'm using a String, but the `fs::read_to_string()` function fails when called on binary files like images and videos. I'm thinking to switch to some kind of BufRead or Stream type.
 
 - I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
 
