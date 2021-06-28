@@ -65,7 +65,7 @@ impl Route {
         println!("serving resource at path: {:?}", rendered_path);
 
         let mut output = match &self.options.access_type {
-            Access::Read => std::fs::read_to_string(rendered_path).ok()?,
+            Access::Read => std::fs::read(rendered_path).ok()?,
             Access::Exec(args) => {
                 let query = HttpQuery::from_url(request.url());
                 let rendered_args: Vec<&str> = args.iter().map(| Arg{ name, value } | match (name.as_str(), value){
@@ -78,8 +78,12 @@ impl Route {
                 println!("executing with args: {:?}", rendered_args);
 
                 let output_raw = Command::new(&rendered_path).args(rendered_args).output().await.ok()?;
-                let output = std::str::from_utf8(&output_raw.stdout).ok()?;
-                output.to_string()
+                let output = output_raw.stdout;
+
+                output
+
+                // let output = std::str::from_utf8(&output_raw.stdout).ok()?;
+                // output.to_string()
             },
         };
 
