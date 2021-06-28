@@ -2,7 +2,7 @@
 /           index.sh      	exec header(content-type:text/html)
 /styles/*   css/*          	header(content-type:text/css)
 /scripts/*  javascript/*	read
-/images/*   media/*  read
+/images/*   media/*  		read header(content-type:image/jpg)
 
 # Markdown Renderer
 /content/*	renderer/render.sh	exec(wild:0) header(content-type:text/html)
