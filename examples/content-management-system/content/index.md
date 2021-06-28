@@ -36,7 +36,7 @@ Mauris at pellentesque quam. Integer non tellus non ligula vestibulum tincidunt 
 Here are some images. If this was a real blog I'd bet you'd be really engaged
 
 ![](https://i.huffpost.com/gen/1271717/thumbs/o-LONDON-MAP-570.jpg?3)
-![](https://i.huffpost.com/gen/1271693/thumbs/o-PARIS-MAP-570.jpg?5)
+![](/images/paris.jpg)
 ![](https://i.huffpost.com/gen/1271776/thumbs/o-LA-MAP-570.jpg?1)
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. In tincidunt sodales vestibulum. Nulla facilisi. Duis porta risus eu arcu cursus rutrum. Integer ut orci sed nibh faucibus tincidunt vitae et augue. Maecenas maximus vehicula quam, sollicitudin semper felis aliquam sit amet. Aliquam nisi orci, fringilla vitae tortor sed, sollicitudin sagittis neque. Sed tempor mattis nisl ac malesuada. Morbi id justo quis libero sagittis viverra vitae quis dolor. Vivamus eget tincidunt risus.
