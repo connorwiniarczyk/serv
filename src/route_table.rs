@@ -14,6 +14,9 @@ use std::path::Path;
 use crate::path_expression::PathExpr;
 use crate::options::Access;
 use crate::options::Options;
+use crate::options::RouteOption;
+
+use crate::error;
 
 lazy_static! {
     static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
@@ -33,6 +36,15 @@ use tide::Request;
 use crate::options::Response;
 
 impl Route {
+    pub fn create(request: &str, resource: &str, options: Vec<RouteOption>) -> Self {
+        todo!();
+        // Self {
+        //     request: PathExpr::new(request),
+        //     resource: PathExpr::new(resource),
+        //     options: Options::from_str(options),
+        // }
+    }
+
     pub fn new(request: &str, resource: &str, options: &str) -> Self {
         Self {
             request: PathExpr::new(request),

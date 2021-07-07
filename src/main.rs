@@ -10,6 +10,8 @@ mod options;
 mod config;
 mod route_table;
 mod path_expression;
+mod error;
+mod parser;
 
 use route_table::Route;
 use config::Config;
