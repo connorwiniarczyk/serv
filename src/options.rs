@@ -9,6 +9,46 @@ use std::iter::Peekable;
 
 use std::collections::HashMap;
 
+
+pub enum OptionKind {
+    Access(fn(String, &Vec<Arg>) -> Response),
+    Process(fn(Response, &Vec<Arg>) -> Response),
+}
+
+pub struct RouteOption {
+    args: Vec<Arg>,
+    func: OptionKind,
+}
+
+impl RouteOption {
+    pub fn new(func: &str, args: Vec<Arg>) -> Self {
+        let func = access_types::get_func(func);
+
+        Self {
+            func:OptionKind::Access(func), args
+        }
+    }
+}
+
+mod access_types { 
+    use super::*;
+
+    type Access = fn(String, &Vec<Arg>) -> Response;
+
+    pub fn exec(input: String, args: &Vec<Arg>) -> Response { todo!(); }
+    pub fn read(input: String, args: &Vec<Arg>) -> Response { todo!(); }
+
+    pub fn get_func(input: &str) -> Access {
+        match input {
+            "exec" => exec,
+            "read" => read,
+            _ => panic!(),
+        }
+    }
+}
+
+
+
 // define regular expressions for the module
 lazy_static! {
    static ref OPTS: Regex = Regex::new(r"(?m:(?P<option>\w+)(?:\((?P<args>.*?)\))?)+").unwrap();
@@ -93,6 +133,13 @@ pub struct Arg {
 }
 
 impl Arg {
+    pub fn new(name: &str, value: Option<&str>) -> Self {
+        Self {
+            name: name.to_string(),
+            value: value.and_then(|x| Some(x.to_string())),
+        }
+
+    }
     /// parse an individual argument string into an Arg
     pub fn from_str(input: &str) -> Option<Self> {
         let captures = ARG.captures(input)?;
