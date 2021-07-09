@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::route_table::*;
 use tide::http::Url;
 use std::process::Command;
+use itertools::Itertools;
 
 type OptionFunc = for<'a> fn(ResponseGenerator<'a>, &Vec<Arg>) -> ResponseGenerator<'a>;
 
@@ -21,64 +22,71 @@ impl RouteOption {
         Self { func, args, func_name }
     }
 
-    pub fn apply<'a>(&self, response: ResponseGenerator<'a>) -> ResponseGenerator<'a> {
+    pub fn apply<'request>(&self, response: ResponseGenerator<'request>) -> ResponseGenerator<'request> {
         (self.func)(response, &self.args)
     }
 }
 
+/// Declare an option using a javascript style arrow function syntax.
+/// Generates a function pointer that can be used in the `func` field of
+/// RouteOptions in the RouteTable. This is mainly useful as a way of
+/// abbreviating the very verbose function signature that `RouteOption` 
+/// requires.
+/// 
+/// Takes as arguments the name of the function, followed by an arrow function
+/// that performs some operation on a `ResponseGenerator`.
+///
+/// ### examples
+/// ```
+/// // Adds CORS headers to the response
+/// option!(cors (input) => {
+///     input.with_header("Access-Control-Allow-Origin", "*")
+/// });
+/// ```
 macro_rules! option {
-    ($name:ident($input:ident, $args:ident) => $func:block) => {
+    ($name:ident, ($input:ident, $args:ident) => $func:block) => {
         pub fn $name<'a>(mut $input: ResponseGenerator<'a>, $args: &Vec<Arg>) -> ResponseGenerator<'a> {
             $func
         }
     };
 
-    ($name:ident($input:ident) => $func:block) => {
+    ($name:ident, ($input:ident) => $func:block) => {
         pub fn $name<'a>(mut $input: ResponseGenerator<'a>, _args: &Vec<Arg>) -> ResponseGenerator<'a> {
             $func
         }
     };
 }
 
+
 pub mod access_types { 
     use super::*;
     use std::fs;
 
-    option!( exec(input, args) => {
-        let path = input.route.resource.get_path(input.request_match);
 
-        // get url query from request
-        let query = HttpQuery::from_url(input.request.url());
+    option!(exec, (response, args) => {
+        let path = response.route.resource.get_path(response.request_match);
+        let rendered_args: Vec<String> = args.iter()
+            .filter_map(|x| response.extract_data(x))
+            .collect();
 
-        let rendered_args: Vec<&str> = args.iter().map(| Arg{ name, value } | match (name.as_str(), value){
-            ("query", Some(param)) => query.get(param).unwrap_or(""),
-            ("wild", Some(index)) => &input.request_match.wildcards[index.parse::<usize>().unwrap()],
-            ("text", Some(value)) => value,
-            (_, _) => "",
-        }).collect();
-
-        let output_raw = Command::new(&path).args(rendered_args).output().unwrap();
-        let output = output_raw.stdout;
-
-        input.body = output;
-
-        return input
+        let result = Command::new(&path).args(rendered_args).output().unwrap().stdout;
+        response.with_body(result)
     });
 
-    option!( read(input) => {
+    option!(read, (input) => {
         let path = input.route.resource.get_path(input.request_match);
-        let body: Vec<u8> = fs::read(&path).unwrap_or_default();
-        input.body = body;
-
-        return input
+        input.with_body(fs::read(&path).unwrap_or_default()) 
     });
 
-
-    option!( header(input, args) => {
+    option!(header, (input, args) => {
         args.into_iter().fold(input, |response, arg| match arg {
             Arg { name, value: Some(value) } => response.with_header(name, value),
             Arg { name, value: None } => response,
         })     
+    });
+
+    option!(cors, (input) => {
+        input.with_header("Access-Control-Allow-Origin", "*")
     });
 
 
@@ -87,37 +95,14 @@ pub mod access_types {
             "exec" => exec,
             "read" => read,
             "header" => header,
+            "cors" => cors,
             _ => panic!(),
-        }
-    }
-
-
-    // ------------
-    // HELPER TYPES
-    // ------------
-    pub struct HttpQuery {
-        inner: HashMap<String, String>,
-    }
-
-    impl HttpQuery {
-        pub fn from_url(url: &Url) -> Self {
-
-            let mut output: HashMap<String, String> = HashMap::new();
-            let pairs = url.query_pairs();
-            for ( left, right ) in pairs {
-                output.insert(left.into_owned(), right.into_owned());
-            }
-            Self { inner: output }
-        }
-
-        pub fn get(&self, key: &str) -> Option<&str> {
-           self.inner.get(key).and_then(|x| Some(x.as_str()))
         }
     }
 }
 
-use crate::path_expression::RequestMatch;
 
+use crate::path_expression::RequestMatch;
 
 pub struct ResponseGenerator<'a> {
     pub route: &'a Route,
@@ -143,6 +128,35 @@ impl<'a> ResponseGenerator<'a> {
 
     pub fn with_header(mut self, key: &str, value: &str) -> Self {
         self.headers.insert(key.to_string(), value.to_string()); self
+    }
+
+    pub fn with_body(mut self, body: Vec<u8>) -> Self {
+        self.body = body; self
+    }
+
+    /// Sometimes, arguments reference data 
+    fn extract_data(&'a self, arg: &Arg) -> Option<String> {
+        let Arg { name, value } = arg;
+        let output = match (name.as_str(), value) {
+            ("query", Some(key)) => {
+                self.request.url()
+                    .query_pairs()
+                    .find_map(|(k, v)| match &k == key {
+                        true => Some(v),
+                        false => None,
+                    })?
+                    .into_owned()
+            },
+            ("query", None) => self.request.url().query()?.to_string(),
+            ("wild", Some(index)) => self.request_match.wildcards[index.parse::<usize>().ok()?].to_string(),
+            ("wild", None) => self.request_match.wildcards.iter().join(" "),
+            ("text", Some(text)) => text.to_string(),
+            (text, None) => text.to_string(),
+
+            _other => return None,
+        };
+
+        Some(output)
     }
 }
 
