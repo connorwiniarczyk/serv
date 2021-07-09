@@ -1,9 +1,10 @@
 # Serve HTML, CSS, JS files
-/test	echo	exec(text:hello)
 
-/styles/*   css/*          	read header(content-type:text/css)
 /           ./index.sh      	exec header(content-type:text/html)
+/styles/*   css/*          	read header(content-type:text/css)
 /images/*   media/*  		read header(content-type:image/jpg)
+
+/date	date	exec
 
 
 # Markdown Renderer

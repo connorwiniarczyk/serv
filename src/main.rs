@@ -1,11 +1,4 @@
-#![allow(dead_code, unused_results, unused_must_use, unused_variables)]
-use async_std;
-use clap::clap_app;
-use std::env::current_dir;
-use std::path::Path;
-use async_process::Command;
-
-use tide;
+#![allow(unused_mut, dead_code, unused_results, unused_must_use, unused_variables)]
 
 mod options;
 mod config;
@@ -16,29 +9,24 @@ mod parser;
 
 use route_table::Route;
 use config::Config;
-
 use tide::Response;
-use std::fs;
-use options::Arg;
 
-use tide::http::Url;
-use std::collections::HashMap;
+use async_std;
+use clap::clap_app;
+use std::env::current_dir;
+use std::path::Path;
+use tide;
 
-type Request = tide::Request<State>;
+
 
 
 pub async fn handler(http_request: Request) -> tide::Result {
+    println!("incoming http request: {}", http_request.url());
     let state = http_request.state();
-
-    // get the requested path by taking the route parameter and prepending /
-    // let mut path = request.param("route").unwrap().to_string();
-    let mut route = http_request.param("route").unwrap_or("").to_string();
-    route = ["/", &route].join("");
-
-    println!("{:?}", route);
+    let route = http_request.param("route").unwrap_or("").to_string();
 
     for route in state.route_table.iter() {
-        if let Some(result) = route.resolve(&http_request) {
+        if let Ok(result) = route.resolve(&http_request) {
             return Ok(result)
         }
     }
@@ -47,11 +35,6 @@ pub async fn handler(http_request: Request) -> tide::Result {
     return Ok(response)
 }
 
-#[derive(Clone, Debug)]
-pub struct State{
-    route_table: Vec<Route>,
-    config: Config,
-}
 
 
 #[async_std::main]
@@ -106,3 +89,13 @@ async fn main() {
     server.at("").get(handler);
     server.listen(listen_addr).await;
 }
+
+
+
+#[derive(Clone, Debug)]
+pub struct State{
+    route_table: Vec<Route>,
+    config: Config,
+}
+
+type Request = tide::Request<State>;

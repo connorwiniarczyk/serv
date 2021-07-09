@@ -15,7 +15,17 @@ use itertools::Itertools;
 use itertools::EitherOrBoth::*;
 
 
+
+macro_rules! replace_if_wild {
+    ($value:ident, take_from=$wilds:ident) => { match $value {
+        Node::Defined(val) => val.as_str(),
+        Node::Wild => $wilds.next().unwrap(),
+    }} 
+}
+
+
 /// A pattern representing a set of http requests
+#[derive(Debug, Clone)]
 pub struct RequestPattern {
     pub path: Vec<Node>,
     
@@ -42,83 +52,44 @@ impl RequestPattern {
         }
 
         let output = RequestMatch { pattern: &self, request, wildcards };
-
         Ok(output)
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct RequestMatch<'request> {
-    pattern: &'request RequestPattern,
-    request: &'request Request,
-    wildcards: Vec<&'request str>,
+    pub pattern: &'request RequestPattern,
+    pub request: &'request Request,
+    pub wildcards: Vec<&'request str>,
 }
 
+#[derive(Debug, Clone)]
 pub struct ResourcePattern {
-    is_global: bool,
-    path: Vec<Node>
+    pub is_global: bool,
+    pub path: Vec<Node>
 }
 
 impl ResourcePattern {
-    pub fn get_path(request_match: &RequestMatch) -> PathBuf {
-        todo!();
-    }
-}
+    pub fn get_path(&self, request_match: &RequestMatch) -> PathBuf {
+        let mut wilds = request_match.wildcards.iter();
 
-
-#[derive(Debug, Clone)]
-pub struct PathExpr {
-    pub is_global: bool,
-    pub inner: Vec<Node>,
-}
-
-impl PathExpr {
-    pub fn new(path: &str) -> Self {
-        let is_global = path.starts_with("/"); // paths are global if they start with "/"
-        let local_path = path.strip_prefix("/").unwrap_or(path); // remove the leading "/" if it exists
-        let inner: Vec<Node> = local_path.split("/").map(Node::from_str).collect(); 
-        Self { is_global, inner }
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<Node> {
-        self.inner.iter()
-    }
-
-    // TODO: this should return a Result type with error information
-    // TODO: I think PathMatch should work exclusively with &str and take a lifetime parameter
-    /// Match an http request against a PathExpr
-    /// If the paths match, returns a PathMatch struct with the corresponding vec of wildcards,
-    /// returns None otherwise
-    pub fn match_request<'a>(&'a self, request: &'a str) -> Option<PathMatch<'a>> {
-
-        let mut wildcards: Vec<&str> = vec![];
-
-        // println!("{}", request);
-
-        let path_nodes = request.strip_prefix("/").unwrap_or(request).split("/");
-        let zipped_nodes = self.iter().zip(path_nodes);
-
-        // if any left and right pair do not match, return None,
-        // if the left element is a Wild, add the corresponding right element to the wildcards vec
-        for (left, right) in zipped_nodes {
-            // println!("{:?} {:?}", left, right);
-            match left {
-                Node::Defined(left) => if left != right { return None; },
-                Node::Wild => { wildcards.push(right) },
-            }
+        // if the PathExpr template is global, make the resulting PathBuf global as well by
+        // prefixing it with "/", otherwise, just use ""
+        let prefix = match self.is_global {
+            true => Path::new("/").to_path_buf(),
+            false => Path::new("").to_path_buf(),
         };
 
-        // convert wildcards to a vec of owned Strings
-        let owned_wildcards = wildcards
-            .into_iter()
-            .map(|x| x.to_string())
-            .collect();
-
-        return Some(PathMatch{ wildcards: owned_wildcards, request: &request, path: &self })
+        self.path.iter()
+            .map(|node| replace_if_wild!(node, take_from=wilds))
+            .fold(prefix, |acc, x| acc.join(&x))
     }
 }
 
 
-#[derive(Debug, Clone)]
+
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     Defined(String),
     Wild,
@@ -133,37 +104,7 @@ impl Node {
     }
 }
 
-macro_rules! replace_if_wild {
-    ($value:ident, take_from=$wilds:ident) => { match $value {
-        Node::Defined(val) => val,
-        Node::Wild => $wilds.next().unwrap(),
-    }} 
-}
 
-#[derive(Debug, Clone)]
-pub struct PathMatch<'a> {
-    pub path: &'a PathExpr, // the path that was used to generate this PathMatch
-    pub request: &'a str, // the input that was used
-    pub wildcards: Vec<String>,
-}
-
-impl PathMatch<'_>{
-    pub fn to_path(&self, template: &PathExpr) -> PathBuf {
-
-        let mut wilds = self.wildcards.iter();
-
-        // if the PathExpr template is global, make the resulting PathBuf global as well by
-        // prefixing it with "/", otherwise, just use ""
-        let prefix = match template.is_global {
-            true => Path::new("/").to_path_buf(),
-            false => Path::new("").to_path_buf(),
-        };
-
-        template.iter()
-            .map(|node| replace_if_wild!(node, take_from=wilds))
-            .fold(prefix, |acc, x| acc.join(&x))
-    }
-}
 
 
 
@@ -179,10 +120,10 @@ impl fmt::Display for Node {
     }
 }
 
-impl fmt::Display for PathExpr {
+impl fmt::Display for ResourcePattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let prefix = match self.is_global { true => "/", false => "" };
-        let mut nodes = self.iter();
+        let mut nodes = self.path.iter();
 
         let empty = &Node::from_str("");
 
@@ -193,52 +134,32 @@ impl fmt::Display for PathExpr {
     }
 }
 
-// ----------
-// UNIT TESTS
-// ----------
-
-#[cfg(test)]
-mod path_matching {
-    use super::*;
-
-    #[test]
-    fn one() {
-        let expr = PathExpr::new("/one/two/*");
-        let out = expr.match_request("/one/two/three").unwrap();
-        let new_path = out.to_path(&PathExpr::new("/*/one/two"));
-
-        assert_eq!(new_path, PathBuf::from("/three/one/two"));
+impl fmt::Display for RequestPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let nodes = self.path.iter();
+        let empty = &Node::from_str("");
+        let path = nodes.fold("".to_string(), |acc, x| format!("{}/{}", acc, x));
+        write!(f, "{}", path)
     }
-
-    #[test]
-    fn two() {
-        let left = PathExpr::new("/one/*/two")
-            .match_request("/one/test/two").unwrap()
-            .to_path(&PathExpr::new("*"));
-
-        let right = PathBuf::from("test");
-        assert_eq!(left, right);
-    }
-
 }
+
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::route_parser as parse;
     
     #[test]
-    fn create_path() {}
-
-    #[test]
-    fn string_conversion() {}
-
-    #[test]
-    fn node_equality() {}
-
-    #[test]
-    /// More specific paths should not be considered equal to less specific
-    /// ones with the same prefix.
-    fn specificity() {}
+    fn create_path() {
+        let request = parse::request("/one/two/*").expect("could not parse path '/one/two/*' ");
+        let mut nodes = request.path.iter();
+        
+        assert_eq!(Some(&Node::from_str("one")), nodes.next());
+        assert_eq!(Some(&Node::from_str("two")), nodes.next());
+        assert_eq!(Some(&Node::Wild), nodes.next());
+        assert_eq!(None, nodes.next());
+    }
 }
 
 

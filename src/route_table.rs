@@ -2,19 +2,14 @@
 
 use super::*;
 
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-
 use regex::Regex;
 use lazy_static::lazy_static;
 
 use std::fmt;
 use std::path::Path;
 
-use crate::path_expression::PathExpr;
+use crate::path_expression::{ RequestPattern, ResourcePattern };
 use crate::options::RouteOption;
-
-use crate::error;
 
 use crate::parser;
 
@@ -24,8 +19,8 @@ lazy_static! {
 
 #[derive(Clone)]
 pub struct Route {
-    pub request: PathExpr,
-    pub resource: PathExpr,
+    pub request: RequestPattern,
+    pub resource: ResourcePattern,
     pub options: Vec<RouteOption>,
 }
 
@@ -35,29 +30,18 @@ use tide::Request;
 use crate::options::ResponseGenerator;
 
 impl Route {
+    pub fn resolve<'request>(&'request self, request: &'request Request<State>) -> Result<tide::Response, &'request str> {
+        let request_match = self.request.compare(request)?;
+        println!("\t found a matching route: {} --> {}", &self.request, &self.resource);
+        println!("\t with wildcards: {:?}", &request_match.wildcards);
 
-    pub fn new(request: &str, resource: &str, options: &str) -> Self {
-        todo!()
-    }
-
-    pub fn resolve<'request>(&self, request: &'request Request<State>) -> Option<tide::Response> {
-
-        let temp = self.request.match_request(request.param("route").unwrap_or(""));
-
-        println!("");
-        println!("{:?}", temp);
-        println!("");
-
-        let path_match = self.request.match_request(request.param("route").unwrap_or(""))?;
-
-        // let response = self.options.iter().fold(ResponseGenerator::new(&path_match, self), |acc, x| x.apply(acc)); 
-        let mut response = ResponseGenerator::new(&path_match, &self, &request);
-
+        let mut response = ResponseGenerator::new(&request_match, &self, &request);
         for option in &self.options {
             response = option.apply(response);
         }
+        
 
-        Some(response.into())
+        Ok(response.into())
     }
 }
 

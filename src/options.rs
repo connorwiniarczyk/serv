@@ -1,15 +1,7 @@
-/// A Resolver is a type that can be turned into a tide HTTP response by
-/// calling its resolve() method. Resolver types are defined as an enum
 
-use crate::config::Config;
-use regex::Regex;
-use lazy_static::lazy_static;
-use std::iter::Peekable;
-
-use std::collections::HashMap; use crate::route_table::*;
-
+use std::collections::HashMap;
+use crate::route_table::*;
 use tide::http::Url;
-
 use std::process::Command;
 
 type OptionFunc = for<'a> fn(ResponseGenerator<'a>, &Vec<Arg>) -> ResponseGenerator<'a>;
@@ -47,18 +39,17 @@ macro_rules! option {
 
 mod access_types { 
     use super::*;
-    
     use std::fs;
 
     option!( exec(input, args) => {
-        let path = input.path_match.to_path(&input.route.resource);
+        let path = input.route.resource.get_path(input.request_match);
 
         // get url query from request
         let query = HttpQuery::from_url(input.request.url());
 
         let rendered_args: Vec<&str> = args.iter().map(| Arg{ name, value } | match (name.as_str(), value){
             ("query", Some(param)) => query.get(param).unwrap_or(""),
-            ("wild", Some(index)) => &input.path_match.wildcards[index.parse::<usize>().unwrap()],
+            ("wild", Some(index)) => &input.request_match.wildcards[index.parse::<usize>().unwrap()],
             ("text", Some(value)) => value,
             (_, _) => "",
         }).collect();
@@ -72,7 +63,7 @@ mod access_types {
     });
 
     option!( read(input) => {
-        let path = input.path_match.to_path(&input.route.resource);
+        let path = input.route.resource.get_path(input.request_match);
         let body: Vec<u8> = fs::read(&path).unwrap_or_default();
         input.body = body;
 
@@ -122,12 +113,12 @@ mod access_types {
     }
 }
 
-use crate::path_expression::PathMatch;
+use crate::path_expression::RequestMatch;
 
 
 pub struct ResponseGenerator<'a> {
     pub route: &'a Route,
-    pub path_match: &'a PathMatch<'a>,
+    pub request_match: &'a RequestMatch<'a>,
     pub request: &'a crate::Request,
 
     pub headers: HashMap<String, String>,
@@ -136,9 +127,9 @@ pub struct ResponseGenerator<'a> {
 }
 
 impl<'a> ResponseGenerator<'a> {
-    pub fn new(path_match: &'a PathMatch, route: &'a Route, request: &'a crate::Request) -> Self  {
+    pub fn new(request_match: &'a RequestMatch, route: &'a Route, request: &'a crate::Request) -> Self  {
         Self {
-            path_match,
+            request_match,
             route,
             request,
             headers: HashMap::new(),
@@ -183,52 +174,3 @@ impl Arg {
         }
     }
 }
-
-
-//#[cfg(test)]
-// mod test_option_parsing {
-//     use super::*;
-
-//     #[test]
-//     fn nominal_case() {
-//         let value = Options::from_str("exec(wild:0 wild:1) header(content-type:text/html)");
-//         let access_type = value.access_type;
-
-//         // check that the access type is Exec, and not Read
-//         let access_args = match access_type {
-//             Access::Exec( args ) => args,
-//             Access::Read => panic!("wrong access type!"),
-//         };
-
-//         // check that there are exactly two arguments
-//         assert_eq!(access_args.len(), 2);
-
-//         // Check that both args are of type "wild" and have a value
-//         for arg in access_args {
-//             assert_eq!(&arg.name, "wild");
-//             arg.value.unwrap();
-//         }
-
-//         let processors = value.post_processors;
-//         assert_eq!(processors.len(), 1);
-
-//         let processor = processors.into_iter().next().expect("The first processor is empty");
-//         let arg = processor.args.into_iter().next().expect("The first argument is empty");
-
-//         assert_eq!(&arg.name, "content-type");
-//         assert_eq!(&arg.value.expect("arg value is none"), "text/html");
-//     }
-
-//     #[test]
-//     /// Empty option strings should parse into an access type of Read, and zero post processors
-//     fn empty_case() {
-//        let left = Options::from_str("");
-
-//        match left.access_type {
-//             Access::Exec(_) => panic!("access type should be Read"),
-//             Access::Read => ()
-//        };
-
-//        assert_eq!(left.post_processors.len(), 0);
-//     }
-
