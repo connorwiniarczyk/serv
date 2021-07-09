@@ -8,14 +8,17 @@ type OptionFunc = for<'a> fn(ResponseGenerator<'a>, &Vec<Arg>) -> ResponseGenera
 
 #[derive(Clone)]
 pub struct RouteOption {
-    args: Vec<Arg>,
-    func: OptionFunc,
+    pub args: Vec<Arg>,
+    pub func: OptionFunc,
+
+    pub func_name: String,
 }
 
 impl RouteOption {
     pub fn new(func: &str, args: Vec<Arg>) -> Self {
+        let func_name = func.to_string();
         let func = access_types::get_func(func);
-        Self { func, args }
+        Self { func, args, func_name }
     }
 
     pub fn apply<'a>(&self, response: ResponseGenerator<'a>) -> ResponseGenerator<'a> {
@@ -37,7 +40,7 @@ macro_rules! option {
     };
 }
 
-mod access_types { 
+pub mod access_types { 
     use super::*;
     use std::fs;
 

@@ -36,7 +36,7 @@ peg::parser! {
     pub grammar route_parser() for str {
 
         pub rule route() -> Route = request:request() [' ' | '\t']+ resource:resource() [' ' | '\t']+ options:options() {
-            Route { request, resource, options }    
+            Route { request, resource, options }.sanitize()
         }
 
         rule path_node() -> Node = node:$([^ ' ' | '\t' | ':' | '/' | '\\']*) { Node::from_str(node) }
