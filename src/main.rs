@@ -1,10 +1,11 @@
 #![allow(dead_code, unused_results, unused_must_use, unused_variables)]
 use async_std;
-use tide::Request;
 use clap::clap_app;
 use std::env::current_dir;
 use std::path::Path;
 use async_process::Command;
+
+use tide;
 
 mod options;
 mod config;
@@ -17,36 +18,16 @@ use route_table::Route;
 use config::Config;
 
 use tide::Response;
-use options::Access;
 use std::fs;
 use options::Arg;
 
 use tide::http::Url;
 use std::collections::HashMap;
 
-pub struct HttpQuery {
-    inner: HashMap<String, String>,
-    // inner: Vec<(String, String)>,
+type Request = tide::Request<State>;
 
-}
 
-impl HttpQuery {
-    pub fn from_url(url: &Url) -> Self {
-
-        let mut output: HashMap<String, String> = HashMap::new();
-        let pairs = url.query_pairs();
-        for ( left, right ) in pairs {
-            output.insert(left.into_owned(), right.into_owned());
-        }
-        Self { inner: output }
-    }
-
-    pub fn get(&self, key: &str) -> Option<&str> {
-       self.inner.get(key).and_then(|x| Some(x.as_str()))
-    }
-}
-
-pub async fn handler(http_request: Request<State>) -> tide::Result {
+pub async fn handler(http_request: Request) -> tide::Result {
     let state = http_request.state();
 
     // get the requested path by taking the route parameter and prepending /
@@ -57,24 +38,12 @@ pub async fn handler(http_request: Request<State>) -> tide::Result {
     println!("{:?}", route);
 
     for route in state.route_table.iter() {
-        if let Some(result) = route.resolve(&http_request).await {
-            let mut output = Response::builder(200).body(result.body);
-
-            //TODO: this is gross, also the status method can't accept a u32 for some reason
-            output = result.headers.iter().fold(output, |acc, (key, value)| acc.header(key.as_str(), value.as_str()));
-            return Ok(output.build())
+        if let Some(result) = route.resolve(&http_request) {
+            return Ok(result)
         }
     }
 
-    // TODO: boy I'd like to replace the above for loop with a call to find_map, but the asyncness
-    // of it makes it tricky. I think I need to use a stream, but I'm not sure how to turn my
-    // Iterator of Futures into a Stream properly
-    // &state.route_table.iter().map(|x| x.resolve(&http_request)).find_map(|x| x.await);
-
-    let response = Response::builder(400)
-        .body("not found")
-        .build();
-
+    let response = Response::builder(400).body("not found").build();
     return Ok(response)
 }
 
