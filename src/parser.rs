@@ -13,7 +13,7 @@ use std::path::Path;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
-use crate::path_expression::{ PathExpr, Node };
+use crate::path_expression::{ Node, RequestPattern, ResourcePattern };
 
 lazy_static! {
     // A regular expression used to strip comments from the file before parsing
@@ -33,21 +33,21 @@ pub fn parse_route_file(path: &Path) -> Result<RouteTable, String>{
 }
 
 peg::parser! {
-    grammar route_parser() for str {
+    pub grammar route_parser() for str {
 
-        pub rule route() -> Route = request:path() [' ' | '\t']+ resource:path() [' ' | '\t']+ options:options() {
+        pub rule route() -> Route = request:request() [' ' | '\t']+ resource:resource() [' ' | '\t']+ options:options() {
             Route { request, resource, options }    
         }
 
-        rule path_node() -> Node = node:$([^ ' ' | '\t' | ':' | '/' | '\\']+) { Node::from_str(node) }
+        rule path_node() -> Node = node:$([^ ' ' | '\t' | ':' | '/' | '\\']*) { Node::from_str(node) }
 
-        pub rule path() -> PathExpr = root:"/"? nodes:path_node() ** "/"  {
-            PathExpr {
-                is_global: root.is_some(),
-                inner: nodes
-            }
+        pub rule request() -> RequestPattern = root:"/"? nodes:path_node() ** "/" {
+            RequestPattern{ path:nodes }
         }
 
+        pub rule resource() -> ResourcePattern = root:"/"? nodes:path_node() ** "/" {
+            ResourcePattern{ is_global: root.is_some(), path:nodes }
+        }
 
         // rules for parsing options. eg: exec(), header(), etc.
         pub rule options() -> Vec<RouteOption> = options:option() ** " " { options }
