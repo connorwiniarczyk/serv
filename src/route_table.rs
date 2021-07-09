@@ -43,6 +43,20 @@ impl Route {
 
         Ok(response.into())
     }
+
+    pub fn sanitize(mut self) -> Self {
+        let first_option = self.options.iter().next();
+
+        let needs_default = match first_option {
+            Some( RouteOption { func, args, func_name } ) => {
+                !(func_name == "exec" || func_name == "read")
+            }
+            None => true,
+        };
+
+        self.options.insert(0, RouteOption::new("read", vec![]));
+        return self
+    }
 }
 
 pub struct RouteTable {

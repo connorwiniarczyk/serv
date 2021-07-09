@@ -1,10 +1,8 @@
 # Serve HTML, CSS, JS files
 
 /           ./index.sh      	exec header(content-type:text/html)
-/styles/*   css/*          	read header(content-type:text/css)
-/images/*   media/*  		read header(content-type:image/jpg)
-
-/date	date	exec
+/styles/*   css/*          	header(content-type:text/css)
+/images/*   media/*  		header(content-type:image/jpg)
 
 
 # Markdown Renderer
