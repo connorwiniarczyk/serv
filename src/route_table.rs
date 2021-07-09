@@ -13,6 +13,10 @@ use crate::options::RouteOption;
 
 use crate::parser;
 
+use crate::State;
+use tide::Request;
+use crate::options::ResponseGenerator;
+
 lazy_static! {
     static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
 }
@@ -24,10 +28,6 @@ pub struct Route {
     pub options: Vec<RouteOption>,
 }
 
-use crate::State;
-use tide::Request;
-
-use crate::options::ResponseGenerator;
 
 impl Route {
     pub fn resolve<'request>(&'request self, request: &'request Request<State>) -> Result<tide::Response, &'request str> {
@@ -40,7 +40,6 @@ impl Route {
             response = option.apply(response);
         }
         
-
         Ok(response.into())
     }
 
@@ -69,11 +68,35 @@ impl RouteTable {
     }
 
     pub fn from_file(path: &Path) -> Self {
-        parser::parse_route_file(path).unwrap()
+        parser::parse_route_file(path)
+            .or_else(|e| {println!("failed to parse routes file, using a default instead: {}", e); Err(e)})
+            .unwrap_or_default()
     }
 
     pub fn iter(&self) -> std::slice::Iter<Route> {
         self.table.iter()
+    }
+}
+
+use parser::route_parser::route as parse;
+
+impl Default for RouteTable {
+    fn default() -> Self {
+        let mut output = Self { table: vec![] };    
+
+        // serve index.html as the root
+        output.add(parse("/ /index.html read header(content-type:text/html)").unwrap());
+
+        // serve javascript and css files from their own folders, use custom headers to make
+        // things easier
+        output.add(parse("/scripts/* scripts/* read header(content-type:text/javascript)").unwrap());
+        output.add(parse("/styles/* /styles/*  read header(content-type:text/css)").unwrap());
+
+        // serve general files, two directories deep
+        output.add(parse("/* /*  read").unwrap());
+        output.add(parse("/*/* /*/*  read").unwrap());
+
+        return output;
     }
 }
 

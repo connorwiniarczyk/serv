@@ -18,8 +18,6 @@ use std::path::Path;
 use tide;
 
 
-
-
 pub async fn handler(http_request: Request) -> tide::Result {
     println!("incoming http request: {}", http_request.url());
     let state = http_request.state();
@@ -31,7 +29,8 @@ pub async fn handler(http_request: Request) -> tide::Result {
         }
     }
 
-    let response = Response::builder(400).body("not found").build();
+    println!("\t failed to find a matching route, serving 404 page instead");
+    let response = Response::builder(404).body("not found").build();
     return Ok(response)
 }
 
@@ -91,6 +90,7 @@ async fn main() {
 }
 
 
+type Request = tide::Request<State>;
 
 #[derive(Clone, Debug)]
 pub struct State{
@@ -98,4 +98,3 @@ pub struct State{
     config: Config,
 }
 
-type Request = tide::Request<State>;
