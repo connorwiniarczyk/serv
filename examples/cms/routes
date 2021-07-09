@@ -1,9 +1,10 @@
 # Serve HTML, CSS, JS files
-
-/           ./index.sh      	exec header(content-type:text/html)
-/styles/*   css/*          	header(content-type:text/css)
-/images/*   media/*  		header(content-type:image/jpg)
-
+/           renderer/render.sh 	   exec(text:index) header(content-type:text/html)
+/styles/*   css/*          	   header(content-type:text/css)
+/images/*   media/*  		   header(content-type:image/jpg)
 
 # Markdown Renderer
-/content/*	 renderer/render.sh	 read header(content-type:text/html)
+/content/*	 renderer/render.sh	 exec header(content-type:text/html)
+
+# Tells you what the date is
+/api/date	api/date	exec

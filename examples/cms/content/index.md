@@ -26,6 +26,8 @@ argument.
 /content/*  renderer/render.sh  exec(wild:0) header(content-type:text/html)
 ```
 
+[date](/api/date)
+
 I think this could make a really nice content management system for a blog or
 personal website. Below are some images. The rest of the paragraph will be
 dummy text.
