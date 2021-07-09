@@ -1,70 +1,170 @@
 /// A Resolver is a type that can be turned into a tide HTTP response by
 /// calling its resolve() method. Resolver types are defined as an enum
 
-use async_process::Command;
 use crate::config::Config;
 use regex::Regex;
 use lazy_static::lazy_static;
 use std::iter::Peekable;
 
-use std::collections::HashMap;
+use std::collections::HashMap; use crate::route_table::*;
 
-use crate::route_table::*;
+use tide::http::Url;
 
-pub struct RouteOption<'a> {
+use std::process::Command;
+
+type OptionFunc = for<'a> fn(ResponseGenerator<'a>, &Vec<Arg>) -> ResponseGenerator<'a>;
+
+#[derive(Clone)]
+pub struct RouteOption {
     args: Vec<Arg>,
-    func: fn(Response<'a>, &Vec<Arg>) -> Response<'a>,
+    func: OptionFunc,
 }
 
 impl RouteOption {
     pub fn new(func: &str, args: Vec<Arg>) -> Self {
         let func = access_types::get_func(func);
-
-        Self {
-            func:OptionKind::Access(func), args
-        }
+        Self { func, args }
     }
+
+    pub fn apply<'a>(&self, response: ResponseGenerator<'a>) -> ResponseGenerator<'a> {
+        (self.func)(response, &self.args)
+    }
+}
+
+macro_rules! option {
+    ($name:ident($input:ident, $args:ident) => $func:block) => {
+        pub fn $name<'a>(mut $input: ResponseGenerator<'a>, $args: &Vec<Arg>) -> ResponseGenerator<'a> {
+            $func
+        }
+    };
+
+    ($name:ident($input:ident) => $func:block) => {
+        pub fn $name<'a>(mut $input: ResponseGenerator<'a>, _args: &Vec<Arg>) -> ResponseGenerator<'a> {
+            $func
+        }
+    };
 }
 
 mod access_types { 
     use super::*;
+    
+    use std::fs;
 
-    type Access<'a> = fn(Response<'a>, &Vec<Arg>) -> Response<'a>;
-    // type Access = fn(Response, &Vec<Arg>) -> Response;
+    option!( exec(input, args) => {
+        let path = input.path_match.to_path(&input.route.resource);
 
-    pub fn exec<'a>(input: Response<'a>, args: &Vec<Arg>) -> Response<'a> { todo!(); }
-    pub fn read<'a>(input: Response<'a>, args: &Vec<Arg>) -> Response<'a> { todo!(); }
+        // get url query from request
+        let query = HttpQuery::from_url(input.request.url());
 
-    pub fn get_func(input: &str) -> Access {
+        let rendered_args: Vec<&str> = args.iter().map(| Arg{ name, value } | match (name.as_str(), value){
+            ("query", Some(param)) => query.get(param).unwrap_or(""),
+            ("wild", Some(index)) => &input.path_match.wildcards[index.parse::<usize>().unwrap()],
+            ("text", Some(value)) => value,
+            (_, _) => "",
+        }).collect();
+
+        let output_raw = Command::new(&path).args(rendered_args).output().unwrap();
+        let output = output_raw.stdout;
+
+        input.body = output;
+
+        return input
+    });
+
+    option!( read(input) => {
+        let path = input.path_match.to_path(&input.route.resource);
+        let body: Vec<u8> = fs::read(&path).unwrap_or_default();
+        input.body = body;
+
+        return input
+    });
+
+
+    option!( header(input, args) => {
+        args.into_iter().fold(input, |response, arg| match arg {
+            Arg { name, value: Some(value) } => response.with_header(name, value),
+            Arg { name, value: None } => response,
+        })     
+    });
+
+
+    pub fn get_func(input: &str) -> OptionFunc {
         match input {
             "exec" => exec,
             "read" => read,
+            "header" => header,
             _ => panic!(),
+        }
+    }
+
+
+    // ------------
+    // HELPER TYPES
+    // ------------
+    pub struct HttpQuery {
+        inner: HashMap<String, String>,
+    }
+
+    impl HttpQuery {
+        pub fn from_url(url: &Url) -> Self {
+
+            let mut output: HashMap<String, String> = HashMap::new();
+            let pairs = url.query_pairs();
+            for ( left, right ) in pairs {
+                output.insert(left.into_owned(), right.into_owned());
+            }
+            Self { inner: output }
+        }
+
+        pub fn get(&self, key: &str) -> Option<&str> {
+           self.inner.get(key).and_then(|x| Some(x.as_str()))
         }
     }
 }
 
+use crate::path_expression::PathMatch;
 
-pub struct Response<'a> {
+
+pub struct ResponseGenerator<'a> {
     pub route: &'a Route,
+    pub path_match: &'a PathMatch<'a>,
+    pub request: &'a crate::Request,
 
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
-    pub status: u32,
+    pub status: u16,
 }
 
-impl<'a> Response<'a> {
-    pub fn new(body: Vec<u8>, route: &'a Route) -> Self  {
+impl<'a> ResponseGenerator<'a> {
+    pub fn new(path_match: &'a PathMatch, route: &'a Route, request: &'a crate::Request) -> Self  {
         Self {
+            path_match,
             route,
+            request,
             headers: HashMap::new(),
-            body: body.clone(),
+            body: vec![],
             status: 200
         }
     }
 
     pub fn with_header(mut self, key: &str, value: &str) -> Self {
         self.headers.insert(key.to_string(), value.to_string()); self
+    }
+}
+
+impl Into<tide::Response> for ResponseGenerator<'_> {
+    fn into(self) -> tide::Response {
+
+        let mut out = tide::Response::builder(self.status);
+        out = self.headers.iter().fold(out, |acc, (key, value)| acc.header(key.as_str(), value.as_str()));
+        out = out.body(self.body);
+
+        // set the MIME type to text/plain if none was set
+        if self.headers.keys().all(|x| x != "content-type") {
+            out = out.header("content-type", "text/plain");
+        }
+
+        out.build()
     }
 }
 
@@ -81,7 +181,6 @@ impl Arg {
             name: name.to_string(),
             value: value.and_then(|x| Some(x.to_string())),
         }
-
     }
 }
 
@@ -132,20 +231,4 @@ impl Arg {
 
 //        assert_eq!(left.post_processors.len(), 0);
 //     }
-
-
-//     #[test]
-//     /// Option strings that don't specify an access type should default to an access type of Read,
-//     /// even if other post processors are specified
-//     fn implicit_read() {
-//        let left = Options::from_str("header(access-control-allow-origin:*)");
-
-//        match left.access_type {
-//             Access::Exec(_) => panic!("access type should be Read"),
-//             Access::Read => ()
-//        };
-
-//        assert_eq!(left.post_processors.len(), 1);
-//     }
-// }
 

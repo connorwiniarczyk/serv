@@ -2,23 +2,51 @@
 
 
 use peg;
-use crate::error;
-
-use crate::route_table;
-use crate::options;
 
 use crate::options::{ Arg, RouteOption };
+use crate::route_table::{ Route, RouteTable };
 
-use crate::route_table::{ Route };
+use regex::Regex;
+use lazy_static::lazy_static;
 
+use std::path::Path;
+use std::io::{BufRead, BufReader};
+use std::fs::File;
+
+use crate::path_expression::{ PathExpr, Node };
+
+lazy_static! {
+    // A regular expression used to strip comments from the file before parsing
+    static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
+}
+
+pub fn parse_route_file(path: &Path) -> Result<RouteTable, String>{
+    let file = File::open(path).expect("There is no `routes` file in this directory");    
+    let reader = BufReader::new(file);
+    let table = reader.lines()
+        .filter_map(|x| x.ok()) // remove Err values and unwrap Ok() values
+        .map(|x| COMMENT.replace(&x, "").to_string()) // remove Comments
+        .filter_map(|x| route_parser::route(&x).ok()) // turn each line into a Route, and remove failures
+        .collect();
+
+    Ok(RouteTable { table })
+}
 
 peg::parser! {
-    grammar path_parser() for str {
+    grammar route_parser() for str {
 
-        pub rule route() -> Route = request:path() " "+ resource:path() " "+ options:options() { todo!() }
+        pub rule route() -> Route = request:path() [' ' | '\t']+ resource:path() [' ' | '\t']+ options:options() {
+            Route { request, resource, options }    
+        }
 
-        pub rule path() -> Vec<String> = root:"/"? node:path_node() ** "/"  { node }
-        rule path_node() -> String = n:$(['a'..='z' | 'A'..='Z' | '0'..='9']+) { n.to_string() }
+        rule path_node() -> Node = node:$([^ ' ' | '\t' | ':' | '/' | '\\']+) { Node::from_str(node) }
+
+        pub rule path() -> PathExpr = root:"/"? nodes:path_node() ** "/"  {
+            PathExpr {
+                is_global: root.is_some(),
+                inner: nodes
+            }
+        }
 
 
         // rules for parsing options. eg: exec(), header(), etc.
@@ -26,7 +54,7 @@ peg::parser! {
 
         // The class of character that can be included in an identifier.
         // an identifier is any option name, argument, or value
-        rule ident() -> &'input str = n:$([^ '(' | ')' | ' ' | ':' | ',']+) { n }
+        rule ident() -> &'input str = n:$([^ '(' | ')' | '\t' | ' ' | ':' | ',']+) { n }
 
         pub rule option() -> RouteOption = name:ident() args:arguments()? { RouteOption::new( name, args.unwrap_or(vec![]) ) }
 
@@ -45,9 +73,19 @@ mod tests{
 
     #[test]
     fn test() {
-        path_parser::options("exec(query:first wild:0) header(content-type:text/html)").unwrap();
-        // let args = path_parser::arguments("(test:abcd test)").unwrap();
-        // path_parser::arguments("test:123 abcd one two:three 10:10 10:one").unwrap();
+        let route = route_parser::route("/styles/*   css/*          	header(content-type:text/css)").unwrap();
+    }
 
+    #[test]
+    fn file() {
+        parse_route_file(Path::new("/home/connor/projects/serv/examples/cms/routes")).unwrap();
+    }
+
+    #[test]
+    fn test2() {
+        let path = "/home/connor/projects/serv/examples/cms/routes";
+        let file = File::open(path).expect("There is no `routes` file in this directory");    
+        let reader = BufReader::new(file);
     }
 }
+
