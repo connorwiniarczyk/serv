@@ -13,10 +13,10 @@ use std::path::Path;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
-use crate::path_expression::{ Node, RequestPattern, ResourcePattern };
+use crate::route_patterns::{ Node, RequestPattern, ResourcePattern };
 
+// A regular expression used to strip comments from the file before parsing
 lazy_static! {
-    // A regular expression used to strip comments from the file before parsing
     static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
 }
 

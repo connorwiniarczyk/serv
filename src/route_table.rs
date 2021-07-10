@@ -1,25 +1,15 @@
 /// parses the routes file
 
-use super::*;
-
-use regex::Regex;
-use lazy_static::lazy_static;
-
 use std::fmt;
 use std::path::Path;
-
-use crate::path_expression::{ RequestPattern, ResourcePattern };
-use crate::options::RouteOption;
-
-use crate::parser;
-
-use crate::State;
 use tide::Request;
+
+use crate::route_patterns::{ RequestPattern, ResourcePattern };
+use crate::options::RouteOption;
+use crate::parser;
+use crate::State;
 use crate::options::ResponseGenerator;
 
-lazy_static! {
-    static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
-}
 
 #[derive(Clone)]
 pub struct Route {
