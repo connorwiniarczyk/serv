@@ -3,7 +3,7 @@
 mod options;
 mod config;
 mod route_table;
-mod path_expression;
+mod route_patterns;
 mod error;
 mod parser;
 
