@@ -1,27 +1,13 @@
-/// Defines the PathExpr type, which is an expression that represent one or 
-/// more Paths. For example, a PathExpr of /one/*/three would be equivalent to
-/// /one/two/three, /one/four/three, etc.
-/// 
-/// I want to use this type as a more flexible way of matching against incoming
-/// HTTP requests. It stores paths as a list of Nodes, an enum which at this
-/// time can be either some string, or a wildcard.
-///
-/// The type implements PartialEq<&str> in order to facilitate matching
+/// Defines the RequestPattern, and ResourcePattern types, which represent the
+/// first two columns of the route table. RequestPatterns represent a set of
+/// potential http requests, and ResourcePatterns represent a set of potential
+/// resources on the host machine. 
 
 use crate::Request;
 
 use std::path::{Path, PathBuf};
-use itertools::Itertools;
-use itertools::EitherOrBoth::*;
-
-
-
-macro_rules! replace_if_wild {
-    ($value:ident, take_from=$wilds:ident) => { match $value {
-        Node::Defined(val) => val.as_str(),
-        Node::Wild => $wilds.next().unwrap(),
-    }} 
-}
+use std::fmt;
+use itertools::{Itertools, EitherOrBoth::*};
 
 
 /// A pattern representing a set of http requests
@@ -35,6 +21,9 @@ pub struct RequestPattern {
 
 impl RequestPattern {
 
+    /// Check the equality of `self` and a given http request. Return an Err
+    /// if they are not equal, or returns a `RequestMatch` with metadata about
+    /// the match, including a `Vec` of wildcards filled in by the request.
     pub fn compare<'request>(&'request self, request: &'request Request) -> Result<RequestMatch<'request>, &'request str> {
 
         let path = request.url().path_segments().ok_or_else(|| "url path cannot be split")?;
@@ -56,12 +45,6 @@ impl RequestPattern {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RequestMatch<'request> {
-    pub pattern: &'request RequestPattern,
-    pub request: &'request Request,
-    pub wildcards: Vec<&'request str>,
-}
 
 #[derive(Debug, Clone)]
 pub struct ResourcePattern {
@@ -69,11 +52,21 @@ pub struct ResourcePattern {
     pub path: Vec<Node>
 }
 
+/// Given a Node and an iterator of filled in wildcards, return either the
+/// value of the Node if it is defined, or the value of the next string in the
+/// iterator if the it is Wild. 
+macro_rules! replace_if_wild {
+    ($value:ident, take_from=$wilds:ident) => { match $value {
+        Node::Defined(val) => val.as_str(),
+        Node::Wild => $wilds.next().unwrap(),
+    }} 
+}
+
 impl ResourcePattern {
     pub fn get_path(&self, request_match: &RequestMatch) -> PathBuf {
         let mut wilds = request_match.wildcards.iter();
 
-        // if the PathExpr template is global, make the resulting PathBuf global as well by
+        // if the path is global, make the resulting PathBuf global as well by
         // prefixing it with "/", otherwise, just use ""
         let prefix = match self.is_global {
             true => Path::new("/").to_path_buf(),
@@ -85,9 +78,6 @@ impl ResourcePattern {
             .fold(prefix, |acc, x| acc.join(&x))
     }
 }
-
-
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
@@ -104,11 +94,24 @@ impl Node {
     }
 }
 
-
-
-
-
-use std::fmt;
+/// Represents a successful match between an HTTP request and a RequestPattern,
+/// and is meant to provide information about the match to the route's options.
+/// Contains a list of "filled in" wildcards that can be used by the
+/// ResourcePattern to generate a concrete path, or by options via the `wild`
+/// argument. 
+///
+/// For example: if the RequestPattern is `/one/*/three/*`, and the request has
+/// a path of `/one/two/three/four`, the wildcards field will be `["two", "four"]`
+///
+/// RequestMatches contain only pointers which are only valid for the lifetime
+/// of the request that generated the match, hence the 'request lifetime
+/// parameter
+#[derive(Debug, Clone)]
+pub struct RequestMatch<'request> {
+    pub pattern: &'request RequestPattern,
+    pub request: &'request Request,
+    pub wildcards: Vec<&'request str>,
+}
 
 // Implement Display for Paths and Nodes
 impl fmt::Display for Node {
