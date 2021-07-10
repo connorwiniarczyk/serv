@@ -37,8 +37,8 @@ impl Route {
         let first_option = self.options.iter().next();
 
         let needs_default = match first_option {
-            Some( RouteOption { func, args, func_name } ) => {
-                !(func_name == "exec" || func_name == "read")
+            Some( RouteOption { processor, args, name } ) => {
+                !(name == "exec" || name == "read")
             }
             None => true,
         };
