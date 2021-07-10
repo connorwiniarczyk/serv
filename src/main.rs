@@ -6,6 +6,7 @@ mod route_table;
 mod route_patterns;
 mod error;
 mod parser;
+mod processors;
 
 use route_table::Route;
 use config::Config;
