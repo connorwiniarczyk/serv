@@ -26,6 +26,7 @@ pub fn parse_route_file(path: &Path) -> Result<RouteTable, String>{
     let table = reader.lines()
         .filter_map(|x| x.ok()) // remove Err values and unwrap Ok() values
         .map(|x| COMMENT.replace(&x, "").to_string()) // remove Comments
+        .map(|x| x.trim().to_string()) // remove leading and trailing whitespace
         .filter_map(|x| route_parser::route(&x).ok()) // turn each line into a Route, and remove failures
         .collect();
 
