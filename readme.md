@@ -5,10 +5,10 @@ in Rust, but this one is mine. My goal for it is to have an HTTP server that
 expresses routes as concisely as possible, while still being flexible enough
 to produce complex APIs with arbitrary behavior.
 
-Each route is defined with a line in a file called `routes`. `routes` is a
+Each route is defined with a line in a file called `routes.conf`. `routes.conf` is a
 whitespace separated values file where the first column represents potential
 HTTP requests, the second column represents the corresponding resource on the
-host system, and the remaining columns are a list of zero or more options.
+host system, and the third column is a list of options.
 
 Serv derives its flexibility from these options, which give the user much more
 control over the behavior of individual routes than would be possible in a more
@@ -55,21 +55,11 @@ curl localhost:4000
 
 ## Options
 
-The first option in the list is special and is referred to as the access type.
-There are two access types:
-
-- `read` : read the file directly and serve the contents as is 
-- `exec` : attempt to execute the file and return the output generated
-
-If the option in the list is neither of these, than serv will automatically
-insert the `read` access type, so it is only necessary to specify when you
-intend on executing the file.
-
-Options that are not the access type are called post processors. I have two
-implemented as a proof of concept:
-
-- `header` : add a list of http headers to the response
-- `cors`   : add specific CORS related headers to the response
+- `read` : Replace the body of the response with the contents of the resource
+- `exec(args)` : Replace the body of the response with the result of executing the resource
+- `header(key:value)` : Add an HTTP header to the response
+- `filetype(type)` : Set the MIME type of the response (shorthand for `header(content-type:<type>)`)
+- `cors` : Add CORS headers to the response (shorthand for `header(access-control-allow-origin:*)`)
 
 ### Options with Arguments
 
@@ -79,18 +69,6 @@ all of the following are valid options:
 ```
 exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 ```
-
-The valid arguments for each option are listed below below:
-
-`exec` : arguments to exec map parts of the http query to arguments that will
-         get passed to the program being executed. The first argument will
-         become $1, the second $2, etc.
-
-- `query:<key>`  : Get the part of the http query string with the given key
-- `wild:<index>` : Get the part matched wildcard at the given index
-
-`header` : arguments to header become the key and value pairs of http headers
-           in the response
 
 
 ## Path Expressions
@@ -106,23 +84,25 @@ will route the request `/styles/main.css` to `css/main.css`.
 
 
 
-## Routes Example 
+## Routes.conf Example 
 
 ```
-# Routes example
+# routes.conf example
 # <request path> <resource path> <options>
 
 # Normal Stuff
-/               index.html              header(content-type:text/html)
-/css/*          public/styles/*         header(content-type:text/css)
-/js/*           public/scripts/*        header(content-type:text/javascript)
+# The read option is optional, if there is no exec option in the route, it will be inferred
+/               index.html              read ft(html)
+/css/*          public/styles/*         ft(css)
+/js/*           public/scripts/*        ft(js)
 
 # Images/Media
-/splash         media/background.jpg    read # the read option can be stated explicitly or ignored
-/images/*       media/images/*/large    
+/splash         media/background.jpg    ft(jpg)
+/images/*       media/images/*/large    ft(jpg)
 
-# API
-/api/date       api/get_date.sh         exec
+# Executables in the PATH are usable as well
+/api/date       date                    exec cors ft(text/plain)
+
 /api/register   api/register_user.py    exec(query:username, query:password)
 /user/*/info    api/get_user_info.py    exec(wild:0) # using part of the path as an argument
 
@@ -134,8 +114,6 @@ will route the request `/styles/main.css` to `css/main.css`.
 ## To Do / Known Issues:
 
 - I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
-
-- `exec` needs an argument that just accepts a constant string and passes that as an arg. It also needs access to the rest of the http request for stuff like post bodies, the path, etc.
 
 - A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that into information about the headers and/or status code
 
