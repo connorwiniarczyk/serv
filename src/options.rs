@@ -33,6 +33,7 @@ pub struct ResponseGenerator<'a> {
     pub route: &'a Route,
     pub request_match: &'a RequestMatch<'a>,
     pub request: &'a crate::Request,
+    pub request_body: &'a Option<String>,
 
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
@@ -40,11 +41,12 @@ pub struct ResponseGenerator<'a> {
 }
 
 impl<'a> ResponseGenerator<'a> {
-    pub fn new(request_match: &'a RequestMatch, route: &'a Route, request: &'a crate::Request) -> Self  {
+    pub fn new(request_match: &'a RequestMatch, route: &'a Route, request: &'a crate::Request, request_body: &'a Option<String>) -> Self  {
         Self {
             request_match,
             route,
             request,
+            request_body,
             headers: HashMap::new(),
             body: vec![],
             status: 200
@@ -76,6 +78,7 @@ impl<'a> ResponseGenerator<'a> {
             ("wild", Some(index)) => self.request_match.wildcards[index.parse::<usize>().ok()?].to_string(),
             ("wild", None) => self.request_match.wildcards.iter().join(" "),
             ("text", Some(text)) => text.to_string(),
+            ("body", None) => self.request_body.as_ref().expect("test").as_str().to_string(),
             (text, None) => text.to_string(),
 
             _other => return None,
@@ -113,6 +116,28 @@ impl Arg {
         Self {
             name: name.to_string(),
             value: value.and_then(|x| Some(x.to_string())),
+        }
+    }
+}
+
+use std::fmt;
+
+impl fmt::Display for RouteOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let args_str = &self.args.iter().map(|x| x.to_string()).join(" ");
+        match args_str.len() {
+            0 => write!(f, "{}", self.name),
+            _ => write!(f, "{}({})", self.name, args_str),
+        }
+        
+    }
+}
+
+impl fmt::Display for Arg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.value {
+            Some(value) => write!(f, "{}:{}", self.name, value),
+            None => write!(f, "{}", self.name),
         }
     }
 }
