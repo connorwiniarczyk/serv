@@ -43,7 +43,7 @@ pub fn get(input: &str) -> Processor {
         "read" => read,
         "header" => header,
         "cors" => cors,
-        "filetype" | "ft" => filetype,
+        "filetype" | "ft" | "file" => filetype,
         _ => panic!("there is no processor defined with the name: {}", input),
     }
 }
@@ -94,6 +94,9 @@ define_processor!(filetype, (input, args) => {
         "html" => "text/html",
         "js" | "javascript" => "application/javascript",
         "css" | "stylesheet" | "style" => "text/css",
+        "jpg" => "image/jpg",
+        "png" => "image/png",
+        "svg" => "image/svg",
         other => other,
     };
 
