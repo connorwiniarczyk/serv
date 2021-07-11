@@ -1,7 +1,7 @@
 # Serve HTML, CSS, JS files
-/           renderer/render.sh 	   exec(text:index) header(content-type:text/html)
-/styles/*   css/*          	   header(content-type:text/css)
-/images/*   media/*  		   header(content-type:image/jpg)
+/           renderer/render.sh 	   ft(html) exec(text:index)
+/styles/*   css/*          	   ft(css)
+/images/*   media/*  		   ft(image/jpg)
 
 # Markdown Renderer
 /content/*	 renderer/render.sh	 exec header(content-type:text/html)
@@ -9,4 +9,4 @@
 # Tells you what the date is
 /api/date	api/date	exec
 
-/test	echo	exec(test)
+/test	echo	exec(body)
