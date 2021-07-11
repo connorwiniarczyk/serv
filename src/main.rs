@@ -82,7 +82,7 @@ async fn main() {
         host: host.to_string(),
     };
 
-    let routefile = config.root.join("routes");
+    let routefile = config.root.join("routes.conf");
     let route_table = route_table::RouteTable::from_file(&routefile);
 
     println!("Generated the following Route Table:");
