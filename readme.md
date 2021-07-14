@@ -18,19 +18,22 @@ responding with its output rather than its contents. By doing this, complex
 logic can be handled by external programs that are better suited for it, and in
 a manner that is more in line with the unix tradition.
 
-The `exec` option is also language agnostic. APIs can be written in bash,
-javascript, python, c, rust, lisp, fortran, or any combination thereof. 
+This design choice also makes serv language agnostic. APIs can be written in bash,
+javascript, python, c, rust, lisp, fortran, or any combination thereof.
+
+Serv is written using the [tide](https://github.com/http-rs/tide) http framework,
+likely inherits most of its strengths and weaknesses. 
 
 
-# Installation / Usage
+## Installation / Usage
 
 You'll need rust installed on your system in order to install serv. It can be 
 installed from [here](https://rustup.rs/) and by then running `rustup default nightly`
 and `rustup update`.
 
 Most of the examples will have dependencies on external programs. In the case
-of the CMS example, you will need `pandoc` installed in order to render 
-markdown files.
+of the Blog example, you will need `pandoc` installed in order to render 
+markdown files, as well as `cowsay` for the date api.
 
 ```bash
 # install rust and cargo, tell cargo to use the nightly version of the compiler
@@ -42,7 +45,7 @@ cargo install --git https://github.com/connorwiniarczyk/serv.git
 
 # run an example
 git clone https://github.com/connorwiniarczyk/serv.git
-cd serv/examples/cms
+cd serv/examples/blog
 
 # serv takes a port argument (the default is 4000) and path to a directory.
 # If the directory does not contain a valid routes.conf file, a default one
@@ -50,7 +53,9 @@ cd serv/examples/cms
 serv -p 4000
 
 # test the server
-curl localhost:4000
+curl localhost:4000/api/date
+
+# or open it in a browser
 ```
 
 # Configuration
