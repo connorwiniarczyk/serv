@@ -56,12 +56,12 @@ peg::parser! {
         // The class of character that can be included in an identifier.
         // an identifier is any option name, argument, or value
         rule ident() -> &'input str = n:$([^ '(' | ')' | '\t' | ' ' | ':' | ',']+) { n }
+        rule string() -> &'input str = "\"" n:$([^ '\"']+) "\"" { n }
 
         pub rule option() -> RouteOption = name:ident() args:arguments()? { RouteOption::new( name, args.unwrap_or(vec![]) ) }
-
         pub rule arguments() -> Vec<Arg> = "(" args:argument() ** ([ ',' | ' ' ]+) ")"   { args }
-        pub rule argument() -> Arg = arg:ident() val:arg_value()? { Arg::new(arg, val) }
-        rule arg_value() -> &'input str = ":" val:ident() { val }
+        pub rule argument() -> Arg = arg:(string() / ident()) val:arg_value()? { Arg::new(arg, val) }
+        rule arg_value() -> &'input str = ":" val:(string() / ident()) { val }
     }
 }
 
@@ -74,17 +74,18 @@ mod tests{
 
     #[test]
     fn test() {
-        let route = route_parser::route("/styles/*   css/*          	header(content-type:text/css)").unwrap();
+        route_parser::route("/styles/*   css/* header(content-type:text/css)").unwrap();
+        route_parser::route("/styles/* curl exec(\"http://test\":\"value::,,  /\")").unwrap();
     }
 
     #[test]
     fn file() {
-        parse_route_file(Path::new("/home/connor/projects/serv/examples/cms/routes")).unwrap();
+        parse_route_file(Path::new("/home/connor/projects/serv/examples/cms/routes.conf")).unwrap();
     }
 
     #[test]
     fn test2() {
-        let path = "/home/connor/projects/serv/examples/cms/routes";
+        let path = "/home/connor/projects/serv/examples/cms/routes.conf";
         let file = File::open(path).expect("There is no `routes` file in this directory");    
         let reader = BufReader::new(file);
     }
