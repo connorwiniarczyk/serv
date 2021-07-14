@@ -54,27 +54,39 @@ pub fn get(input: &str) -> Processor {
 
 use std::process::Command;
 use std::fs;
+use crate::parser::route_parser as parse;
 
 // Replace the body of the response with the content of the file at the specified resource
-define_processor!(read, (input) => {
-    let path = input.route.resource.get_path(input.request_match);
-    input.with_body(fs::read(&path).unwrap_or_default()) 
+define_processor!(read, (input, args) => {
+    println!("\t READ");
+
+    // if an argument was given, use it as the path instead of the resource
+    let path = match args.iter().next() {
+        Some(Arg { name, value }) => parse::resource(name).unwrap().get_path(input.request_match),
+        None => input.route.resource.get_path(input.request_match),
+    };
+    println!("\t\t reading from path: {:?}", &path);
+    input.append_to_body(fs::read(&path).unwrap_or_default()) 
 });
 
 // Replace the body of the response with the result of executing the file at the specified resource
 define_processor!(exec, (response, args) => {
+    println!("\t EXEC");
     let path = response.route.resource.get_path(response.request_match);
+
+    println!("\t\t executing command: {:?}", &path);
     let rendered_args: Vec<String> = args.iter()
         .filter_map(|x| response.extract_data(x))
         .collect();
 
     let result = Command::new(&path).args(rendered_args).output().unwrap().stdout;
-    response.with_body(result)
+    response.append_to_body(result)
 });
 
 
 // Adds one or more http headers to the http response
 define_processor!(header, (input, args) => {
+    println!("\t HEADER");
     args.into_iter().fold(input, |response, arg| match arg {
         Arg { name, value: Some(value) } => response.with_header(name, value),
         Arg { name, value: None } => response,
@@ -83,12 +95,14 @@ define_processor!(header, (input, args) => {
 
 // Adds CORS related headers to the response
 define_processor!(cors, (input) => {
+    println!("\t CORS");
     input.with_header("Access-Control-Allow-Origin", "*")
 });
 
 // Shorthand for header(content-type:<filetype>)  but with built in abbreviations for common
 // filetypes like js, css, and html.
 define_processor!(filetype, (input, args) => {
+    println!("\t FILETYPE");
     let arg = args.iter().next().expect("filetype needs at least one argument").name.to_lowercase();
     let header = match arg.as_str() {
         "html" => "text/html",
