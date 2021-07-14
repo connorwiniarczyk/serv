@@ -62,7 +62,7 @@ curl localhost:4000/api/date
 Each route is defined with a line in a file called `routes.conf`. `routes.conf` is a
 whitespace separated values file where the first column represents potential
 HTTP requests, the second column represents the corresponding resource on the
-host system, and the third column is a list of options.
+host system, and the third column is a list of options that define how the resource will be processed.
 
 ## Request Patterns and Resource Patterns
 
@@ -77,15 +77,15 @@ will route the request `/styles/main.css` to `css/main.css`.
 
 ## Options
 
-Options are how serv derives its flexibility, they are essentially pre-defined
-functions that transform the server's response as it is being generated. They
+Options are how serv derives its flexibility, they are essentially pointers to pre-defined
+functions that transform the route's response as it is being generated. They
 are called in the order they are written and can be composed arbitrarily. A
 list of currently implemented options is included below.
 
-- `read` : Replace the body of the response with the contents of the resource
-- `exec(args)` : Replace the body of the response with the result of executing the resource
+- `read` : Read the resource and append its contents to the body
+- `exec(args)` : Execute the resource with the given arguments and append its output to the body
 - `header(key:value)` : Add an HTTP header to the response
-- `filetype(type)` : Set the MIME type of the response (shorthand for `header(content-type:<type>)`)
+- `filetype | ft(type)` : Set the MIME type of the response (shorthand for `header(content-type:<type>)`)
 - `cors` : Add CORS headers to the response (shorthand for `header(access-control-allow-origin:*)`)
 
 If a Route has no options, it's response will always be empty. At least one
@@ -139,3 +139,13 @@ exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 - A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that into information about the headers and/or status code
 
 - Better debug information for stuff like explaining whether/why a route is valid or not or when requests fail.
+
+### Ideas for More Options
+
+Just brainstorming
+
+- `log(file)` : write information about the request to a file
+- `hook(program, args)` : execute a given 'hook' script. Would be a superset of log, but the distinction might be semantically useful
+- `literal` : append the resource to the body as a string
+- `status(code)` : change the status code
+-  `striplines(range)` : remove a set of lines from the body
