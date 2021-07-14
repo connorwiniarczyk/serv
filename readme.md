@@ -105,11 +105,11 @@ exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 ```
 
 
-## Routes.conf Example 
+## Example Config
 
 ```
 # routes.conf example
-# <request path> <resource path> <options>
+# <request> <resource> <options>
 
 # Normal Stuff
 # The read option is optional, if there is no exec option in the route, it will be inferred
