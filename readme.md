@@ -9,8 +9,7 @@ but with much more flexibility in how routes can be configured.
 
 ![screenshot](screenshot.png)
 
-Serv behaves like a static file server
-in almost every way, except that when a route needs to do something more
+Serv behaves like a static file server in almost every way, except that when a route needs to do something more
 complicated than reading and transmitting a file, it can do so by invoking
 another program on the host system. An option called `exec` in the config file
 tells the Route to treat the file it points to as an executable and run it,
@@ -22,7 +21,7 @@ This design choice also makes serv language agnostic. APIs can be written in bas
 javascript, python, c, rust, lisp, fortran, or any combination thereof.
 
 Serv is written using the [tide](https://github.com/http-rs/tide) http framework,
-likely inherits most of its strengths and weaknesses. 
+and likely inherits most of its strengths and weaknesses. 
 
 
 ## Installation / Usage
