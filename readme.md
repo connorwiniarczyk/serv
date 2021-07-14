@@ -1,24 +1,15 @@
 # Serv
 
 Serv is a web server written in Rust. There are a lot of web servers written
-in Rust, but this one is mine. I wanted something that was as fast and easy to
-use as static file servers like [sfz](https://github.com/weihanglo/sfz) or
-[binserve](https://github.com/mufeedvh/binserve), but with more of the
-flexibility of web frameworks like
-[express](http://expressjs.com/),
-[flask](https://flask.palletsprojects.com/en/2.0.x/),
-and [rocket](https://rocket.rs/).
+in Rust, but this one is mine. It is inspired by static file servers like 
+[sfz](https://github.com/weihanglo/sfz),
+[serve](https://github.com/vercel/serve), and
+[binserve](https://github.com/mufeedvh/binserve),
+but with much more flexibility in how routes can be configured.
 
 ![screenshot](screenshot.png)
 
-Often, when I am trying to spin up a new website or web interface for an idea
-I have, I'll start by using a static file server because of how easy they are 
-to set up. This will work well for a while, until I need to do anything even
-slightly outside the scope of whatever program I am using, and I discover that
-now I have to drop everything to learn a web framework in whatever language I
-happen to be using.
-
-Serv is my response to this frustration. It behaves like a static file server
+Serv behaves like a static file server
 in almost every way, except that when a route needs to do something more
 complicated than reading and transmitting a file, it can do so by invoking
 another program on the host system. An option called `exec` in the config file
