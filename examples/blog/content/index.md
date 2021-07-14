@@ -1,5 +1,9 @@
 # This is Markdown
 
+- [index](/)
+- [page two](/content/two)
+- [what's the date?](/api/date)
+
 A shell script is piping this through Pandoc before serving it as HTML and I
 think that's pretty neat. You could probably write a pretty cool blog or
 something and spend very little effort to maintain it.
@@ -12,9 +16,9 @@ passes as an argument into pandoc before surrounding it with the values of
 
 ```bash
 #!/bin/sh
-cat renderer/head.html
+cat head.html
 pandoc content/$1.md
-cat renderer/tail.html
+cat tail.html
 ```
 
 This is the line in the `routes` file that defines this route.
@@ -23,10 +27,10 @@ and the `wild:0` argument tells it to use the first matched wildcard as an
 argument.
 
 ```bash
-/content/*  renderer/render.sh  exec(wild:0) header(content-type:text/html)
+/content/*  ./render.sh	  exec(wild:0) ft(html)
 ```
 
-[date](/api/date)
+
 
 I think this could make a really nice content management system for a blog or
 personal website. Below are some images. The rest of the paragraph will be
