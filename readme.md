@@ -1,5 +1,7 @@
 # Serv
 
+![screenshot](screenshot.png)
+
 Serv is a web server written in Rust. There are a lot of web servers written
 in Rust, but this one is mine. I wanted something that was as fast and easy to
 use as static file servers like [sfz](https://github.com/weihanglo/sfz) or
