@@ -134,11 +134,33 @@ exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 
 ## To Do / Known Issues:
 
-- I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
+- I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell    script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
 
-- A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that into information about the headers and/or status code
+- A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that   into information about the headers and/or status code
 
 - Better debug information for stuff like explaining whether/why a route is valid or not or when requests fail.
+
+- Routes should be aware of file extensions. Request Patterns should have the ability to match against them, and operators should have the ability to 
+  reference one if it is given. This should include automatic MIME type detection.
+
+- Better compliance with [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface) scripts.
+  Should have the option to parse the first few lines of the script as response headers and to pass
+  information about the request through environment variables or stdin as defined in the the CGI spec
+  
+- The arguments to exec that refer to information in the request should have a more general form and be usable
+  outside of the exec operator itself. Perhaps by a set of keywords preceded by an `@` sign such as `@query`, `@body`, `@query:key`, etc.
+  
+- Wildcards in the request pattern should be nameable and referenceable by operators outside of `exec`. Maybe by appending a name after
+  the `*` symbol. So a route like `/images/*  ./render  exec(wild:0)` could be expressed as `/images/*image  ./render  exec(*image)`.
+  Or if filetypes are implemented, something like `/images/*images.*ft  ./render  exec(*image)  filetype(*ft)`.
+  
+- I think the distinction between the Resource column and the operators is unnecessary. A path by itself should be parsed as a read operator
+  pointing to the appropriate file, while other operators that reference a file should point to it with their own syntax. So a route like
+  `/  index.html  read` could just be expressed as `/  index.html`. Or an executable route like `/  date  exec` could be `/  exec(date)`,
+  or maybe something more concise like `/  !date`.
+  
+- I would love to get streams working. This would make it very easy to set up your own streaming server by integrating with something like ffmpeg
+
 
 ### Ideas for More Options
 
