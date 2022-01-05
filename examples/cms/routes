@@ -8,3 +8,5 @@
 
 # Tells you what the date is
 /api/date	api/date	exec
+
+/test	echo	exec(test)
