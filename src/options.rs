@@ -1,9 +1,9 @@
-
 use std::collections::HashMap;
-use crate::route_table::*;
-use tide::http::Url;
 use std::process::Command;
 use itertools::Itertools;
+
+use crate::route_patterns::RequestMatch;
+use crate::route_table::{Route};
 
 type OptionFunc = for<'a> fn(ResponseGenerator<'a>, &Vec<Arg>) -> ResponseGenerator<'a>;
 
@@ -102,7 +102,6 @@ pub mod access_types {
 }
 
 
-use crate::path_expression::RequestMatch;
 
 pub struct ResponseGenerator<'a> {
     pub route: &'a Route,
