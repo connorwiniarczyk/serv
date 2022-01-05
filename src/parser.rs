@@ -21,7 +21,7 @@ lazy_static! {
 }
 
 pub fn parse_route_file(path: &Path) -> Result<RouteTable, String>{
-    let file = File::open(path).or_else(|_| Err("There is no `routes` file in this directory"))?;    
+    let file = File::open(path).or_else(|_| Err("There is no `routes.conf` file in this directory"))?;    
     let reader = BufReader::new(file);
     let table = reader.lines()
         .filter_map(|x| x.ok()) // remove Err values and unwrap Ok() values
