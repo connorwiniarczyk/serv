@@ -56,7 +56,7 @@ curl localhost:4000
 ## Options
 
 The first option in the list is special and is referred to as the access type.
-There are two access type:
+There are two access types:
 
 - `read` : read the file directly and serve the contents as is 
 - `exec` : attempt to execute the file and return the output generated
