@@ -54,11 +54,12 @@ impl<'a> ResponseGenerator<'a> {
     }
 
     pub fn with_header(mut self, key: &str, value: &str) -> Self {
+        println!("\t\t adding header: {}:{}", key, value);
         self.headers.insert(key.to_string(), value.to_string()); self
     }
 
-    pub fn with_body(mut self, body: Vec<u8>) -> Self {
-        self.body = body; self
+    pub fn append_to_body(mut self, mut body: Vec<u8>) -> Self {
+        self.body.append(&mut body); self
     }
 
     /// Sometimes, arguments reference data 
