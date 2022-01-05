@@ -19,13 +19,18 @@ use std::path::Path;
 use tide;
 
 
-pub async fn handler(http_request: Request) -> tide::Result {
+pub async fn handler(mut http_request: Request) -> tide::Result {
     println!("incoming http request: {}", http_request.url());
+
+    // get the body string if there is one
+    let body = http_request.body_string().await.ok();
+
     let state = http_request.state();
     let route = http_request.param("route").unwrap_or("").to_string();
 
     for route in state.route_table.iter() {
-        if let Ok(result) = route.resolve(&http_request) {
+        if let Ok(result) = route.resolve(&http_request, &body).await {
+            println!();
             return Ok(result)
         }
     }
@@ -64,7 +69,8 @@ async fn main() {
         false => current_dir().unwrap().join(path),
     }.canonicalize().unwrap();
 
-    println!("{:?}", path_abs);
+    println!("");
+    println!("Serving Directory: {:?}", path_abs);
 
     // It is important to cd into the target directory so that shell scripts invoked in that
     // directory will know what directory they are being run from
@@ -79,15 +85,25 @@ async fn main() {
     let routefile = config.root.join("routes");
     let route_table = route_table::RouteTable::from_file(&routefile);
 
+    println!("Generated the following Route Table:");
+    println!("{}", route_table);
+
     let listen_addr = format!("{}:{}", &config.host, &config.port);
 
-    println!("{:#?}", route_table.table);
 	let mut server = tide::with_state(State{route_table: route_table.table, config});
 
     // let server_instance = server::init(route_table);
     server.at("*route").get(handler);
     server.at("").get(handler);
-    server.listen(listen_addr).await;
+    server.at("*route").post(handler);
+    server.at("").post(handler);
+
+    let result = server.listen(listen_addr).await;
+
+    match result {
+        Ok(_) => (),
+        Err(e) => println!("Server Terminating: {}", e),
+    };
 }
 
 
