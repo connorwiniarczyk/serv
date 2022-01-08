@@ -8,6 +8,9 @@ mod error;
 mod parser;
 mod processors;
 
+mod command;
+mod request_state;
+
 use route_table::Route;
 use config::Config;
 use tide::Response;
