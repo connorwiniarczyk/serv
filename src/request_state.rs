@@ -5,10 +5,11 @@ use itertools::Itertools;
 use crate::route_patterns::RequestMatch;
 use crate::route_table::Route;
 
+use crate::Request;
+
 use crate::processors::*;
 use crate::processors;
 
-use crate::Request;
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
@@ -18,7 +19,7 @@ pub struct RequestState<'request> {
     // I don't think you need this if you use variables
     // pub request_match: &'request  RequestMatch<'request>,
 
-    pub request: &'request  crate::Request,
+    pub request: &'request Request,
     pub request_body: &'request  Option<String>,
 
     pub variables: HashMap<String, String>,
@@ -29,6 +30,19 @@ pub struct RequestState<'request> {
 }
 
 impl<'request> RequestState<'request> {
+
+    pub fn new(route: &'request Route, request: &'request Request, request_body: &'request Option<String>) -> Self  {
+        Self {
+            route,
+            request,
+            request_body,
+            variables: HashMap::new(),
+            headers: HashMap::new(),
+            body: vec![],
+            status: 200
+        }
+    }
+
     fn get_variable(name: &str) -> String {
         todo!();
     }

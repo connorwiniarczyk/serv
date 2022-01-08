@@ -2,6 +2,7 @@ use crate::request_state::RequestState;
 
 pub type CommandFunction = for<'a> fn(RequestState<'a>, &Vec<Arg>) -> RequestState<'a>;
 
+#[derive(Clone)]
 pub struct Command {
     pub name: String,
     pub args: Vec<Arg>,
@@ -14,7 +15,8 @@ impl Command {
     }
 }
 
-pub struct Arg(String);
+#[derive(Clone)]
+pub struct Arg(pub String);
 
 
 
