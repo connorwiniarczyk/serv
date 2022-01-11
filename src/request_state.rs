@@ -7,9 +7,6 @@ use crate::route_table::Route;
 
 use crate::Request;
 
-use crate::processors::*;
-use crate::processors;
-
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
@@ -43,8 +40,11 @@ impl<'request> RequestState<'request> {
         }
     }
 
-    fn get_variable(name: &str) -> String {
-        todo!();
+    pub fn get_variable(&'request self, name: &str) -> &'request str {
+        match self.variables.get(name){
+            Some(var) => var.as_str(),
+            None => panic!("that variable doesn't exist"), // TODO: this should fail more gracefully
+        }
     }
 
 }
