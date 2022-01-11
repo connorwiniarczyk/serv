@@ -69,11 +69,8 @@ impl Default for RouteTable {
         output.add(
             Route {
                 request: RequestPattern{ path: vec![ route_patterns::Node::Defined("test".to_string()) ] },
-                commands: vec![ Command {
-                    name: "test".to_string(),
-                    args: vec![Arg("test".to_string())],
-                    function: crate::command::echo,
-                } ]
+                // commands: vec![ Command::new("exec", vec!["/bin/sh", "echo hello world"]) ],
+                commands: vec![ Command::new("set", vec!["test", "abcdefg"]), Command::new("exec", vec!["echo", "$(test) world"]) ],
             });
 
         return output;
