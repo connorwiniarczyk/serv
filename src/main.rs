@@ -1,7 +1,6 @@
 #![allow(unused_mut, dead_code, unused_results, unused_must_use, unused_variables)]
 #![allow(warnings)]
 
-mod options;
 mod config;
 mod route_table;
 mod route_patterns;

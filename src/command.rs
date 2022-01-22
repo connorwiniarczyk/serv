@@ -22,17 +22,6 @@ pub struct Command {
 
 impl Command {
 
-    // fn variable_substitution(&self, state: &RequestState) {
-
-    //     let test = &self.args[0].value();
-    //     let res = VAR.replace("stdin=$(ABCD)", |caps: &Captures| {
-    //         format!("hello")
-    //     });
-
-    //     println!("{:?}", res);
-    //     todo!();
-    // }
-
     pub fn run<'request>(&self, mut state: RequestState<'request>) -> RequestState<'request> {
         let args: Vec<Arg> = self.args.iter().map(|arg| arg.substitute_variables(&state)).collect();
         (self.function)(&mut state, &args);
@@ -40,13 +29,38 @@ impl Command {
         return state;
     }
 
-    pub fn new(name: &str, arg_strings: Vec<&str>) -> Self {
-        let args = arg_strings.iter().map(|arg| Arg::new(None, arg)).collect();
+    pub fn new(name: &str, args: Vec<Arg>) -> Self {
         Self {
             name: name.to_string(),
             args,
             function: get_command_function(name),
         } 
+    }
+
+    // pub fn new(name: &str, arg_strings: Vec<&str>) -> Self {
+    //     let args = arg_strings.iter().map(|arg| Arg::new(None, arg)).collect();
+    //     Self {
+    //         name: name.to_string(),
+    //         args,
+    //         function: get_command_function(name),
+    //     } 
+    // }
+}
+
+macro_rules! command {
+    ($name:expr) => {{ Command::new($name, vec![]) }};
+    ($name:expr, $( $arg:expr ),+) => {{ Command::new($name, vec![$(Arg::new(None, $arg),)+]) }};
+}
+
+pub(crate) use command;
+
+use std::fmt;
+impl fmt::Debug for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Point")
+            .field("name", &self.name)
+            .field("args", &self.args)
+            .finish()
     }
 }
 
@@ -56,7 +70,7 @@ impl Command {
 //     ( $value:expr ) => { Arg::Positional{ value: $value.to_string() } };
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Arg {
     Positional{ value: String },
     Named{ key: String, value: String },
