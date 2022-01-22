@@ -79,8 +79,6 @@ impl Default for RouteTable {
         let commands = vec![
             command!("set", "var", "hello"),
             command!("echo", "$(path:acbd)", "world"),
-            // Command::new("set", vec!["var", "hello"]),
-            // Command::new("echo", vec!["$(path:abcd) world"]),
         ];
 
         output.add(
@@ -115,11 +113,12 @@ impl fmt::Display for RouteTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>)  -> fmt::Result {
 
         let mut table = Table::new();
-        table.add_row(row![ "REQUEST", "RESOURCE", "OPTIONS" ]);
+        table.add_row(row![ "ROUTE", "COMMANDS"]);
         for row in self.iter() {
+            let commands = row.commands.iter().map(|command| command.to_string()).join("; ");
             // let options_str = row.options.iter().map(|x| x.to_string()).join(" ");
-            let options_str = "test";
-            table.add_row(row![row.request, options_str]);
+            // let options_str = "test";
+            table.add_row(row![row.request, commands]);
         }
 
         write!(f, "{}", table)
