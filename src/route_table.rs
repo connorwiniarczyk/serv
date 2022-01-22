@@ -6,7 +6,7 @@ use tide::Request;
 use prettytable::{ Table, Row, Cell, row, cell };
 use itertools::Itertools;
 
-use crate::route_patterns::{ RequestPattern, ResourcePattern };
+use crate::route_patterns::{RequestPattern, Node };
 use crate::parser;
 use crate::State;
 
@@ -15,6 +15,7 @@ use crate::request_state::RequestState;
 use crate::route_patterns;
 
 use crate::command::Command;
+use crate::command::command;
 
 #[derive(Clone)]
 pub struct Route {
@@ -24,11 +25,15 @@ pub struct Route {
 
 impl Route {
     pub async fn resolve<'request>(&'request self, request: &'request Request<State>, body: &'request Option<String>) -> Result<tide::Response, &'request str> {
-        let request_match = self.request.compare(request)?;
-        println!("\t found a matching route: {}", &self.request);
-        println!("\t with wildcards: {:?}", &request_match.wildcards);
 
         let mut request_state = RequestState::new(&self, &request, body);
+        let request_match = self.request.compare(request, &mut request_state);
+
+        if !request_match { return Err("did not match"); }
+
+        // println!("\t found a matching route: {}", &self.request);
+        // println!("\t with wildcards: {:?}", &request_match.wildcards);
+
 
         for command in &self.commands {
             request_state = command.run(request_state);
@@ -65,12 +70,23 @@ use crate::command::Arg;
 impl Default for RouteTable {
     fn default() -> Self {
         let mut output = Self { table: vec![] };
+        let request = RequestPattern::new(vec![
+            Node::val("test"),
+            Node::var("abcd"),
+        ]);
+
+        let commands = vec![
+            command!("set", "var", "hello"),
+            command!("echo", "$(path:acbd)", "world"),
+            // Command::new("set", vec!["var", "hello"]),
+            // Command::new("echo", vec!["$(path:abcd) world"]),
+        ];
 
         output.add(
             Route {
-                request: RequestPattern{ path: vec![ route_patterns::Node::Defined("test".to_string()) ] },
-                // commands: vec![ Command::new("exec", vec!["/bin/sh", "echo hello world"]) ],
-                commands: vec![ Command::new("set", vec!["test", "abcdefg"]), Command::new("exec", vec!["echo", "$(test) world"]) ],
+                request,
+                commands,
+                // request: route_pattern![*test],//RequestPattern{ path: vec![ node!("test") ] },
             });
 
         return output;
