@@ -36,15 +36,6 @@ impl Command {
             function: get_command_function(name),
         } 
     }
-
-    // pub fn new(name: &str, arg_strings: Vec<&str>) -> Self {
-    //     let args = arg_strings.iter().map(|arg| Arg::new(None, arg)).collect();
-    //     Self {
-    //         name: name.to_string(),
-    //         args,
-    //         function: get_command_function(name),
-    //     } 
-    // }
 }
 
 macro_rules! command {
@@ -64,11 +55,18 @@ impl fmt::Debug for Command {
     }
 }
 
-// TODO macro for easier definition of args inside code
-// macro_rules! arg {
-//     ( $key:ident=$value:expr ) => { Arg::Named{ key: stringify!($key).to_string(), value: $value.to_string() } };
-//     ( $value:expr ) => { Arg::Positional{ value: $value.to_string() } };
-// }
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.name);
+        for arg in &self.args {
+            f.write_str(" ");
+            f.write_str(arg.value());
+        }
+
+        Ok(())
+    }
+}
+
 
 #[derive(Clone, Debug)]
 pub enum Arg {
