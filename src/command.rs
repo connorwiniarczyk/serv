@@ -5,6 +5,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use regex::Captures;
 
+use std::fs;
+
 lazy_static! {
     /// defines syntax for variables within an argument.
     /// syntax is based on Makefile variable syntax: ie. $(VAR)
@@ -149,22 +151,19 @@ command_function!(echo, (state, args) => {
 });
 
 command_function!(exec, (state, args) => {
-    println!("\t exec");
     let mut args_iterator = args.iter();
     let path = &args_iterator.next().unwrap().value();
     let executable_arguments:Vec<&str> = args_iterator.map(|arg| arg.value()).collect();
 
-    // println!("\t\t executing command: {:?}", &path);
-    // let rendered_args: Vec<String> = args.iter()
-    //     .filter_map(|x| response.extract_data(x))
-    //     .collect();
-
-    println!("{}", path);
-    println!("{:?}", executable_arguments);
-
     let mut result = process::Command::new(&path).args(executable_arguments).output().unwrap().stdout;
-    println!("{:?}", result);
     state.body.append(&mut result);
+});
+
+command_function!(file, (state, args) => {
+    for arg in args {
+        let mut data = fs::read(arg.value()).unwrap();
+        state.body.append(&mut data);
+    }
 });
 
 fn get_command_function(name: &str) -> CommandFunction{
@@ -172,6 +171,7 @@ fn get_command_function(name: &str) -> CommandFunction{
         "echo" => echo,
         "exec" => exec,
         "set" => set,
+        "file" => file,
         _ => panic!("command_function {} isn't defined", name), 
     }
 }
