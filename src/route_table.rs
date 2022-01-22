@@ -52,11 +52,12 @@ impl RouteTable {
        self.table.push( route ); 
     }
 
-    // pub fn from_file(path: &Path) -> Self {
-    //     parser::parse_route_file(path)
-    //         .or_else(|e| {println!("failed to parse routes file, using a default instead: {}", e); Err(e)})
-    //         .unwrap_or_default()
-    // }
+    pub fn from_file(path: &Path) -> Self {
+        parser::parse_route_file(path).unwrap()
+        // parser::parse_route_file(path)
+        //     .or_else(|e| {println!("failed to parse routes file, using a default instead"); Err(e)})
+        //     .unwrap_or_default()
+    }
 
     pub fn iter(&self) -> std::slice::Iter<Route> {
         self.table.iter()

@@ -85,8 +85,8 @@ async fn main() {
     };
 
     let routefile = config.root.join("routes.conf");
-    // let route_table = route_table::RouteTable::from_file(&routefile);
-    let route_table = route_table::RouteTable::default();
+    let route_table = route_table::RouteTable::from_file(&routefile);
+    // let route_table = route_table::RouteTable::default();
 
     println!("Generated the following Route Table:");
     println!("{}", route_table);

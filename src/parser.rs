@@ -24,34 +24,28 @@ lazy_static! {
     static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
 }
 
-// pub fn parse_route_file(path: &Path) -> Result<RouteTable, String>{
-//     let file = File::open(path).or_else(|_| Err("There is no `routes.conf` file in this directory"))?;    
-//     let reader = BufReader::new(file);
-//     let table = reader.lines()
-//         .filter_map(|x| x.ok()) // remove Err values and unwrap Ok() values
-//         .map(|x| COMMENT.replace(&x, "").to_string()) // remove Comments
-//         .map(|x| x.trim().to_string()) // remove leading and trailing whitespace
-//         .filter_map(|x| route_parser::route(&x).ok()) // turn each line into a Route, and remove failures
-//         .collect();
-
-//     Ok(RouteTable { table })
-// }
-
 pub fn parse_route_file(path: &Path) -> Result<RouteTable, ()> {
-    let file = File::open(path).or_else(|_| Err(()))?;    
-    let reader = BufReader::new(file);
-
-    // let file = read_to_string(path)?;
-
-    Err(())
+    let file = read_to_string(path).unwrap();
+    let route_table = route_parser::route_table(&file).unwrap();
+    Ok(route_table)
 }
 
 peg::parser! {
     pub grammar route_parser() for str {
 
-        pub rule route_table() -> RouteTable = routes:route() ** "/n" {
+        pub rule route_table() -> RouteTable = $(['\n'])* lines:line() ** ['\n'] $(['\n'])* {
+            // filter all lines for those that contain valid routes
+            let routes = lines.iter()
+                .filter_map(|route| route.as_ref())
+                .map(|route| route.clone())
+                .collect();
+
             RouteTable { table:routes }   
         }
+
+        rule line() -> Option<Route> = whitespace()? route:route()? $(['#'] [^ '\n']*)? { route }
+
+        rule route_seperator() = quiet!{['\n']+}
         pub rule route() -> Route = request:request() [':'] commands:commands(){
             Route { request, commands }
         }
@@ -80,14 +74,11 @@ peg::parser! {
 
         pub rule arg() -> Arg = word:word() { Arg::new(None, word) }
 
-        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';']+) { word }
+        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';' | '#']+) { word }
         rule whitespace() = quiet!{[' ' | '\t']+}
         // rule whitespace() = quiet!{[' ' | '\t' | '\n']+}
     }
 }
-
-
-
 
 
 #[cfg(test)]
@@ -96,61 +87,6 @@ mod tests{
 
     #[test]
     fn test() {
-        // let res = route_parser::route("/test/abcd/*onetwothree:").unwrap();
-        // let res = route_parser::commands("echo;").unwrap();
-        let res = route_parser::route("/abcd/efg: echo abcd efg; echo asdfas asdflk;").unwrap();
-        let res = 
-        println!("{:?}", res);
+        let res = route_parser::route_table("/test : echo abcd;\n\n\n/hello: echo test; \n\n\n\n\n\n\n # comment \n").unwrap();
     }
-
-    // #[test]
-    // fn test() {
-    //     route_parser::route("/styles/*   css/* header(content-type:text/css)").unwrap();
-    //     route_parser::route("/styles/* curl exec(\"http://test\":\"value::,,  /\")").unwrap();
-    // }
-
-    // #[test]
-    // fn file() {
-    //     parse_route_file(Path::new("/home/connor/projects/serv/examples/cms/routes.conf")).unwrap();
-    // }
-
-    // #[test]
-    // fn test2() {
-    //     let path = "/home/connor/projects/serv/examples/cms/routes.conf";
-    //     let file = File::open(path).expect("There is no `routes` file in this directory");    
-    //     let reader = BufReader::new(file);
-    // }
 }
-
-
-// peg::parser! {
-//     pub grammar route_parser() for str {
-
-//         pub rule route() -> Route = request:request() [' ' | '\t']+ resource:resource() [' ' | '\t']+ options:options() {
-//             Route { request, resource, options }.sanitize()
-//         }
-
-//         rule path_node() -> Node = node:$([^ ' ' | '\t' | ':' | '/' | '\\']*) { Node::from_str(node) }
-
-//         pub rule request() -> RequestPattern = root:"/"? nodes:path_node() ** "/" {
-//             RequestPattern{ path:nodes }
-//         }
-
-//         pub rule resource() -> ResourcePattern = root:"/"? nodes:path_node() ** "/" {
-//             ResourcePattern{ is_global: root.is_some(), path:nodes }
-//         }
-
-//         // rules for parsing options. eg: exec(), header(), etc.
-//         pub rule options() -> Vec<RouteOption> = options:option() ** " " { options }
-
-//         // The class of character that can be included in an identifier.
-//         // an identifier is any option name, argument, or value
-//         rule ident() -> &'input str = n:$([^ '(' | ')' | '\t' | ' ' | ':' | ',']+) { n }
-//         rule string() -> &'input str = "\"" n:$([^ '\"']+) "\"" { n }
-
-//         pub rule option() -> RouteOption = name:ident() args:arguments()? { RouteOption::new( name, args.unwrap_or(vec![]) ) }
-//         pub rule arguments() -> Vec<Arg> = "(" args:argument() ** ([ ',' | ' ' ]+) ")"   { args }
-//         pub rule argument() -> Arg = arg:(string() / ident()) val:arg_value()? { Arg::new(arg, val) }
-//         rule arg_value() -> &'input str = ":" val:(string() / ident()) { val }
-//     }
-// }
