@@ -116,8 +116,6 @@ impl fmt::Display for RouteTable {
         table.add_row(row![ "ROUTE", "COMMANDS"]);
         for row in self.iter() {
             let commands = row.commands.iter().map(|command| command.to_string()).join("; ");
-            // let options_str = row.options.iter().map(|x| x.to_string()).join(" ");
-            // let options_str = "test";
             table.add_row(row![row.request, commands]);
         }
 

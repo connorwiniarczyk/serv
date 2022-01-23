@@ -7,6 +7,8 @@ use regex::Captures;
 
 use std::fs;
 
+use itertools::Itertools;
+
 lazy_static! {
     /// defines syntax for variables within an argument.
     /// syntax is based on Makefile variable syntax: ie. $(VAR)
@@ -159,11 +161,47 @@ command_function!(exec, (state, args) => {
     state.body.append(&mut result);
 });
 
-command_function!(file, (state, args) => {
+command_function!(read, (state, args) => {
     for arg in args {
         let mut data = fs::read(arg.value()).unwrap();
         state.body.append(&mut data);
     }
+});
+
+command_function!(header, (state, args) => {
+    let mut args_iter = args.iter();    
+    let key = args_iter.next().unwrap().value().to_string();
+    let value = args_iter.next().unwrap().value().to_string();
+    state.headers.insert(key, value);
+});
+
+command_function!(filetype, (state, args) => {
+    let value = args.iter().next().unwrap().value().to_string();
+    state.headers.insert("content-type".to_string(), value);
+});
+
+/// Joins all of the arguments into a single string and pipes it into /bin/sh, and appends the
+/// result to the response body. Lets the user easily run arbitrary shell scripts with complicated
+/// behaviors like pipes
+command_function!(shell, (state, args) => {
+    let input = args.iter().map(|arg| arg.value()).join(" ");
+    let input_stream = process::Command::new("echo")
+        .arg(input)
+        .stdout(process::Stdio::piped())
+        .spawn()
+        .expect("failed to start echo process");
+
+
+    let mut shell_process = process::Command::new("/bin/sh")
+        .stdin(process::Stdio::from(input_stream.stdout.unwrap()))
+        .stdout(process::Stdio::piped())
+        .spawn()
+        .expect("failed to start shell process");
+
+    let mut output = shell_process.wait_with_output().expect("failed to wait for shell").stdout;
+
+    state.body.append(&mut output);
+
 });
 
 fn get_command_function(name: &str) -> CommandFunction{
@@ -171,7 +209,10 @@ fn get_command_function(name: &str) -> CommandFunction{
         "echo" => echo,
         "exec" => exec,
         "set" => set,
-        "file" => file,
+        "read" => read,
+        "header" => header,
+        "filetype" | "ft" | "type" => filetype,
+        "shell" | "sh" => shell,
         _ => panic!("command_function {} isn't defined", name), 
     }
 }
