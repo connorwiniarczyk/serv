@@ -1,36 +1,33 @@
 # This is Markdown
 
+
+### Pages
+
 - [index](/)
 - [page two](/content/two)
 - [what's the date?](/api/date)
 
-A shell script is piping this through Pandoc before serving it as HTML and I
-think that's pretty neat. You could probably write a pretty cool blog or
-something and spend very little effort to maintain it.
+This page is being rendered on the fly from content stored in a markdown file.
+The server pipes the contents of the markdown file through pandoc to render it
+as html before appending a header and footer that are common to every page.
+You could probably write a pretty cool blog this way.
 
-This is the code that's being used to render this markdown right now. It's
-only three lines of bash script. Serv knows from the routes file to pass the 
-part of the path after `/content/` as the first argument to this script, which
-passes as an argument into pandoc before surrounding it with the values of
-`head.html` and `tail.html`.
-
-```bash
-#!/bin/sh
-cat head.html
-pandoc content/$1.md
-cat tail.html
-```
-
-This is the line in the `routes` file that defines this route.
-The `exec` option tells serv to execute render.sh instead of just reading it,
-and the `wild:0` argument tells it to use the first matched wildcard as an
-argument.
+This is the routes.conf file used to generate this example. Each page of
+content uses a combination of the read command for the header and footer, and
+the shell (sh) command to render the content page with pandoc. Note that the
+order of these commands matters as it will determine the order that their
+output appears in the final response. The type command simply adds the
+'content-type:text/html' http header to the response.
 
 ```bash
-/content/*  ./render.sh	  exec(wild:0) ft(html)
+/: read head.html; sh pandoc content/index.md; read tail.html; type text/html
+/content/*page:	read head.html; sh pandoc content/$(path:page).md; read tail.html; type text/html
+
+/styles/*stylesheet: file css/$(path:stylesheet); type text/css; 
+/images/*image: file media/$(path:image); type text/css; 
+
+/api/date: sh date | cowsay; type text/plain
 ```
-
-
 
 I think this could make a really nice content management system for a blog or
 personal website. Below are some images. The rest of the paragraph will be
