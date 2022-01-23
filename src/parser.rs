@@ -46,6 +46,7 @@ peg::parser! {
         rule line() -> Option<Route> = whitespace()? route:route()? $(['#'] [^ '\n']*)? { route }
 
         rule route_seperator() = quiet!{['\n']+}
+
         pub rule route() -> Route = request:request() [':'] commands:commands(){
             Route { request, commands }
         }
@@ -54,7 +55,7 @@ peg::parser! {
             RequestPattern::new(nodes)
         }
 
-        pub rule node() -> Node = is_var:$(['*'])? value:$([^ ':' | '/']+) {
+        pub rule node() -> Node = is_var:$(['*'])? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {
             match is_var {
                 Some(_) => Node::var(value), 
                 None => Node::val(value), 
