@@ -31,10 +31,6 @@ impl Route {
 
         if !request_match { return Err("did not match"); }
 
-        // println!("\t found a matching route: {}", &self.request);
-        // println!("\t with wildcards: {:?}", &request_match.wildcards);
-
-
         for command in &self.commands {
             request_state = command.run(request_state);
         }
@@ -54,9 +50,6 @@ impl RouteTable {
 
     pub fn from_file(path: &Path) -> Self {
         parser::parse_route_file(path).unwrap()
-        // parser::parse_route_file(path)
-        //     .or_else(|e| {println!("failed to parse routes file, using a default instead"); Err(e)})
-        //     .unwrap_or_default()
     }
 
     pub fn iter(&self) -> std::slice::Iter<Route> {

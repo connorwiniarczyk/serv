@@ -52,7 +52,11 @@ peg::parser! {
         }
 
         pub rule request() -> RequestPattern = "/"? nodes:node() ** "/" {
-            RequestPattern::new(nodes)
+            if nodes.len() == 0 {
+                return RequestPattern::new(vec![Node::val("")])
+            } else {
+                return RequestPattern::new(nodes)
+            }
         }
 
         pub rule node() -> Node = is_var:$(['*'])? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {

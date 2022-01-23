@@ -209,7 +209,7 @@ fn get_command_function(name: &str) -> CommandFunction{
         "echo" => echo,
         "exec" => exec,
         "set" => set,
-        "read" => read,
+        "read" | "file" => read,
         "header" => header,
         "filetype" | "ft" | "type" => filetype,
         "shell" | "sh" => shell,
