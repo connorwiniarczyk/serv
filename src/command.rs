@@ -95,7 +95,6 @@ impl Arg {
 
     pub fn substitute_variables(&self, state: &RequestState) -> Self {
         let new_value = VAR.replace(self.value(), |caps: &Captures|{
-            println!("{:?}", caps);
             let var_name = caps.name("name").unwrap().as_str();
             state.get_variable(&var_name)
         });
