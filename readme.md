@@ -10,10 +10,12 @@ development time.
 
 Serv is configured at runtime with its own Domain Specific Language, read from 
 a file called 'routes.conf'. The goal of the language is to express HTTP routes
-as concisely as possible while still being readable. 
-
-Serv is written using the [tide](https://github.com/http-rs/tide) http framework,
-and likely inherits most of its strengths and weaknesses. 
+as concisely as possible while still being readable. In the routes.conf file,
+HTTP routes are generally defined in a single line, which consists of a pattern
+representing one or more potential HTTP requests, followed by a series of
+commands which are executed to generate the response. Commands are designed to
+be simple and composable, and allow you to do things like read the contents of
+a file, execute a program, and set headers.
 
 
 ## Installation / Usage
@@ -67,26 +69,14 @@ curl localhost:4000/api/date
 
 ```
 # routes.conf example
-# <request> <resource> <options>
 
-# Normal Stuff
-# The read option is optional, if there is no exec option in the route, it will be inferred
-/               index.html              read ft(html)
-/css/*          public/styles/*         ft(css)
-/js/*           public/scripts/*        ft(js)
+/: 			read head.html; exec pandoc content/index.md; read tail.html; type text/html
+/content/*page:		read head.html; exec pandoc content/$(path:page).md; read tail.html; type text/html
 
-# Images/Media
-/splash         media/background.jpg    ft(jpg)
-/images/*       media/images/*/large    ft(jpg)
+/styles/*stylesheet:	file css/$(path:stylesheet); type text/css; 
+/images/*image: 	file media/$(path:image); type text/css; 
 
-# Executables in the PATH are usable as well
-/api/date       date                    exec cors ft(text/plain)
-
-/api/register   api/register_user.py    exec(query:username, query:password)
-/user/*/info    api/get_user_info.py    exec(wild:0) # using part of the path as an argument
-
-# Rendered Content
-/content/*      render_markdown.sh      exec(wild:0)
+/api/date:		sh date | cowsay; type text/plain;
 
 ```
 
