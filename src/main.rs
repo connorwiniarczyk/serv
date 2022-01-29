@@ -3,8 +3,7 @@
 
 mod config;
 mod route_table;
-mod route_patterns;
-mod error;
+mod pattern;
 mod parser;
 
 mod command;
@@ -49,9 +48,9 @@ async fn main() {
 
     // Define this programs arguments
     let matches = clap_app!(serv =>
-        (version: "0.1")
-        (author: "")
-        (about: "A Web Server")
+        (version: "0.2")
+        (author: "Connor Winiarczyk")
+        (about: "A Based Web Server")
         (@arg port: -p --port +takes_value "which tcp port to listen on")
         (@arg host: -h --host +takes_value "which ip addresses to accept connections from")
         (@arg debug: -d ... "Sets the level of debugging information")
@@ -86,7 +85,6 @@ async fn main() {
 
     let routefile = config.root.join("routes.conf");
     let route_table = route_table::RouteTable::from_file(&routefile);
-    // let route_table = route_table::RouteTable::default();
 
     println!("Generated the following Route Table:");
     println!("{}", route_table);

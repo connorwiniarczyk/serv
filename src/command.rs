@@ -204,6 +204,12 @@ command_function!(shell, (state, args) => {
 
 });
 
+
+/// Prints the entirety of the current state to stdout
+command_function!(debug, (state) => {
+    println!("{:#?}", state);
+});
+
 fn get_command_function(name: &str) -> CommandFunction{
     match name {
         "echo" => echo,
@@ -213,6 +219,7 @@ fn get_command_function(name: &str) -> CommandFunction{
         "header" => header,
         "filetype" | "ft" | "type" => filetype,
         "shell" | "sh" => shell,
+        "debug" => debug,
         _ => panic!("command_function {} isn't defined", name), 
     }
 }
