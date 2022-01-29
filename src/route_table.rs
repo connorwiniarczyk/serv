@@ -6,20 +6,21 @@ use tide::Request;
 use prettytable::{ Table, Row, Cell, row, cell };
 use itertools::Itertools;
 
-use crate::route_patterns::{RequestPattern, Node };
+use crate::pattern;
+use crate::pattern::{Pattern, Node };
+
 use crate::parser;
 use crate::State;
 
 use crate::request_state::RequestState;
 
-use crate::route_patterns;
 
 use crate::command::Command;
 use crate::command::command;
 
 #[derive(Clone)]
 pub struct Route {
-    pub request: RequestPattern,
+    pub request: Pattern,
     pub commands: Vec<Command>,
 }
 
@@ -64,7 +65,7 @@ use crate::command::Arg;
 impl Default for RouteTable {
     fn default() -> Self {
         let mut output = Self { table: vec![] };
-        let request = RequestPattern::new(vec![
+        let request = Pattern::new(vec![
             Node::val("test"),
             Node::var("abcd"),
         ]);
@@ -78,7 +79,7 @@ impl Default for RouteTable {
             Route {
                 request,
                 commands,
-                // request: route_pattern![*test],//RequestPattern{ path: vec![ node!("test") ] },
+                // request: route_pattern![*test],//Pattern{ path: vec![ node!("test") ] },
             });
 
         return output;

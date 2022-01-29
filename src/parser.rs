@@ -5,7 +5,7 @@ use peg;
 
 use crate::route_table::{ Route, RouteTable };
 
-use crate::route_patterns::*;
+use crate::pattern::{Pattern, Node};
 use crate::command::*;
 
 use regex::Regex;
@@ -15,8 +15,6 @@ use std::path::Path;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 
-use crate::route_patterns::{ Node, RequestPattern };
-
 use std::fs::read_to_string;
 
 // A regular expression used to strip comments from the file before parsing
@@ -25,8 +23,8 @@ lazy_static! {
 }
 
 pub fn parse_route_file(path: &Path) -> Result<RouteTable, ()> {
-    let file = read_to_string(path).unwrap();
-    let route_table = route_parser::route_table(&file).unwrap();
+    let file = read_to_string(path).expect("Cannot find a routes.conf file in this directory");
+    let route_table = route_parser::route_table(&file).expect("Failed to parse routes.conf file");
     Ok(route_table)
 }
 
@@ -51,11 +49,11 @@ peg::parser! {
             Route { request, commands }
         }
 
-        pub rule request() -> RequestPattern = "/"? nodes:node() ** "/" {
+        pub rule request() -> Pattern = "/"? nodes:node() ** "/" {
             if nodes.len() == 0 {
-                return RequestPattern::new(vec![Node::val("")])
+                return Pattern::new(vec![Node::val("")])
             } else {
-                return RequestPattern::new(nodes)
+                return Pattern::new(nodes)
             }
         }
 
