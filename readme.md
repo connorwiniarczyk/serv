@@ -1,25 +1,15 @@
 # Serv
 
 Serv is a web server written in Rust. There are a lot of web servers written
-in Rust, but this one is mine. I wanted something that was as fast and easy to
-use as static file servers like [sfz](https://github.com/weihanglo/sfz) or
-[binserve](https://github.com/mufeedvh/binserve), but with more of the
-flexibility of web frameworks like
-[express](http://expressjs.com/),
-[flask](https://flask.palletsprojects.com/en/2.0.x/),
-and [rocket](https://rocket.rs/).
+in Rust, but this one is mine. It is inspired by static file servers like 
+[sfz](https://github.com/weihanglo/sfz),
+[serve](https://github.com/vercel/serve), and
+[binserve](https://github.com/mufeedvh/binserve),
+but with much more flexibility in how routes can be configured.
 
 ![screenshot](screenshot.png)
 
-Often, when I am trying to spin up a new website or web interface for an idea
-I have, I'll start by using a static file server because of how easy they are 
-to set up. This will work well for a while, until I need to do anything even
-slightly outside the scope of whatever program I am using, and I discover that
-now I have to drop everything to learn a web framework in whatever language I
-happen to be using.
-
-Serv is my response to this frustration. It behaves like a static file server
-in almost every way, except that when a route needs to do something more
+Serv behaves like a static file server in almost every way, except that when a route needs to do something more
 complicated than reading and transmitting a file, it can do so by invoking
 another program on the host system. An option called `exec` in the config file
 tells the Route to treat the file it points to as an executable and run it,
@@ -27,19 +17,22 @@ responding with its output rather than its contents. By doing this, complex
 logic can be handled by external programs that are better suited for it, and in
 a manner that is more in line with the unix tradition.
 
-The `exec` option is also language agnostic. APIs can be written in bash,
-javascript, python, c, rust, lisp, fortran, or any combination thereof. 
+This design choice also makes serv language agnostic. APIs can be written in bash,
+javascript, python, c, rust, lisp, fortran, or any combination thereof.
+
+Serv is written using the [tide](https://github.com/http-rs/tide) http framework,
+and likely inherits most of its strengths and weaknesses. 
 
 
-# Installation / Usage
+## Installation / Usage
 
 You'll need rust installed on your system in order to install serv. It can be 
 installed from [here](https://rustup.rs/) and by then running `rustup default nightly`
 and `rustup update`.
 
 Most of the examples will have dependencies on external programs. In the case
-of the CMS example, you will need `pandoc` installed in order to render 
-markdown files.
+of the Blog example, you will need `pandoc` installed in order to render 
+markdown files, as well as `cowsay` for the date api.
 
 ```bash
 # install rust and cargo, tell cargo to use the nightly version of the compiler
@@ -51,7 +44,7 @@ cargo install --git https://github.com/connorwiniarczyk/serv.git
 
 # run an example
 git clone https://github.com/connorwiniarczyk/serv.git
-cd serv/examples/cms
+cd serv/examples/blog
 
 # serv takes a port argument (the default is 4000) and path to a directory.
 # If the directory does not contain a valid routes.conf file, a default one
@@ -59,7 +52,9 @@ cd serv/examples/cms
 serv -p 4000
 
 # test the server
-curl localhost:4000
+curl localhost:4000/api/date
+
+# or open it in a browser
 ```
 
 # Configuration
@@ -67,7 +62,7 @@ curl localhost:4000
 Each route is defined with a line in a file called `routes.conf`. `routes.conf` is a
 whitespace separated values file where the first column represents potential
 HTTP requests, the second column represents the corresponding resource on the
-host system, and the third column is a list of options.
+host system, and the third column is a list of options that define how the resource will be processed.
 
 ## Request Patterns and Resource Patterns
 
@@ -82,15 +77,15 @@ will route the request `/styles/main.css` to `css/main.css`.
 
 ## Options
 
-Options are how serv derives its flexibility, they are essentially pre-defined
-functions that transform the server's response as it is being generated. They
+Options are how serv derives its flexibility, they are essentially pointers to pre-defined
+functions that transform the route's response as it is being generated. They
 are called in the order they are written and can be composed arbitrarily. A
 list of currently implemented options is included below.
 
-- `read` : Replace the body of the response with the contents of the resource
-- `exec(args)` : Replace the body of the response with the result of executing the resource
+- `read` : Read the resource and append its contents to the body
+- `exec(args)` : Execute the resource with the given arguments and append its output to the body
 - `header(key:value)` : Add an HTTP header to the response
-- `filetype(type)` : Set the MIME type of the response (shorthand for `header(content-type:<type>)`)
+- `filetype | ft(type)` : Set the MIME type of the response (shorthand for `header(content-type:<type>)`)
 - `cors` : Add CORS headers to the response (shorthand for `header(access-control-allow-origin:*)`)
 
 If a Route has no options, it's response will always be empty. At least one
@@ -110,11 +105,11 @@ exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 ```
 
 
-## Routes.conf Example 
+## Example Config
 
 ```
 # routes.conf example
-# <request path> <resource path> <options>
+# <request> <resource> <options>
 
 # Normal Stuff
 # The read option is optional, if there is no exec option in the route, it will be inferred
@@ -139,8 +134,40 @@ exec exec() exec(query) exec(query:key) exec(query:key query:key2)
 
 ## To Do / Known Issues:
 
-- I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
+- I would like some kind of `pipe` option that would let me pipe the body of a response into another program. You can get around this by using `exec` on a shell    script that does the piping for you, but I think there are instances where it would be cleaner to include all of the logic in the routes file.
 
-- A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that into information about the headers and/or status code
+- A way for executables to dynamically change the response header and status code. I'm thinking an option that strips the first line from the body and parses that   into information about the headers and/or status code
 
 - Better debug information for stuff like explaining whether/why a route is valid or not or when requests fail.
+
+- Routes should be aware of file extensions. Request Patterns should have the ability to match against them, and operators should have the ability to 
+  reference one if it is given. This should include automatic MIME type detection.
+
+- Better compliance with [CGI](https://en.wikipedia.org/wiki/Common_Gateway_Interface) scripts.
+  Should have the option to parse the first few lines of the script as response headers and to pass
+  information about the request through environment variables or stdin as defined in the the CGI spec
+  
+- The arguments to exec that refer to information in the request should have a more general form and be usable
+  outside of the exec operator itself. Perhaps by a set of keywords preceded by an `@` sign such as `@query`, `@body`, `@query:key`, etc.
+  
+- Wildcards in the request pattern should be nameable and referenceable by operators outside of `exec`. Maybe by appending a name after
+  the `*` symbol. So a route like `/images/*  ./render  exec(wild:0)` could be expressed as `/images/*image  ./render  exec(*image)`.
+  Or if filetypes are implemented, something like `/images/*images.*ft  ./render  exec(*image)  filetype(*ft)`.
+  
+- I think the distinction between the Resource column and the operators is unnecessary. A path by itself should be parsed as a read operator
+  pointing to the appropriate file, while other operators that reference a file should point to it with their own syntax. So a route like
+  `/  index.html  read` could just be expressed as `/  index.html`. Or an executable route like `/  date  exec` could be `/  exec(date)`,
+  or maybe something more concise like `/  !date`.
+  
+- I would love to get streams working. This would make it very easy to set up your own streaming server by integrating with something like ffmpeg
+
+
+### Ideas for More Options
+
+Just brainstorming
+
+- `log(file)` : write information about the request to a file
+- `hook(program, args)` : execute a given 'hook' script. Would be a superset of log, but the distinction might be semantically useful
+- `literal` : append the resource to the body as a string
+- `status(code)` : change the status code
+-  `striplines(range)` : remove a set of lines from the body
