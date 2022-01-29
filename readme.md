@@ -6,7 +6,7 @@ configure, and is thus best suited for applications like rapid prototyping and
 small personal projects where security and performance are less important than
 development time.
 
-![screenshot](screenshot.png)
+![screenshot](screenshot2.png)
 
 Serv is configured at runtime with its own Domain Specific Language, read from 
 a file called 'routes.conf'. The goal of the language is to express HTTP routes
