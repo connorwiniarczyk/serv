@@ -94,7 +94,7 @@ impl Arg {
     }
 
     pub fn substitute_variables(&self, state: &RequestState) -> Self {
-        let new_value = VAR.replace(self.value(), |caps: &Captures|{
+        let new_value = VAR.replace_all(self.value(), |caps: &Captures|{
             let var_name = caps.name("name").unwrap().as_str();
             state.get_variable(&var_name)
         });
@@ -209,6 +209,32 @@ command_function!(debug, (state) => {
     println!("{:#?}", state);
 });
 
+
+command_function!(parse_query, (state, args) =>{
+
+    let mut input = state.request.url().query_pairs();
+    let mut output = String::new();
+
+    output.push_str("{");
+
+    match input.next() {
+        Some((key, value)) => output.push_str(&format!("\"{}\": \"{}\"", key, value).as_str()),
+        _ => return,
+    };
+
+    for (key, value) in input {
+        output.push_str(&format!(", \"{}\": \"{}\"", key, value).as_str());
+    }
+
+    output.push_str("}");
+
+    println!("{}", output);
+
+    // write output to variable
+    let key = &args[0];
+    state.variables.insert(key.value().to_string(), output);
+});
+
 fn get_command_function(name: &str) -> CommandFunction{
     match name {
         "echo" => echo,
@@ -219,6 +245,7 @@ fn get_command_function(name: &str) -> CommandFunction{
         "filetype" | "ft" | "type" => filetype,
         "shell" | "sh" => shell,
         "debug" => debug,
+        "parse_query" => parse_query,
         _ => panic!("command_function {} isn't defined", name), 
     }
 }
