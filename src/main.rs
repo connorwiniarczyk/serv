@@ -30,7 +30,7 @@ pub async fn handler(mut http_request: Request) -> tide::Result {
     let route = http_request.param("route").unwrap_or("").to_string();
 
     for route in state.route_table.iter() {
-        if let Ok(result) = route.resolve(&http_request, &body).await {
+        if let Ok(result) = route.resolve(&http_request, body.as_deref()).await {
             println!();
             return Ok(result)
         }

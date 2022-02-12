@@ -228,8 +228,6 @@ command_function!(parse_query, (state, args) =>{
 
     output.push_str("}");
 
-    println!("{}", output);
-
     // write output to variable
     let key = &args[0];
     state.variables.insert(key.value().to_string(), output);
