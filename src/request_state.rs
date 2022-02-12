@@ -13,7 +13,8 @@ pub struct RequestState<'request> {
 
     pub route: &'request Route,
     pub request: &'request Request,
-    pub request_body: &'request  Option<String>,
+    pub request_body: Option<&'request str>,
+    // pub request_body: Option<String>,
 
     pub variables: HashMap<String, String>,
 
@@ -24,7 +25,7 @@ pub struct RequestState<'request> {
 
 impl<'request> RequestState<'request> {
 
-    pub fn new(route: &'request Route, request: &'request Request, request_body: &'request Option<String>) -> Self  {
+    pub fn new(route: &'request Route, request: &'request Request, request_body: Option<&'request str>) -> Self  {
 
         // populate variables with key value pairs in the query string
         let mut variables = HashMap::new();
@@ -49,7 +50,7 @@ impl<'request> RequestState<'request> {
 
     pub fn get_variable(&'request self, name: &str) -> &'request str {
         if name == "body" {
-            return std::str::from_utf8(&self.body).unwrap_or("");
+            return &self.request_body.unwrap_or("");
         }
 
         self.variables.get(name).and_then(|val| Some(val.as_str())).unwrap_or("")

@@ -25,7 +25,7 @@ pub struct Route {
 }
 
 impl Route {
-    pub async fn resolve<'request>(&'request self, request: &'request Request<State>, body: &'request Option<String>) -> Result<tide::Response, &'request str> {
+    pub async fn resolve<'request>(&'request self, request: &'request Request<State>, body: Option<&'request str>) -> Result<tide::Response, &'request str> {
 
         let mut request_state = RequestState::new(&self, &request, body);
         let request_match = self.request.compare(request, &mut request_state);
