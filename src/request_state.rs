@@ -80,6 +80,7 @@ impl<'request> Debug for RequestState<'request> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("State")
             .field("status", &self.status)
+            .field("request_body", &self.request_body)
             .field("body", &std::str::from_utf8(&self.body).unwrap_or("<bin>"))
             .field("headers", &self.headers)
             .field("vars", &self.variables)
