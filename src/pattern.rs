@@ -31,7 +31,7 @@ impl Pattern {
             match pair {
                 Both(left, right) => match left {
                     Node::Value(left) => if left != right { return false; },
-                    Node::Variable(name) => { state.variables.insert(format!("path:{}",name), right.to_string()); },
+                    Node::Variable(name) => { state.variables.insert(format!("{}",name), right.to_string()); },
                 },
                  _ => return false,
             }
