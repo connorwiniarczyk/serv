@@ -10,6 +10,7 @@ use std::fs;
 use itertools::Itertools;
 
 use tree_magic;
+use std::io::Write;
 
 lazy_static! {
     /// defines syntax for variables within an argument.
@@ -158,8 +159,19 @@ command_function!(exec, (state, args) => {
     let path = &args_iterator.next().unwrap().value();
     let executable_arguments:Vec<&str> = args_iterator.map(|arg| arg.value()).collect();
 
-    let mut result = process::Command::new(&path).args(executable_arguments).output().unwrap().stdout;
-    state.body.append(&mut result);
+    let mut child = process::Command::new(&path)
+        .args(executable_arguments)
+        .stdin(process::Stdio::piped())
+        .stdout(process::Stdio::piped())
+        .spawn()
+        .expect("failed to spawn child");
+
+    let mut stdin = child.stdin.as_mut().expect("failed to open stdin");
+    stdin.write_all(&state.request_body.as_ref().unwrap_or(&Vec::new()));
+
+    let mut output = child.wait_with_output().expect("failed").stdout;
+    state.body.append(&mut output);
+
 });
 
 command_function!(read, (state, args) => {
@@ -188,18 +200,15 @@ command_function!(filetype, (state, args) => {
 /// behaviors like pipes
 command_function!(shell, (state, args) => {
     let input = args.iter().map(|arg| arg.value()).join(" ");
-    let input_stream = process::Command::new("echo")
-        .arg(input)
-        .stdout(process::Stdio::piped())
-        .spawn()
-        .expect("failed to start echo process");
-
 
     let mut shell_process = process::Command::new("/bin/sh")
-        .stdin(process::Stdio::from(input_stream.stdout.unwrap()))
+        .stdin(process::Stdio::piped())
         .stdout(process::Stdio::piped())
         .spawn()
         .expect("failed to start shell process");
+
+    let mut stdin = shell_process.stdin.as_mut().expect("failed to open stdin");
+    stdin.write_all(input.as_bytes()).expect("failed to write");
 
     let mut output = shell_process.wait_with_output().expect("failed to wait for shell").stdout;
 
