@@ -9,6 +9,8 @@ use std::fs;
 
 use itertools::Itertools;
 
+use tree_magic;
+
 lazy_static! {
     /// defines syntax for variables within an argument.
     /// syntax is based on Makefile variable syntax: ie. $(VAR)
@@ -165,6 +167,7 @@ command_function!(read, (state, args) => {
         let mut data = fs::read(arg.value()).unwrap();
         state.body.append(&mut data);
     }
+
 });
 
 command_function!(header, (state, args) => {
@@ -176,7 +179,8 @@ command_function!(header, (state, args) => {
 
 command_function!(filetype, (state, args) => {
     let value = args.iter().next().unwrap().value().to_string();
-    state.headers.insert("content-type".to_string(), value);
+    state.mime = Some(value);
+    // state.headers.insert("content-type".to_string(), value);
 });
 
 /// Joins all of the arguments into a single string and pipes it into /bin/sh, and appends the

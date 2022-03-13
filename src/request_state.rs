@@ -20,6 +20,7 @@ pub struct RequestState<'request> {
 
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
+    pub mime: Option<String>,
     pub status: u16,
 }
 
@@ -40,6 +41,7 @@ impl<'request> RequestState<'request> {
             variables,
             headers: HashMap::new(),
             body: vec![],
+            mime: None,
             status: 200
         }
     }
@@ -56,19 +58,24 @@ impl<'request> RequestState<'request> {
         self.variables.get(name).and_then(|val| Some(val.as_str())).unwrap_or("")
     }
 
+    // Automatically detect the mime type of the response
+    pub fn set_mime_type(&mut self) {
+        match &self.mime {
+            Some(mime_type) => self.headers.insert("content-type".to_string(), mime_type.to_string()),
+            None => self.headers.insert("content-type".to_string(), tree_magic::from_u8(&self.body)),
+        };
+    }
+
 }
 
 impl Into<tide::Response> for RequestState<'_> {
-    fn into(self) -> tide::Response {
+    fn into(mut self) -> tide::Response {
+
+        self.set_mime_type();
 
         let mut out = tide::Response::builder(self.status);
         out = self.headers.iter().fold(out, |acc, (key, value)| acc.header(key.as_str(), value.as_str()));
         out = out.body(self.body);
-
-        // set the MIME type to text/plain if none was set
-        if self.headers.keys().all(|x| x != "content-type") {
-            out = out.header("content-type", "text/plain");
-        }
 
         out.build()
     }
