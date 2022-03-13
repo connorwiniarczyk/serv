@@ -23,14 +23,14 @@ use tide;
 pub async fn handler(mut http_request: Request) -> tide::Result {
     println!("incoming http request: {}", http_request.url());
 
-    // get the body string if there is one
-    let body = http_request.body_string().await.ok();
-
-    let state = http_request.state();
+    let state = http_request.state().clone();
     let route = http_request.param("route").unwrap_or("").to_string();
 
+    // get the body if there is one
+    let body = http_request.body_bytes().await.ok();
+
     for route in state.route_table.iter() {
-        if let Ok(result) = route.resolve(&http_request, body.as_deref()).await {
+        if let Ok(result) = route.resolve(&mut http_request, &body).await {
             println!();
             return Ok(result)
         }

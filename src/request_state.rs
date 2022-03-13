@@ -13,7 +13,7 @@ pub struct RequestState<'request> {
 
     pub route: &'request Route,
     pub request: &'request Request,
-    pub request_body: Option<&'request str>,
+    pub request_body: &'request Option<Vec<u8>>,
     // pub request_body: Option<String>,
 
     pub variables: HashMap<String, String>,
@@ -26,8 +26,7 @@ pub struct RequestState<'request> {
 
 impl<'request> RequestState<'request> {
 
-    pub fn new(route: &'request Route, request: &'request Request, request_body: Option<&'request str>) -> Self  {
-
+    pub fn new(route: &'request Route, request: &'request Request, request_body: &'request Option<Vec<u8>>) -> Self  {
         // populate variables with key value pairs in the query string
         let mut variables = HashMap::new();
         for (key, value) in request.url().query_pairs() {
@@ -52,7 +51,12 @@ impl<'request> RequestState<'request> {
 
     pub fn get_variable(&'request self, name: &str) -> &'request str {
         if name == "body" {
-            return &self.request_body.unwrap_or("");
+            return match &self.request_body {
+                Some(bytes) => std::str::from_utf8(bytes).unwrap_or(""),
+                None => "",
+
+            };
+            // return std::str::from_utf8(&self.request_body.unwrap_or(Vec::new())).unwrap_or("");
         }
 
         self.variables.get(name).and_then(|val| Some(val.as_str())).unwrap_or("")
