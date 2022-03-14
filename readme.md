@@ -5,7 +5,7 @@ in Rust, but this one is mine. It is configured at runtime using a domain
 specific language that tries to express HTTP routes concisely and with as little
 boilerplate as possible. Right now it's meant mainly for rapid prototyping and
 small projects that don't really matter, but I'd like to keep improving it until
-it can be used in more and more important applications.
+it can be used confidently in more and more important applications.
 
 ## Configuration
 
