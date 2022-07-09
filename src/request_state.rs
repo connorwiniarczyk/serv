@@ -2,19 +2,22 @@ use std::collections::HashMap;
 use std::process::Command;
 use itertools::Itertools;
 
+use hyper::{Request, Response, Body};
+
 // use crate::route_patterns::RequestMatch;
 use crate::route_table::Route;
 
-use crate::Request;
+use lazy_static::lazy_static;
+
+// use crate::Request;
 
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
 
     pub route: &'request Route,
-    pub request: &'request Request,
-    pub request_body: &'request Option<Vec<u8>>,
-    // pub request_body: Option<String>,
+    pub request: &'request Request<Body>,
+    // pub request_body: &'request Option<Vec<u8>>,
 
     pub variables: HashMap<String, String>,
 
@@ -24,19 +27,24 @@ pub struct RequestState<'request> {
     pub status: u16,
 }
 
+// temporary to stop compiler errors until request_body field is removed
+lazy_static! {
+    static ref request_body: Option<Vec<u8>> = Some(vec![0x00]);
+}
+
 impl<'request> RequestState<'request> {
 
-    pub fn new(route: &'request Route, request: &'request Request, request_body: &'request Option<Vec<u8>>) -> Self  {
+    pub fn new(route: &'request Route, request: &'request Request<Body>) -> Self  {
         // populate variables with key value pairs in the query string
         let mut variables = HashMap::new();
-        for (key, value) in request.url().query_pairs() {
-            variables.insert(format!("query:{}", key), value.to_string());
-        }
+        // for (key, value) in request.url().query_pairs() {
+        //     variables.insert(format!("query:{}", key), value.to_string());
+        // }
+
 
         Self {
             route,
             request,
-            request_body,
             variables,
             headers: HashMap::new(),
             body: vec![],
@@ -50,14 +58,19 @@ impl<'request> RequestState<'request> {
     }
 
     pub fn get_variable(&'request self, name: &str) -> &'request str {
-        if name == "body" {
-            return match &self.request_body {
-                Some(bytes) => std::str::from_utf8(bytes).unwrap_or(""),
-                None => "",
 
-            };
-            // return std::str::from_utf8(&self.request_body.unwrap_or(Vec::new())).unwrap_or("");
-        }
+        // TODO: add back a way to access the body as a variable.
+        // Because the body is a stream now this gets more complicated since you need to await the
+        // end of the stream in order to get all its data
+        //
+        // if name == "body" {
+        //     return match &self.request.body() {
+        //         Some(bytes) => std::str::from_utf8(bytes).unwrap_or(""),
+        //         None => "",
+
+        //     };
+        //     // return std::str::from_utf8(&self.request_body.unwrap_or(Vec::new())).unwrap_or("");
+        // }
 
         self.variables.get(name).and_then(|val| Some(val.as_str())).unwrap_or("")
     }
@@ -72,16 +85,20 @@ impl<'request> RequestState<'request> {
 
 }
 
-impl Into<tide::Response> for RequestState<'_> {
-    fn into(mut self) -> tide::Response {
+impl Into<Response<Body>> for RequestState<'_> {
+    fn into(mut self) -> Response<Body> {
 
         self.set_mime_type();
 
-        let mut out = tide::Response::builder(self.status);
-        out = self.headers.iter().fold(out, |acc, (key, value)| acc.header(key.as_str(), value.as_str()));
-        out = out.body(self.body);
+        let mut out = hyper::Response::builder().status(self.status);
 
-        out.build()
+        // for (key, value) in self.headers.iter() {
+        //     out.headers_mut().insert(hyper::header::HeaderName.from_lowercase())
+        //     out.header(key.as_str(), value.as_str());
+        // }
+
+
+        out.body(self.body.into()).unwrap()
     }
 }
 
@@ -91,7 +108,7 @@ impl<'request> Debug for RequestState<'request> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("State")
             .field("status", &self.status)
-            .field("request_body", &self.request_body)
+            .field("request_body", &self.request.body())
             .field("body", &std::str::from_utf8(&self.body).unwrap_or("<bin>"))
             .field("headers", &self.headers)
             .field("vars", &self.variables)
