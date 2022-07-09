@@ -3,12 +3,14 @@
 /// potential http requests, and ResourcePatterns represent a set of potential
 /// resources on the host machine. 
 
-use crate::Request;
+// use crate::Request;
 use crate::request_state::RequestState;
 
 use std::path::{Path, PathBuf};
 use std::fmt;
 use itertools::{Itertools, EitherOrBoth::*};
+
+use hyper::{Request, Body};
 
 
 /// A pattern representing a set of http requests
@@ -25,17 +27,17 @@ impl Pattern {
     /// Check the equality of `self` and a given http request. Return an Err
     /// if they are not equal, or returns a `RequestMatch` with metadata about
     /// the match, including a `Vec` of wildcards filled in by the request.
-    pub fn compare<'request>(&'request self, request: &'request Request, state: &mut RequestState) -> bool {
-        let path = request.url().path_segments().unwrap(); 
-        for pair in self.path.iter().zip_longest(path) {
-            match pair {
-                Both(left, right) => match left {
-                    Node::Value(left) => if left != right { return false; },
-                    Node::Variable(name) => { state.variables.insert(format!("{}",name), right.to_string()); },
-                },
-                 _ => return false,
-            }
-        }
+    pub fn compare<'request>(&'request self, request: &'request Request<Body>, state: &mut RequestState) -> bool {
+        // let path = request.url().path_segments().unwrap(); 
+        // for pair in self.path.iter().zip_longest(path) {
+        //     match pair {
+        //         Both(left, right) => match left {
+        //             Node::Value(left) => if left != right { return false; },
+        //             Node::Variable(name) => { state.variables.insert(format!("{}",name), right.to_string()); },
+        //         },
+        //          _ => return false,
+        //     }
+        // }
 
         return true
     }

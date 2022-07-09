@@ -167,7 +167,7 @@ command_function!(exec, (state, args) => {
         .expect("failed to spawn child");
 
     let mut stdin = child.stdin.as_mut().expect("failed to open stdin");
-    stdin.write_all(&state.request_body.as_ref().unwrap_or(&Vec::new()));
+    stdin.write_all(&state.request.body());
 
     let mut output = child.wait_with_output().expect("failed").stdout;
     state.body.append(&mut output);
@@ -225,25 +225,25 @@ command_function!(debug, (state) => {
 
 command_function!(parse_query, (state, args) =>{
 
-    let mut input = state.request.url().query_pairs();
-    let mut output = String::new();
+    // let mut input = state.request.url().query_pairs();
+    // let mut output = String::new();
 
-    output.push_str("{");
+    // output.push_str("{");
 
-    match input.next() {
-        Some((key, value)) => output.push_str(&format!("\"{}\": \"{}\"", key, value).as_str()),
-        _ => return,
-    };
+    // match input.next() {
+    //     Some((key, value)) => output.push_str(&format!("\"{}\": \"{}\"", key, value).as_str()),
+    //     _ => return,
+    // };
 
-    for (key, value) in input {
-        output.push_str(&format!(", \"{}\": \"{}\"", key, value).as_str());
-    }
+    // for (key, value) in input {
+    //     output.push_str(&format!(", \"{}\": \"{}\"", key, value).as_str());
+    // }
 
-    output.push_str("}");
+    // output.push_str("}");
 
-    // write output to variable
-    let key = &args[0];
-    state.variables.insert(key.value().to_string(), output);
+    // // write output to variable
+    // let key = &args[0];
+    // state.variables.insert(key.value().to_string(), output);
 });
 
 fn get_command_function(name: &str) -> CommandFunction{

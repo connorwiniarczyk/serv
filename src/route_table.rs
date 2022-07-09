@@ -2,7 +2,6 @@
 
 use std::fmt;
 use std::path::Path;
-use tide::Request;
 use prettytable::{ Table, Row, Cell, row, cell };
 use itertools::Itertools;
 
@@ -18,6 +17,8 @@ use crate::request_state::RequestState;
 use crate::command::Command;
 use crate::command::command;
 
+use hyper::{Request, Body, Response};
+
 #[derive(Clone)]
 pub struct Route {
     pub request: Pattern,
@@ -25,9 +26,10 @@ pub struct Route {
 }
 
 impl Route {
-    pub async fn resolve<'request>(&'request self, request: &'request mut Request<State>, body: &'request Option<Vec<u8>>) -> Result<tide::Response, &'request str> {
+    pub async fn resolve<'request>(&'request self, request: &'request mut Request<Body>) -> Result<Response<Body>, &'request str> {
 
-        let mut request_state = RequestState::new(&self, &request, body);
+
+        let mut request_state = RequestState::new(&self, request);
         let request_match = self.request.compare(request, &mut request_state);
 
         if !request_match { return Err("did not match"); }
@@ -55,6 +57,18 @@ impl RouteTable {
 
     pub fn iter(&self) -> std::slice::Iter<Route> {
         self.table.iter()
+    }
+
+    pub async fn resolve(&self, mut req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+        println!("incoming http request: {}", req.uri());
+
+        for route in self.iter() {
+            if let Ok(result) = route.resolve(&mut req).await {
+                return Ok(result)
+            }
+        }
+
+        todo!();
     }
 }
 
