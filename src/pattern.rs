@@ -22,27 +22,46 @@ pub struct Pattern {
     // pub methods: Vec<Method>,
 }
 
+use std::collections::HashMap;
+type Vars = HashMap<String, String>;
+
 impl Pattern {
 
     /// Check the equality of `self` and a given http request. Return an Err
     /// if they are not equal, or returns a `RequestMatch` with metadata about
     /// the match, including a `Vec` of wildcards filled in by the request.
-    pub fn compare<'request>(&'request self, request: &'request Request<Body>, state: &mut RequestState) -> bool {
-        // let path = request.url().path_segments().unwrap(); 
-        // for pair in self.path.iter().zip_longest(path) {
-        //     match pair {
-        //         Both(left, right) => match left {
-        //             Node::Value(left) => if left != right { return false; },
-        //             Node::Variable(name) => { state.variables.insert(format!("{}",name), right.to_string()); },
-        //         },
-        //          _ => return false,
-        //     }
-        // }
+    pub fn compare<'request>(&'request self, request: &'request Request<Body>) -> Result<Vars, ()> {
+        let path = request.uri().path().split("/"); 
+        let mut vars = Vars::new();
 
-        return true
+        for pair in self.path.iter().zip_longest(path) {
+            match pair {
+                Both(pattern, value) => match pattern {
+
+                    // if the node is a value , check for equality
+                    Node::Value(pattern) => if pattern != value { return Err(()); },
+
+                    // if the node is a variable, equality is implied, but we need to update the
+                    // variables with the value of the request at the same spot
+                    Node::Variable(name) => {
+                        vars.insert(name.to_string(), value.to_string());
+                    },
+
+                    Node::Rest(name) => {
+                        let rest = request.uri().path().split("/").skip_while(|x| x != &value).join("/");
+                        vars.insert(name.to_string(), rest);
+                        return Ok(vars)
+                    }
+                },
+                 _ => return Err(()),
+            }
+        }
+
+        return Ok(vars);
     }
 
-    pub fn new(path: Vec<Node>) -> Self {
+    pub fn new(mut path: Vec<Node>) -> Self {
+        path.insert(0, Node::val(""));
         Self { path }
     }
 }
@@ -53,12 +72,7 @@ impl Pattern {
 pub enum Node {
     Value(String),
     Variable(String),
-}
-
-macro_rules! route_pattern {
-    (var:$node:expr) => {{
-        Pattern{ path: vec![node!($node)]}
-    }}
+    Rest(String),
 }
 
 impl Node {
@@ -69,6 +83,10 @@ impl Node {
     pub fn var(input: &str) -> Self {
         Self::Variable(input.to_string())
     }
+
+    pub fn rest(input: &str) -> Self {
+        Self::Rest(input.to_string())
+    }
 }
 
 // Implement Display for Paths and Nodes
@@ -77,15 +95,13 @@ impl fmt::Display for Node {
         match self {
             Self::Value(value) => write!(f, "{}", value),
             Self::Variable(name) => write!(f, "*{}", name),
+            Self::Rest(name) => write!(f, "**{}", name),
         }
     }
 }
 
 impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let nodes = self.path.iter();
-        let empty = &Node::val("");
-        let path = nodes.fold("".to_string(), |acc, x| format!("{}/{}", acc, x));
-        write!(f, "{}", path)
+        write!(f, "{}", self.path.iter().join("/"))
     }
 }
