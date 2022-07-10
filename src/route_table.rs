@@ -28,14 +28,21 @@ pub struct Route {
 impl Route {
     pub async fn resolve<'request>(&'request self, request: &'request mut Request<Body>) -> Result<Response<Body>, &'request str> {
 
-
         let mut request_state = RequestState::new(&self, request);
-        let request_match = self.request.compare(request, &mut request_state);
 
-        if !request_match { return Err("did not match"); }
+        match self.request.compare(request) {
+            Ok(vars) => {
 
-        for command in &self.commands {
-            request_state = command.run(request_state);
+                for (key, value) in vars.into_iter(){
+                    request_state.variables.insert(key, value);
+                }
+
+                for command in &self.commands {
+                    command.run(&mut request_state);
+                }
+            }
+
+            Err(_) => return Err("did not match")
         }
 
         Ok(request_state.into())
@@ -68,7 +75,7 @@ impl RouteTable {
             }
         }
 
-        todo!();
+        return Ok(Response::new(Body::from("404 errer")))
     }
 }
 
