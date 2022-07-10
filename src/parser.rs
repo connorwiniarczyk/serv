@@ -45,7 +45,7 @@ peg::parser! {
 
         rule route_seperator() = quiet!{['\n']+}
 
-        pub rule route() -> Route = request:request() [':'] commands:commands(){
+        pub rule route() -> Route = request:request() [':'] commands:(commands_multi_line() / commands()) {
             Route { request, commands }
         }
 
@@ -57,14 +57,25 @@ peg::parser! {
             }
         }
 
-        pub rule node() -> Node = is_var:$(['*'])? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {
-            match is_var {
-                Some(_) => Node::var(value), 
-                None => Node::val(value), 
+        // pub rule node() -> Node = is_var:$(['*'])? is_rest:$(['*'])? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {
+        pub rule node() -> Node = is_var:"*"? is_rest:"*"? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {
+            match (is_var, is_rest) {
+                (Some(_), Some(_)) => Node::rest(value),
+                (Some(_), None) => Node::var(value),
+                (None, None) => Node::val(value),
+                _  => Node::val(value), 
             }
         }
 
-        pub rule commands() -> Vec<Command> = commands:command() ** ";" ";"? whitespace()? { commands }
+        pub rule commands() -> Vec<Command> = commands:command() ** ";" ";"? whitespace()? {
+            commands
+        }
+        pub rule commands_multi_line() -> Vec<Command> =
+            whitespace()? "{" whitespace_with_line_breaks()?
+            commands:command() ** (";" whitespace_with_line_breaks()?)
+            ";"? whitespace_with_line_breaks()? "}" {
+            commands
+        }
 
         pub rule command() -> Command = whitespace()? name:word() args:args()? whitespace()? {
             match args {
@@ -77,8 +88,9 @@ peg::parser! {
 
         pub rule arg() -> Arg = word:word() { Arg::new(None, word) }
 
-        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';' | '#']+) { word }
+        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';' | '#' | '}']+) { word }
         rule whitespace() = quiet!{[' ' | '\t']+}
+        rule whitespace_with_line_breaks() = quiet!{[' ' | '\t' | '\n' | '\r']+}
         // rule whitespace() = quiet!{[' ' | '\t' | '\n']+}
     }
 }
