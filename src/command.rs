@@ -29,17 +29,10 @@ pub struct Command {
 
 impl Command {
 
-    pub fn run<'request>(&self, state: &mut RequestState<'request>){
+    pub async fn run<'request>(&self, state: &mut RequestState<'request>){
         let args: Vec<Arg> = self.args.iter().map(|arg| arg.substitute_variables(&state)).collect();
         (self.function)(state, &args);
     }
-
-    // pub fn run<'request>(&self, &mut state: RequestState<'request>) -> RequestState<'request> {
-    //     let args: Vec<Arg> = self.args.iter().map(|arg| arg.substitute_variables(&state)).collect();
-    //     (self.function)(&mut state, &args);
-
-    //     return state;
-    // }
 
     pub fn new(name: &str, args: Vec<Arg>) -> Self {
         Self {
@@ -171,8 +164,8 @@ command_function!(exec, (state, args) => {
         .spawn()
         .expect("failed to spawn child");
 
-    // let mut stdin = child.stdin.as_mut().expect("failed to open stdin");
-    // stdin.write_all(&state.request.body());
+    let mut stdin = child.stdin.as_mut().expect("failed to open stdin");
+    stdin.write_all(&state.body);
 
     let mut output = child.wait_with_output().expect("failed").stdout;
     state.body.append(&mut output);

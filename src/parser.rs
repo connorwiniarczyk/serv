@@ -88,7 +88,7 @@ peg::parser! {
 
         pub rule arg() -> Arg = word:word() { Arg::new(None, word) }
 
-        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';' | '#' | '}']+) { word }
+        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';' | '#']+) { word }
         rule whitespace() = quiet!{[' ' | '\t']+}
         rule whitespace_with_line_breaks() = quiet!{[' ' | '\t' | '\n' | '\r']+}
         // rule whitespace() = quiet!{[' ' | '\t' | '\n']+}
