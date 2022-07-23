@@ -9,7 +9,7 @@ use crate::pattern;
 use crate::pattern::{Pattern, Node };
 
 use crate::parser;
-use crate::State;
+// use crate::State;
 
 use crate::request_state::RequestState;
 
@@ -28,6 +28,7 @@ pub struct Route {
 impl Route {
     pub async fn resolve<'request>(&'request self, request: &'request mut Request<Body>) -> Result<Response<Body>, &'request str> {
 
+        let body = hyper::body::to_bytes(request.body_mut()).await.unwrap().to_vec();
         let mut request_state = RequestState::new(&self, request);
 
         match self.request.compare(request) {
@@ -36,6 +37,9 @@ impl Route {
                 for (key, value) in vars.into_iter(){
                     request_state.variables.insert(key, value);
                 }
+
+                request_state.body = body;
+
 
                 for command in &self.commands {
                     command.run(&mut request_state);

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::process::Command;
 use itertools::Itertools;
+use url::Url;
 
 use hyper::{Request, Response, Body};
 
@@ -11,36 +12,33 @@ use lazy_static::lazy_static;
 
 // use crate::Request;
 
-
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
 
     pub route: &'request Route,
     pub request: &'request Request<Body>,
-    // pub request_body: &'request Option<Vec<u8>>,
 
     pub variables: HashMap<String, String>,
-
     pub headers: HashMap<String, String>,
-    pub body: Vec<u8>,
-    pub mime: Option<String>,
-    pub status: u16,
-}
 
-// temporary to stop compiler errors until request_body field is removed
-lazy_static! {
-    static ref request_body: Option<Vec<u8>> = Some(vec![0x00]);
+    pub body: Vec<u8>, 
+    pub mime: Option<String>,
+
+    pub status: u16,
 }
 
 impl<'request> RequestState<'request> {
 
     pub fn new(route: &'request Route, request: &'request Request<Body>) -> Self  {
+
         // populate variables with key value pairs in the query string
         let mut variables = HashMap::new();
-        // for (key, value) in request.url().query_pairs() {
-        //     variables.insert(format!("query:{}", key), value.to_string());
-        // }
+        println!("{:?}", request);
 
+        let url = Url::parse(&request.uri().to_string()).unwrap();
+        for (key, value) in url.query_pairs() {
+            variables.insert(format!("query:{}", key), value.to_string());
+        }
 
         Self {
             route,
