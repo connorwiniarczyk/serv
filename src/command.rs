@@ -29,7 +29,8 @@ pub struct Command {
 
 impl Command {
 
-    pub async fn run<'request>(&self, state: &mut RequestState<'request>){
+    pub fn run<'request>(&self, state: &mut RequestState<'request>){
+        println!("run");
         let args: Vec<Arg> = self.args.iter().map(|arg| arg.substitute_variables(&state)).collect();
         (self.function)(state, &args);
     }
@@ -53,7 +54,7 @@ pub(crate) use command;
 use std::fmt;
 impl fmt::Debug for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Point")
+        f.debug_struct("Command")
             .field("name", &self.name)
             .field("args", &self.args)
             .finish()
@@ -147,9 +148,12 @@ command_function!(set, (state, args) => {
 });
 
 command_function!(echo, (state, args) => {
+    println!("echo");
     for arg in args {
         state.body.append(&mut arg.value().as_bytes().to_vec());
     }
+
+    println!("{:?}", state.body);
 });
 
 command_function!(exec, (state, args) => {

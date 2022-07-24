@@ -31,6 +31,7 @@ impl Route {
         let body = hyper::body::to_bytes(request.body_mut()).await.unwrap().to_vec();
         let mut request_state = RequestState::new(&self, request);
 
+
         match self.request.compare(request) {
             Ok(vars) => {
 
@@ -40,10 +41,10 @@ impl Route {
 
                 request_state.body = body;
 
-
                 for command in &self.commands {
                     command.run(&mut request_state);
                 }
+
             }
 
             Err(_) => return Err("did not match")
