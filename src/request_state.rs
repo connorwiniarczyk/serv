@@ -35,7 +35,14 @@ impl<'request> RequestState<'request> {
         let mut variables = HashMap::new();
         println!("{:?}", request);
 
-        let url = Url::parse(&request.uri().to_string()).unwrap();
+
+        let mut url_string = "http://0.0.0.0".to_string();
+        url_string.push_str(&request.uri().to_string());
+
+        let url = Url::parse(&url_string).expect("Could not parse url");
+
+
+        // let url = Url::parse(&request.uri().to_string()).unwrap();
         for (key, value) in url.query_pairs() {
             variables.insert(format!("query:{}", key), value.to_string());
         }
