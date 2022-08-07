@@ -50,8 +50,11 @@ impl KeyPair {
     pub fn into_tls_acceptor(&self) -> Acceptor {
         let mut key_file = BufReader::new(File::open(&self.key).unwrap());
         let key_der = match read_one(&mut key_file).unwrap().unwrap() {
+            Item::X509Certificate(_) => panic!("not a valid key"),
             Item::RSAKey(key) => key,
-            _ => panic!("not a valid key"),
+            Item::PKCS8Key(key) => key,
+            Item::ECKey(key) => key,
+            _ => panic!("item not covered"),
         };
 
         let mut cert_file = BufReader::new(File::open(&self.cert).unwrap());
