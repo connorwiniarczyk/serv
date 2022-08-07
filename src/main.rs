@@ -3,7 +3,6 @@
 #![allow(warnings)]
 
 mod config;
-// use crate::config::Config;
 mod route_table;
 mod pattern;
 mod parser;
@@ -12,14 +11,11 @@ mod command;
 mod request_state;
 
 use std::convert::Infallible;
-
 use route_table::Route;
-// use config::Config;
 
 use clap::clap_app;
 use std::env::current_dir;
 use std::path::Path;
-// use tide;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
@@ -31,38 +27,50 @@ use futures_util::stream::StreamExt;
 use futures_util::future::ready;
 use hyper::server::accept;
 
+use rustls_pemfile::{Item, read_all, read_one};
 
+use std::io::BufReader;
+use std::fs::File;
 
-
-
-
-// tls stuff
 use tls_listener::TlsListener;
-
 use std::sync::Arc;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
-const CERT: &[u8] = include_bytes!("tls_config/local.cert");
-const PKEY: &[u8] = include_bytes!("tls_config/local.key");
-
 pub type Acceptor = tokio_rustls::TlsAcceptor;
 
-fn tls_acceptor_impl(cert_der: &[u8], key_der: &[u8]) -> Acceptor {
-    let key = PrivateKey(cert_der.into());
-    let cert = Certificate(key_der.into());
-    Arc::new(
-        ServerConfig::builder()
+
+
+#[derive(Clone, Debug)]
+struct KeyPair {
+    key: PathBuf,
+    cert: PathBuf,
+}
+
+impl KeyPair {
+    pub fn into_tls_acceptor(&self) -> Acceptor {
+        let mut key_file = BufReader::new(File::open(&self.key).unwrap());
+        let key_der = match read_one(&mut key_file).unwrap().unwrap() {
+            Item::RSAKey(key) => key,
+            _ => panic!("not a valid key"),
+        };
+
+        let mut cert_file = BufReader::new(File::open(&self.cert).unwrap());
+        let cert_der = match read_one(&mut cert_file).unwrap().unwrap() {
+            Item::X509Certificate(cert) => cert,
+            _ => panic!("not a valid certificate"),
+        };
+
+        let key = PrivateKey(key_der.into());
+        let cert = Certificate(cert_der.into());
+
+        let server_config = ServerConfig::builder()
             .with_safe_defaults()
             .with_no_client_auth()
             .with_single_cert(vec![cert], key)
-            .unwrap(),
-    )
-    .into()
-}
-
-
-pub fn tls_acceptor() -> Acceptor {
-    tls_acceptor_impl(PKEY, CERT)
+            .unwrap();
+         
+        Arc::new(server_config).into()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -71,7 +79,8 @@ pub struct Config {
     root: PathBuf,
     port: u32,
     host: String,
-    cert: Option<PathBuf>,
+
+    keypair: Option<KeyPair>,
 }
 
 
@@ -85,12 +94,26 @@ async fn main() -> hyper::Result<()> {
         (about: "A Based Web Server")
         (@arg port: -p --port +takes_value "which tcp port to listen on")
         (@arg host: -h --host +takes_value "which ip addresses to accept connections from")
+        (@arg cert: -c --cert +takes_value "path to ssl certificate")
+        (@arg key:  -k --key  +takes_value "path to matching rsa key")
         (@arg debug: -d ... "Sets the level of debugging information")
         (@arg PATH: "the directory to serve files from")
     ).get_matches();
 
     let port = matches.value_of("port").unwrap_or("4000");
     let host = matches.value_of("host").unwrap_or("0.0.0.0");
+
+    let keypair = match (matches.value_of("cert"), matches.value_of("key")) {
+        (Some(cert), Some(key)) => Some(KeyPair {
+            cert: Path::new(&cert).to_path_buf(),
+            key: Path::new(&key).to_path_buf(),
+        }),
+        (None, None) => None,
+
+        // if one is set but not the other
+        _ => panic!("please specify both a key and a cert or neither"),
+    };
+
 
     // Determine the local path to serve files out of 
     let path = Path::new(matches.value_of("PATH").unwrap_or("."));
@@ -113,7 +136,16 @@ async fn main() -> hyper::Result<()> {
         root: current_dir().unwrap(),
         port: port.parse().unwrap(), // parse port value into an integer
         host: host.to_string(),
-        cert: Some(PathBuf::new()),
+
+        keypair,
+
+        // keypair: Some(KeyPair {
+        //     key: Path::new("local.key").to_path_buf(),
+        //     cert: Path::new("local.cert").to_path_buf(),
+        // }),
+
+        // cert: Some(PathBuf::new()),
+        // key: Some(),
     };
 
     let routefile = config.root.join("routes.conf");
@@ -129,7 +161,7 @@ async fn main() -> hyper::Result<()> {
 
     let listen_addr = ([0,0,0,0], port.parse::<u16>().unwrap_or(4000)).into();
 
-    match config.cert {
+    match config.keypair {
         None => {
             let service = make_service_fn(move |_| {
                 let route_table = route_table.clone();
@@ -145,7 +177,8 @@ async fn main() -> hyper::Result<()> {
 
             Server::bind(&listen_addr).serve(service).await;
         },
-        Some(cert) => {
+
+        Some(keypair) => {
             let service = make_service_fn(move |_| {
                 let route_table = route_table.clone();
                 async move {
@@ -160,7 +193,8 @@ async fn main() -> hyper::Result<()> {
 
 
             let addr = AddrIncoming::bind(&listen_addr)?;
-            let incoming = TlsListener::new(tls_acceptor(), addr).filter(|conn|{
+            // let incoming = TlsListener::new(tls_acceptor(&keypair), addr).filter(|conn|{
+            let incoming = TlsListener::new(keypair.into_tls_acceptor(), addr).filter(|conn|{
                 if let Err(err) = conn {
                     eprintln!("Error: {:?}", err);
                     ready(false)
@@ -175,28 +209,4 @@ async fn main() -> hyper::Result<()> {
     };
 
     Ok(())
-
-
-    // use hyper::server::conn::AddrIncoming;
-
-
-    // match config.cert 
-    //     None => Server::bind(&listen_addr).serve(service).await,
-    //     Some(cert) => {
-    //         let incoming = TlsListener::new(tls_acceptor(), AddrIncoming::bind(&listen_addr).unwrap());
-    //         Server::builder(incoming).serve(service).await
-    //     }
-    //     _ => panic!()
-    // };
-
-    // server.serve(service).await
-
-
-    // let incoming = TlsListener::new(tls_acceptor(), AddrIncoming::bind(&listen_addr).unwrap());
-    // let incoming = TlsListener::new(tls_acceptor(), TcpListener::bind(&listen_addr).await.unwrap());
-
-    // let server = Server::builder(incoming).serve(service).await;
 }
-
-
-
