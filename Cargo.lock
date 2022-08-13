@@ -966,7 +966,7 @@ checksum = "ec7505abeacaec74ae4778d9d9328fe5a5d04253220a85c4ee022239fc996d03"
 
 [[package]]
 name = "serv"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-process",
  "clap",

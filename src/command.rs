@@ -18,97 +18,61 @@ lazy_static! {
     static ref VAR: Regex = Regex::new(r"\$\((?P<name>.+?)\)").unwrap();
 }
 
-pub type CommandFunction = for<'a> fn(&mut RequestState<'a>, &Vec<Arg>);
+pub type CommandFunction = for<'a> fn(&mut RequestState<'a>, Option<&str>);
 
 #[derive(Clone)]
 pub struct Command {
     pub name: String,
-    pub args: Vec<Arg>,
+    pub arg: Option<String>,
     pub function: CommandFunction, 
 }
 
 impl Command {
 
-    pub fn run<'request>(&self, state: &mut RequestState<'request>){
-        println!("run");
-        let args: Vec<Arg> = self.args.iter().map(|arg| arg.substitute_variables(&state)).collect();
-        (self.function)(state, &args);
+    pub fn substitute_variables(&self, state: &RequestState) -> Option<String> {
+        
+        let original_value = self.arg.clone()?;
+
+        let new_value = VAR.replace_all(&original_value, |caps: &Captures|{
+            let var_name = caps.name("name").unwrap().as_str();
+            state.get_variable(&var_name)
+        });
+
+        Some(new_value.to_string())
     }
 
-    pub fn new(name: &str, args: Vec<Arg>) -> Self {
+    pub fn run<'request>(&self, state: &mut RequestState<'request>){
+        // (self.function)(state, &self.substitute_variables(&state));
+        (self.function)(state, None);
+    }
+
+    pub fn new(name: &str, arg: Option<&str>) -> Self {
         Self {
             name: name.to_string(),
-            args,
+            arg: arg.map(|arg| arg.to_string()),
             function: get_command_function(name),
         } 
     }
 }
-
-macro_rules! command {
-    ($name:expr) => {{ Command::new($name, vec![]) }};
-    ($name:expr, $( $arg:expr ),+) => {{ Command::new($name, vec![$(Arg::new(None, $arg),)+]) }};
-}
-
-pub(crate) use command;
 
 use std::fmt;
 impl fmt::Debug for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Command")
             .field("name", &self.name)
-            .field("args", &self.args)
+            .field("args", &self.arg)
             .finish()
     }
 }
 
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.name);
-        for arg in &self.args {
-            f.write_str(" ");
-            f.write_str(arg.value());
-        }
+        f.write_str(&self.name)?;
+        f.write_str(&self.arg.clone().unwrap_or(String::new()))?;
 
         Ok(())
     }
 }
-
-
-#[derive(Clone, Debug)]
-pub enum Arg {
-    Positional{ value: String },
-    Named{ key: String, value: String },
-}
-
-impl Arg {
-    pub fn new(key: Option<&str>, value: &str) -> Self {
-        match key {
-            Some(key) => Self::Named { key: key.to_string(), value: value.to_string() },
-            None => Self::Positional { value: value.to_string() },
-        }
-    }
-
-    pub fn value(&self) -> &str {
-        match self {
-            Self::Named { key, value } => &value,
-            Self::Positional { value } => &value,
-        }
-    }
-
-    pub fn substitute_variables(&self, state: &RequestState) -> Self {
-        let new_value = VAR.replace_all(self.value(), |caps: &Captures|{
-            let var_name = caps.name("name").unwrap().as_str();
-            state.get_variable(&var_name)
-        });
-
-        match self {
-            Self::Positional { value } => Self::new(None, &new_value),
-            Self::Named { key, value } => Self::new(Some(key), &new_value),
-        }
-    }
-}
-
-
 
 /// Declare a command using a javascript style arrow function syntax.
 /// Generates a function pointer that can be used in the `func` field of
@@ -128,41 +92,38 @@ impl Arg {
 /// ```
 macro_rules! command_function {
     ($name:ident, ($state:ident, $args:ident) => $func:block) => {
-        pub fn $name<'a>($state: &mut RequestState<'a>, $args: &Vec<Arg>) {
+        pub fn $name<'a>($state: &mut RequestState<'a>, $args: Option<&str>) {
             $func
         }
     };
 
     ($name:ident, ($state:ident) => $func:block) => {
-        pub fn $name<'a>($state: &mut RequestState<'a>, _args: &Vec<Arg>) {
+        pub fn $name<'a>($state: &mut RequestState<'a>, _args: Option<&str>) {
             $func
         }
     };
 }
 
 command_function!(set, (state, args) => {
-    let key = &args[0];
-    let value = &args[1];
+    let mut args_iter = args.unwrap().split(" ");
+    let key = &args_iter.next().unwrap();
+    let value = &args_iter.next().unwrap();
 
-    state.variables.insert(key.value().to_string(), value.value().to_string());
+    state.variables.insert(key.to_string(), value.to_string());
 });
 
 command_function!(echo, (state, args) => {
-    println!("echo");
-    for arg in args {
-        state.body.append(&mut arg.value().as_bytes().to_vec());
-    }
-
-    println!("{:?}", state.body);
+    state.body.append(&mut args.unwrap_or("").as_bytes().to_vec());
 });
 
 command_function!(exec, (state, args) => {
-    let mut args_iterator = args.iter();
-    let path = &args_iterator.next().unwrap().value();
-    let executable_arguments:Vec<&str> = args_iterator.map(|arg| arg.value()).collect();
+
+    let mut args_iter = args.unwrap().split(" ");
+    let path = &args_iter.next().unwrap();
+    let exec_args: Vec<&str> = args_iter.collect();
 
     let mut child = process::Command::new(&path)
-        .args(executable_arguments)
+        .args(exec_args)
         .stdin(process::Stdio::piped())
         .stdout(process::Stdio::piped())
         .spawn()
@@ -176,32 +137,37 @@ command_function!(exec, (state, args) => {
 
 });
 
-command_function!(read, (state, args) => {
-    for arg in args {
-        let mut data = fs::read(arg.value()).unwrap();
-        state.body.append(&mut data);
+command_function!(read, (state, arg) => {
+    if let Some(paths) = arg {
+        for path in paths.split(" ") {
+            let mut data = fs::read(path).unwrap();
+            state.body.append(&mut data);
+        }
     }
 
 });
 
 command_function!(header, (state, args) => {
-    let mut args_iter = args.iter();    
-    let key = args_iter.next().unwrap().value().to_string();
-    let value = args_iter.next().unwrap().value().to_string();
+    let mut args_iter = args.unwrap().split(" ");    
+
+    let key = args_iter.next().unwrap().to_string();
+    let value = args_iter.next().unwrap().to_string();
+
     state.headers.insert(key, value);
 });
 
-command_function!(filetype, (state, args) => {
-    let value = args.iter().next().unwrap().value().to_string();
-    state.mime = Some(value);
+command_function!(filetype, (state, arg) => {
+    state.mime = arg.map(|x| x.to_string());
     // state.headers.insert("content-type".to_string(), value);
 });
 
 /// Joins all of the arguments into a single string and pipes it into /bin/sh, and appends the
 /// result to the response body. Lets the user easily run arbitrary shell scripts with complicated
 /// behaviors like pipes
-command_function!(shell, (state, args) => {
-    let input = args.iter().map(|arg| arg.value()).join(" ");
+command_function!(shell, (state, arg) => {
+    // let input = args.iter().map(|arg| arg.value()).join(" ");
+
+    let input = arg.unwrap_or("");
 
     let mut shell_process = process::Command::new("/bin/sh")
         .stdin(process::Stdio::piped())

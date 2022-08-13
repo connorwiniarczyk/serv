@@ -15,7 +15,6 @@ use crate::request_state::RequestState;
 
 
 use crate::command::Command;
-use crate::command::command;
 
 use hyper::{Request, Body, Response};
 
@@ -30,7 +29,6 @@ impl Route {
 
         let body = hyper::body::to_bytes(request.body_mut()).await.unwrap().to_vec();
         let mut request_state = RequestState::new(&self, request);
-
 
         match self.request.compare(request) {
             Ok(vars) => {
@@ -86,29 +84,28 @@ impl RouteTable {
 
 // use parser::route_parser::route as parse;
 
-use crate::command::Arg;
-
 impl Default for RouteTable {
     fn default() -> Self {
-        let mut output = Self { table: vec![] };
-        let request = Pattern::new(vec![
-            Node::val("test"),
-            Node::var("abcd"),
-        ]);
+        todo!();
+        // let mut output = Self { table: vec![] };
+        // let request = Pattern::new(vec![
+        //     Node::val("test"),
+        //     Node::var("abcd"),
+        // ]);
 
-        let commands = vec![
-            command!("set", "var", "hello"),
-            command!("echo", "$(path:acbd)", "world"),
-        ];
+        // let commands = vec![
+        //     command!("set", "var", "hello"),
+        //     command!("echo", "$(path:acbd)", "world"),
+        // ];
 
-        output.add(
-            Route {
-                request,
-                commands,
-                // request: route_pattern![*test],//Pattern{ path: vec![ node!("test") ] },
-            });
+        // output.add(
+        //     Route {
+        //         request,
+        //         commands,
+        //         // request: route_pattern![*test],//Pattern{ path: vec![ node!("test") ] },
+        //     });
 
-        return output;
+        // return output;
     }
     // fn default() -> Self {
     //     let mut output = Self { table: vec![] };    

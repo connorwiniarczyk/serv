@@ -16,10 +16,9 @@ use hyper::{Request, Body};
 /// A pattern representing a set of http requests
 #[derive(Debug, Clone)]
 pub struct Pattern {
+    pub attributes: Vec<String>,
     pub path: Vec<Node>,
-    
-    // TODO: should be able to match against GET, POST, PUT etc.
-    // pub methods: Vec<Method>,
+    pub extension: Vec<String>
 }
 
 use std::collections::HashMap;
@@ -62,7 +61,7 @@ impl Pattern {
 
     pub fn new(mut path: Vec<Node>) -> Self {
         path.insert(0, Node::val(""));
-        Self { path }
+        Self { path, attributes: vec![], extension: vec![] }
     }
 }
 
