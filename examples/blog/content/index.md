@@ -13,8 +13,7 @@ window.onload = async function() {
 
 
 
-# This is Markdown
-
+# Serv Blog Example
 
 ### Pages
 
