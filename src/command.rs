@@ -15,7 +15,7 @@ use std::io::Write;
 lazy_static! {
     /// defines syntax for variables within an argument.
     /// syntax is based on Makefile variable syntax: ie. $(VAR)
-    static ref VAR: Regex = Regex::new(r"(?<!\$)\$\((?P<name>.+?)\)").unwrap();
+    static ref VAR: Regex = Regex::new(r"(?P<precede>\$?)\$\((?P<name>.+?)\)").unwrap();
     // static ref ESC: Regex = Regex::new(r"$$").unwrap();
 }
 
@@ -33,12 +33,29 @@ impl Command {
     pub fn substitute_variables(&self, state: &RequestState) -> Option<String> {
 
         let new_value = VAR.replace_all(&self.arg.as_deref()?, |caps: &Captures|{
-            let var_name = caps.name("name").unwrap().as_str();
-            state.get_variable(&var_name)
-        })
-        .replace("$$", "$");
 
-        Some(new_value)
+            // check to see if the variable syntax is prefixed by a second dollar sign
+            // ie. $$(var) instead of $(var)
+            let is_double = caps.name("precede").unwrap().as_str() == "$";
+
+            match is_double {
+                // if so, strip the preceding dollar sign and use the string as is
+                true => {
+                    caps.get(0)
+                        .unwrap()
+                        .as_str()
+                        .strip_prefix("$").unwrap().to_string()
+                },
+
+                // otherwise, perform variable substitution
+                false => {
+                    let var_name = caps.name("name").unwrap().as_str();
+                    state.get_variable(&var_name).to_string()
+                },
+            }
+        });
+
+        Some(new_value.into_owned())
     }
 
     pub fn run<'request>(&self, state: &mut RequestState<'request>){
