@@ -1,95 +1,16 @@
+/// Declare CommandFunctions here
+
+use super::command::CommandFunction;
+
 use crate::request_state::RequestState;
 use std::process;
-
 use lazy_static::lazy_static;
 use regex::Regex;
 use regex::Captures;
-
 use std::fs;
-
 use itertools::Itertools;
-
 use tree_magic;
 use std::io::Write;
-
-lazy_static! {
-    /// defines syntax for variables within an argument.
-    /// syntax is based on Makefile variable syntax: ie. $(VAR)
-    static ref VAR: Regex = Regex::new(r"(?P<precede>\$?)\$\((?P<name>.+?)\)").unwrap();
-    // static ref ESC: Regex = Regex::new(r"$$").unwrap();
-}
-
-pub type CommandFunction = for<'a> fn(&mut RequestState<'a>, Option<&str>);
-
-#[derive(Clone)]
-pub struct Command {
-    pub name: String,
-    pub arg: Option<String>,
-    pub function: CommandFunction, 
-}
-
-impl Command {
-
-    pub fn substitute_variables(&self, state: &RequestState) -> Option<String> {
-
-        let new_value = VAR.replace_all(&self.arg.as_deref()?, |caps: &Captures|{
-
-            // check to see if the variable syntax is prefixed by a second dollar sign
-            // ie. $$(var) instead of $(var)
-            let is_double = caps.name("precede").unwrap().as_str() == "$";
-
-            match is_double {
-                // if so, strip the preceding dollar sign and use the string as is
-                true => {
-                    caps.get(0)
-                        .unwrap()
-                        .as_str()
-                        .strip_prefix("$").unwrap().to_string()
-                },
-
-                // otherwise, perform variable substitution
-                false => {
-                    let var_name = caps.name("name").unwrap().as_str();
-                    state.get_variable(&var_name).to_string()
-                },
-            }
-        });
-
-        Some(new_value.into_owned())
-    }
-
-    pub fn run<'request>(&self, state: &mut RequestState<'request>){
-        (self.function)(state, self.substitute_variables(&state).as_deref());
-    }
-
-    pub fn new(name: &str, arg: Option<&str>) -> Self {
-        Self {
-            name: name.to_string(),
-            arg: arg.map(|arg| arg.to_string()),
-            function: get_command_function(name),
-        } 
-    }
-}
-
-use std::fmt;
-impl fmt::Debug for Command {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Command")
-            .field("name", &self.name)
-            .field("args", &self.arg)
-            .finish()
-    }
-}
-
-impl fmt::Display for Command {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.name)?;
-        f.write_str(" ")?;
-        f.write_str(&self.arg.clone().unwrap_or(String::new()))?;
-
-        Ok(())
-    }
-}
 
 /// Declare a command using a javascript style arrow function syntax.
 /// Generates a function pointer that can be used in the `func` field of
@@ -107,6 +28,7 @@ impl fmt::Display for Command {
 ///     input.with_header("Access-Control-Allow-Origin", "*")
 /// });
 /// ```
+#[macro_export]
 macro_rules! command_function {
     ($name:ident, ($state:ident, $args:ident) => $func:block) => {
         pub fn $name<'a>($state: &mut RequestState<'a>, $args: Option<&str>) {
@@ -121,6 +43,7 @@ macro_rules! command_function {
     };
 }
 
+
 command_function!(set, (state, args) => {
     let mut args_iter = args.unwrap().split(" ");
     let key = &args_iter.next().unwrap();
@@ -130,7 +53,7 @@ command_function!(set, (state, args) => {
 });
 
 command_function!(echo, (state, args) => {
-    state.body.append(&mut args.unwrap_or("").as_bytes().to_vec());
+    state.body.append(args.unwrap_or(""));
 });
 
 command_function!(exec, (state, args) => {
@@ -147,19 +70,19 @@ command_function!(exec, (state, args) => {
         .expect("failed to spawn child");
 
     let mut stdin = child.stdin.as_mut().expect("failed to open stdin");
-    stdin.write_all(&state.body);
+    stdin.write_all(state.body.data());
 
     let mut output = child.wait_with_output().expect("failed").stdout;
-    state.body = output;
-    // state.body.append(&mut output);
-
+    state.body.replace(output.as_slice());
 });
 
 command_function!(read, (state, arg) => {
     if let Some(paths) = arg {
         for path in paths.split(" ") {
-            let mut data = fs::read(path).expect(&format!("can't read file: {:?}", path));
-            state.body.append(&mut data);
+            match fs::read(path) {
+                Ok(data) => state.body.append(data.as_slice()),
+                Err(error) => state.body = crate::body::Body::Err(error.into()),
+            }
         }
     }
 
@@ -183,10 +106,7 @@ command_function!(filetype, (state, arg) => {
 /// result to the response body. Lets the user easily run arbitrary shell scripts with complicated
 /// behaviors like pipes
 command_function!(shell, (state, arg) => {
-    // let input = args.iter().map(|arg| arg.value()).join(" ");
-
     let input = arg.unwrap_or("");
-
     let mut shell_process = process::Command::new("/bin/sh")
         .stdin(process::Stdio::piped())
         .stdout(process::Stdio::piped())
@@ -198,7 +118,7 @@ command_function!(shell, (state, arg) => {
 
     let mut output = shell_process.wait_with_output().expect("failed to wait for shell").stdout;
 
-    state.body.append(&mut output);
+    state.body.append(output.as_slice());
 
 });
 
@@ -232,7 +152,7 @@ command_function!(parse_query, (state, args) =>{
     // state.variables.insert(key.value().to_string(), output);
 });
 
-fn get_command_function(name: &str) -> CommandFunction{
+pub fn get_command_function(name: &str) -> CommandFunction{
     match name {
         "echo" => echo,
         "exec" => exec,

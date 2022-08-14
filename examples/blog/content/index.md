@@ -1,3 +1,18 @@
+<script type = "text/javascript">
+window.onload = async function() {
+	const self = await window.fetch("/self").then(res => res.text());
+	let code = document.querySelector("code");
+	document.querySelector("code").innerHtml = self;
+
+	code.innerHTML = self
+
+	console.log(code);
+
+}
+</script>
+
+
+
 # This is Markdown
 
 
@@ -20,13 +35,7 @@ output appears in the final response. The type command simply adds the
 'content-type:text/html' http header to the response.
 
 ```bash
-/: read head.html; sh pandoc content/index.md; read tail.html; type text/html
-/content/*page:	read head.html; sh pandoc content/$(path:page).md; read tail.html; type text/html
-
-/styles/*stylesheet: file css/$(path:stylesheet); type text/css; 
-/images/*image: file media/$(path:image); type text/css; 
-
-/api/date: sh date | cowsay; type text/plain
+{{routes.conf}}
 ```
 
 I think this could make a really nice content management system for a blog or
@@ -39,7 +48,8 @@ Mauris at pellentesque quam. Integer non tellus non ligula vestibulum tincidunt 
 Here are some images. If this was a real blog I'd bet you'd be really engaged
 
 ![](https://i.huffpost.com/gen/1271717/thumbs/o-LONDON-MAP-570.jpg?3)
-![](/images/paris.jpg)
-![](https://i.huffpost.com/gen/1271776/thumbs/o-LA-MAP-570.jpg?1)
+![](/media/paris.jpg)
+![](/redirect/la)
+<!-- ![](https://i.huffpost.com/gen/1271776/thumbs/o-LA-MAP-570.jpg?1) -->
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. In tincidunt sodales vestibulum. Nulla facilisi. Duis porta risus eu arcu cursus rutrum. Integer ut orci sed nibh faucibus tincidunt vitae et augue. Maecenas maximus vehicula quam, sollicitudin semper felis aliquam sit amet. Aliquam nisi orci, fringilla vitae tortor sed, sollicitudin sagittis neque. Sed tempor mattis nisl ac malesuada. Morbi id justo quis libero sagittis viverra vitae quis dolor. Vivamus eget tincidunt risus.

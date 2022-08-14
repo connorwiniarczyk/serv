@@ -2,26 +2,29 @@ use std::collections::HashMap;
 use std::process::Command;
 use itertools::Itertools;
 use url::Url;
+use std::io::Read;
 
-use hyper::{Request, Response, Body};
-
-// use crate::route_patterns::RequestMatch;
+use hyper;
+use hyper::{Request, Response};
 use crate::route_table::Route;
-
 use lazy_static::lazy_static;
 
-// use crate::Request;
+use bytes::Bytes;
+// use std::io::Stream;
+
+use crate::body::Body;
+
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
 
     pub route: &'request Route,
-    pub request: &'request Request<Body>,
+    pub request: &'request Request<hyper::Body>,
 
     pub variables: HashMap<String, String>,
     pub headers: HashMap<String, String>,
 
-    pub body: Vec<u8>, 
+    pub body: Body,
     pub mime: Option<String>,
 
     pub status: u16,
@@ -29,7 +32,7 @@ pub struct RequestState<'request> {
 
 impl<'request> RequestState<'request> {
 
-    pub fn new(route: &'request Route, request: &'request Request<Body>) -> Self  {
+    pub fn new(route: &'request Route, request: &'request Request<hyper::Body>) -> Self  {
 
         // populate variables with key value pairs in the query string
         let mut variables = HashMap::new();
@@ -46,7 +49,7 @@ impl<'request> RequestState<'request> {
             request,
             variables,
             headers: HashMap::new(),
-            body: vec![],
+            body: Body::from_str(""),
             mime: None,
             status: 200
         }
@@ -78,14 +81,16 @@ impl<'request> RequestState<'request> {
     pub fn set_mime_type(&mut self) {
         match &self.mime {
             Some(mime_type) => self.headers.insert("content-type".to_string(), mime_type.to_string()),
-            None => self.headers.insert("content-type".to_string(), tree_magic::from_u8(&self.body)),
+            // None => self.headers.insert("content-type".to_string(), tree_magic::from_u8(&self.body)),
+            None => Some("text/plain".to_string()),
+            // None => todo!(),
         };
     }
 
 }
 
-impl Into<Response<Body>> for RequestState<'_> {
-    fn into(mut self) -> Response<Body> {
+impl Into<Response<hyper::Body>> for RequestState<'_> {
+    fn into(mut self) -> Response<hyper::Body> {
 
         self.set_mime_type();
 
@@ -95,7 +100,6 @@ impl Into<Response<Body>> for RequestState<'_> {
         //     out.headers_mut().insert(hyper::header::HeaderName.from_lowercase())
         //     out.header(key.as_str(), value.as_str());
         // }
-
 
         out.body(self.body.into()).unwrap()
     }
@@ -108,7 +112,7 @@ impl<'request> Debug for RequestState<'request> {
         f.debug_struct("State")
             .field("status", &self.status)
             .field("request_body", &self.request.body())
-            .field("body", &std::str::from_utf8(&self.body).unwrap_or("<bin>"))
+            .field("body", &format!("{:?}", self.body))
             .field("headers", &self.headers)
             .field("vars", &self.variables)
             .finish()

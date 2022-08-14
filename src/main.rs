@@ -6,9 +6,9 @@ mod config;
 mod route_table;
 mod pattern;
 mod parser;
-
 mod command;
 mod request_state;
+mod body;
 
 use std::convert::Infallible;
 use route_table::Route;
@@ -37,7 +37,6 @@ use std::sync::Arc;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 pub type Acceptor = tokio_rustls::TlsAcceptor;
-
 
 
 #[derive(Clone, Debug)]
@@ -139,16 +138,7 @@ async fn main() -> hyper::Result<()> {
         root: current_dir().unwrap(),
         port: port.parse().unwrap(), // parse port value into an integer
         host: host.to_string(),
-
         keypair,
-
-        // keypair: Some(KeyPair {
-        //     key: Path::new("local.key").to_path_buf(),
-        //     cert: Path::new("local.cert").to_path_buf(),
-        // }),
-
-        // cert: Some(PathBuf::new()),
-        // key: Some(),
     };
 
     let routefile = config.root.join("routes.conf");
@@ -194,9 +184,7 @@ async fn main() -> hyper::Result<()> {
                 }
             });
 
-
             let addr = AddrIncoming::bind(&listen_addr)?;
-            // let incoming = TlsListener::new(tls_acceptor(&keypair), addr).filter(|conn|{
             let incoming = TlsListener::new(keypair.into_tls_acceptor(), addr).filter(|conn|{
                 if let Err(err) = conn {
                     eprintln!("Error: {:?}", err);

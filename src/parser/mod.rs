@@ -11,7 +11,11 @@ use token::{Token, TokenKind, TokenKind::*};
 
 use super::route_table::{RouteTable, Route};
 use super::pattern::{Pattern, Node};
-use super::command::Command;
+
+// use crate::command::command::Command;
+// use crate::command::Command;
+
+use crate::command::Command;
 
 trait FromToken {
     fn from_token(token: &Token) -> Result<Self, ()> where Self: Sized;
@@ -25,7 +29,7 @@ impl FromToken for Route {
         let command_list = token_cl.get_child(CommandList).unwrap().clone();
 
         let mut commands = vec![];
-        for command_token in command_list.children.into_iter() {
+        for command_token in command_list.children.into_iter().filter(|x| x.kind == Command) {
             let command = Command::from_token(&command_token)?;
             commands.push(command);
         }
@@ -91,7 +95,7 @@ impl RouteTableBuilder {
     pub fn generate(self) -> Result<RouteTable, Error> {
         let mut output = RouteTable { table: vec![] };
 
-        for route_token in self.tree.children.into_iter() {
+        for route_token in self.tree.children.into_iter().filter(|x| x.kind == Route) {
             output.add(Route::from_token(&route_token).unwrap()); 
         }
 
