@@ -15,7 +15,8 @@ use std::io::Write;
 lazy_static! {
     /// defines syntax for variables within an argument.
     /// syntax is based on Makefile variable syntax: ie. $(VAR)
-    static ref VAR: Regex = Regex::new(r"\$\((?P<name>.+?)\)").unwrap();
+    static ref VAR: Regex = Regex::new(r"(?<!\$)\$\((?P<name>.+?)\)").unwrap();
+    // static ref ESC: Regex = Regex::new(r"$$").unwrap();
 }
 
 pub type CommandFunction = for<'a> fn(&mut RequestState<'a>, Option<&str>);
@@ -30,20 +31,18 @@ pub struct Command {
 impl Command {
 
     pub fn substitute_variables(&self, state: &RequestState) -> Option<String> {
-        
-        let original_value = self.arg.clone()?;
 
-        let new_value = VAR.replace_all(&original_value, |caps: &Captures|{
+        let new_value = VAR.replace_all(&self.arg.as_deref()?, |caps: &Captures|{
             let var_name = caps.name("name").unwrap().as_str();
             state.get_variable(&var_name)
-        });
+        })
+        .replace("$$", "$");
 
-        Some(new_value.to_string())
+        Some(new_value)
     }
 
     pub fn run<'request>(&self, state: &mut RequestState<'request>){
-        // (self.function)(state, &self.substitute_variables(&state));
-        (self.function)(state, None);
+        (self.function)(state, self.substitute_variables(&state).as_deref());
     }
 
     pub fn new(name: &str, arg: Option<&str>) -> Self {
@@ -68,6 +67,7 @@ impl fmt::Debug for Command {
 impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.name)?;
+        f.write_str(" ")?;
         f.write_str(&self.arg.clone().unwrap_or(String::new()))?;
 
         Ok(())
@@ -133,14 +133,15 @@ command_function!(exec, (state, args) => {
     stdin.write_all(&state.body);
 
     let mut output = child.wait_with_output().expect("failed").stdout;
-    state.body.append(&mut output);
+    state.body = output;
+    // state.body.append(&mut output);
 
 });
 
 command_function!(read, (state, arg) => {
     if let Some(paths) = arg {
         for path in paths.split(" ") {
-            let mut data = fs::read(path).unwrap();
+            let mut data = fs::read(path).expect(&format!("can't read file: {:?}", path));
             state.body.append(&mut data);
         }
     }

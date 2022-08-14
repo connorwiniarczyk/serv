@@ -14,7 +14,7 @@ pub enum TokenKind {
     MultiLine,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub children: Vec<Token>,
@@ -39,6 +39,10 @@ impl Token {
 
     pub fn add_child(&mut self, child: Token) {
         self.children.push(child);
+    }
+
+    pub fn get_child(&self, kind: TokenKind) -> Option<&Token> {
+        self.children.iter().find(|x| x.kind == kind)
     }
 }
 

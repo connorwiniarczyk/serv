@@ -86,6 +86,16 @@ impl Node {
     pub fn rest(input: &str) -> Self {
         Self::Rest(input.to_string())
     }
+
+    pub fn from_str(input: &str) -> Self {
+        if let Some(value) = input.strip_prefix("**") { 
+            return Self::rest(value);
+        } else if let Some(value) = input.strip_prefix("*") {
+            return Self::var(value);
+        } else {
+            return Self::val(input);
+        }
+    }
 }
 
 // Implement Display for Paths and Nodes

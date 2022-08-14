@@ -32,7 +32,6 @@ impl Route {
 
         match self.request.compare(request) {
             Ok(vars) => {
-
                 for (key, value) in vars.into_iter(){
                     request_state.variables.insert(key, value);
                 }
@@ -62,7 +61,7 @@ impl RouteTable {
     }
 
     pub fn from_file(path: &Path) -> Self {
-        parser::parse_route_file(path).unwrap()
+        parser::parse_route_file(path).unwrap_or_default()
     }
 
     pub fn iter(&self) -> std::slice::Iter<Route> {
@@ -71,7 +70,6 @@ impl RouteTable {
 
     pub async fn resolve(&self, mut req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
         println!("incoming http request: {}", req.uri());
-
         for route in self.iter() {
             if let Ok(result) = route.resolve(&mut req).await {
                 return Ok(result)
@@ -82,48 +80,21 @@ impl RouteTable {
     }
 }
 
-// use parser::route_parser::route as parse;
+use parser::token::Token;
 
 impl Default for RouteTable {
     fn default() -> Self {
-        todo!();
-        // let mut output = Self { table: vec![] };
-        // let request = Pattern::new(vec![
-        //     Node::val("test"),
-        //     Node::var("abcd"),
-        // ]);
+        let mut output = Self { table: vec![] };
+        let request = Pattern::new(vec![
+            Node::rest("path"),
+        ]);
 
-        // let commands = vec![
-        //     command!("set", "var", "hello"),
-        //     command!("echo", "$(path:acbd)", "world"),
-        // ];
+        let command = Command::new("read", Some("$(path)"));
 
-        // output.add(
-        //     Route {
-        //         request,
-        //         commands,
-        //         // request: route_pattern![*test],//Pattern{ path: vec![ node!("test") ] },
-        //     });
+        output.add(Route { request, commands: vec![command] });
 
-        // return output;
+        output
     }
-    // fn default() -> Self {
-    //     let mut output = Self { table: vec![] };    
-
-    //     // serve index.html as the root
-    //     output.add(parse("/ /index.html read filetype(html)").unwrap());
-
-    //     // serve javascript and css files from their own folders, use custom headers to make
-    //     // things easier
-    //     output.add(parse("/scripts/* scripts/* filetype(js)").unwrap());
-    //     output.add(parse("/styles/* styles/*  read filetype(css)").unwrap());
-
-    //     // serve general files, two directories deep
-    //     output.add(parse("/* *  read").unwrap());
-    //     output.add(parse("/*/* */*  read").unwrap());
-
-    //     return output;
-    // }
 }
 
 impl fmt::Display for RouteTable {
@@ -132,7 +103,7 @@ impl fmt::Display for RouteTable {
         let mut table = Table::new();
         table.add_row(row![ "ROUTE", "COMMANDS"]);
         for row in self.iter() {
-            let commands = row.commands.iter().map(|command| command.to_string()).join("; ");
+            let commands = row.commands.iter().map(|command| command.to_string().replace("\n", "")).join("\n");
             table.add_row(row![row.request, commands]);
         }
 
