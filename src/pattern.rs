@@ -3,14 +3,13 @@
 /// potential http requests, and ResourcePatterns represent a set of potential
 /// resources on the host machine. 
 
-// use crate::Request;
 use crate::request_state::RequestState;
 
 use std::path::{Path, PathBuf};
 use std::fmt;
 use itertools::{Itertools, EitherOrBoth::*};
-
 use hyper::{Request, Body};
+use Node::*;
 
 
 /// A pattern representing a set of http requests
@@ -18,7 +17,7 @@ use hyper::{Request, Body};
 pub struct Pattern {
     pub attributes: Vec<String>,
     pub path: Vec<Node>,
-    pub extension: Vec<String>
+    pub extension: Vec<Node>,
 }
 
 use std::collections::HashMap;
@@ -30,33 +29,31 @@ impl Pattern {
     /// if they are not equal, or returns a `RequestMatch` with metadata about
     /// the match, including a `Vec` of wildcards filled in by the request.
     pub fn compare<'request>(&'request self, request: &'request Request<Body>) -> Result<Vars, ()> {
-        let path = request.uri().path().split("/"); 
-        let mut vars = Vars::new();
 
-        for pair in self.path.iter().zip_longest(path) {
-            match pair {
-                Both(pattern, value) => match pattern {
+        let mut output = Vars::new();
+        let path_full = request.uri().path();
 
-                    // if the node is a value , check for equality
-                    Node::Value(pattern) => if pattern != value { return Err(()); },
+        let (path, ext) = path_full.rsplit_once(".")
+            .map(|(p, e)| (p, Some(e)))
+            .unwrap_or((path_full, None));
 
-                    // if the node is a variable, equality is implied, but we need to update the
-                    // variables with the value of the request at the same spot
-                    Node::Variable(name) => {
-                        vars.insert(name.to_string(), value.to_string());
-                    },
+        match (self.extension.iter().next(), ext) {
+            (Some(node), Some(e)) => node.compare(&mut std::iter::once(e), &mut output)?,
+            (None, None) => (),
+            _ => return Err(()),
+        };
 
-                    Node::Rest(name) => {
-                        let rest = request.uri().path().split("/").skip_while(|x| x != &value).join("/");
-                        vars.insert(name.to_string(), rest);
-                        return Ok(vars)
-                    }
-                },
-                 _ => return Err(()),
-            }
-        }
+        let mut path_iter = path.split("/");
 
-        return Ok(vars);
+        let result: Result<(), ()> = self.path.iter()
+            .map(|node| node.compare(&mut path_iter, &mut output))
+            .collect();
+
+        if let Some(_) = path_iter.next() {
+            return Err(());
+        } 
+
+        result.map(|_| output)
     }
 
     pub fn new(mut path: Vec<Node>) -> Self {
@@ -75,6 +72,29 @@ pub enum Node {
 }
 
 impl Node {
+    pub fn compare<'a, I: Iterator<Item = &'a str>>(&'a self, path: &mut I, vars: &mut HashMap<String, String>) -> Result<(), ()> {
+
+        let next: &str = path.next().ok_or(())?;
+
+        match self {
+            Value(value) => match value == next {
+                true => Ok(()),
+                false => Err(()),
+            },
+            Variable(name) => {
+                vars.insert(name.to_string(), next.to_string());
+                Ok(())
+
+            },
+            Rest(name) => {
+                vars.insert(name.to_string(), path.join("/"));
+                Ok(())
+            }
+        }
+    }
+
+
+
     pub fn val(input: &str) -> Self {
         Self::Value(input.to_string())
     }
@@ -96,6 +116,7 @@ impl Node {
             return Self::val(input);
         }
     }
+
 }
 
 // Implement Display for Paths and Nodes
@@ -111,6 +132,25 @@ impl fmt::Display for Node {
 
 impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.path.iter().join("/"))
+        write!(f, "{}", self.path.iter().join("/"))?;
+        f.write_str(".")?;
+        write!(f, "{}", self.extension.iter().join("."))?;
+
+        Ok(())
+
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pattern_compare() {
+        let pattern = Pattern {
+            attributes: vec![],
+            path: vec![],
+            extension: vec![],
+        };
     }
 }
