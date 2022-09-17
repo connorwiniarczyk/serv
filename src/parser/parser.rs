@@ -1,10 +1,8 @@
 use std::io::Read;
 
-use super::token::{Token, TokenKind};
+use super::token::{ Token, TokenKind };
 use super::token::TokenKind::*;
-
 use super::error::{Error, ParseResult};
-
 
 pub struct Parser<R: Read> {
     reader: R,
@@ -23,48 +21,72 @@ impl<R: Read> Parser<R> {
     }
 
     fn step(&mut self, character: char) -> ParseResult {
+        println!("{:?}", self.mode());
         match (self.mode(), character) {
-            (context, '#') if context != Comment && context != MultiLine => self.enter(Comment, None),
+            (context, '#') if context != Comment && context != Block => self.enter(Comment, None),
             (Comment, '\n') => self.exit(None),
             (Comment, _) => (),
 
+            // describe the parsing modes where whitespace or newline characters should be ignored
             (Root | Route | CommandList | Command | Path, c) if self.is_whitespace(c) => (),
             (Root | CommandList | Route, '\n') => (),
 
-            (Root,  c @ ('/' | '@' | '.')) => self.enter(Route, Some(c)),
-            (Route, c @ ('/' | '@' | '.')) => self.enter(Path, Some(c)),
-            (Route, ':') => self.enter(CommandList, None), 
+            // new Routes can be denoted with either the / or @ symbols
+            (Root,  c @ ('/' | '@')) => {
+                self.enter(Route, None);
+                self.enter(Path, None);
+                match c {
+                    '/' => self.enter(PathNode, None),
+                    '@' => self.enter(PathAttribute, None),
+                    _   => unreachable!(),
+                };
+            },
+            
+            // Logic for transitioning from one path element to another
+            (PathAttribute, '@') => { self.exit(None); self.enter(PathAttribute, None) },
+            (PathAttribute | PathNode, '/') => { self.exit(None); self.enter(PathNode, None) },
+            (PathNode, '.') => { self.exit(None); self.enter(PathExt, None) },
 
-            (Path, ':') => self.exit(Some(':')), 
-            (Path, '/') => self.enter(PathNode, None), 
-            (Path, '@') => self.enter(PathAttribute, None), 
-            (Path, '.') => self.enter(PathExt, None), 
+            // if a colon is seen anywhere in the path, leave Path parsing and enter CommandList
+            // parsing
+            (Path | PathNode | PathExt | PathAttribute, ':') => {
+                self.exit_until(Route, None);
+                self.enter(CommandList, None);
+            },
 
+            // allow whitespace in between the end of the path and the colon
+            (PathAttribute | PathNode | PathExt , c) if self.is_whitespace(c) => self.exit_until(Path, Some(c)),
+
+            // Define valid characters for path elements
             (PathNode | PathExt | PathAttribute, c @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '*')) => self.buffer.push(c),
-            (PathNode | PathExt | PathAttribute, c @ ('.' | '@' | '/' | ':')) => self.exit(Some(c)),
-            (PathNode | PathExt | Path, c) if self.is_whitespace(c) => self.exit(Some(c)),
-            (PathNode | PathExt | Path, c) => return Err(Error::new(&format!("{} is not a valid character", c))),
 
-            (CommandList, c @ ('/' | '@')) => {self.exit(None); self.exit(Some(c))},
+
+            // Exit CommandList parsing when we see the beginning of a new Path
+            (CommandList, c @ ('/' | '@')) => {self.exit_until(Root, Some(c))},
+
             (CommandList, c @ ('a'..='z' | 'A'..='Z' | '0'..='9')) => self.enter(Command, Some(c)),
-
             (Command, c @ ('a'..='z' | 'A'..='Z' | '0'..='9')) => self.enter(CommandName, Some(c)),
-            (Command, '\n') => self.exit(Some('\n')),
-            (Command, ';') => self.delimit(),
 
-            (CommandName | CommandArg, c @ (';' | '\n')) => self.exit(Some(c)),
+            (CommandName | CommandArg, c @ (';' | '\n')) => self.exit_until(CommandList, None),
             (CommandName, ' ') => { self.exit(None); self.enter(CommandArg, None); },
 
             // support for multiple line command args if put inside of quotes
-            (CommandArg, '`') if self.buffer.len() == 0 => self.enter(MultiLine, None),
-            (MultiLine, '`') => { self.exit(None); self.exit(None) },
+            (CommandArg, '`') if self.buffer.len() == 0 => self.enter(Block, None),
+            (Block, '`') => self.exit_until(Command, None),
 
             // CommandArgs support an escape sequence to input special characters
-            (CommandArg | MultiLine, '\\') => self.escape_char()?,
+            (CommandArg | Block, '\\') => self.escape_char()?,
 
-            (CommandName | CommandArg | MultiLine, c) => self.buffer.push(c),
+            (CommandName | CommandArg | Block, c) => self.buffer.push(c),
 
-            status => todo!("{:?}", status),
+            // Handle the invalid character, mode combinations
+            (PathNode | PathExt | Path, c) => return Err(Error::new(&format!("{} is not a valid character", c))),
+            status => {
+                for token in self.tree.iter() {
+                    println!("{}", token);
+                }
+                todo!("{:?}", status);
+            },
         };
 
         Ok(())
@@ -89,6 +111,7 @@ impl<R: Read> Parser<R> {
             '#' => self.buffer.push('#'), 
             '`' => self.buffer.push('`'), 
             ';' => self.buffer.push(';'), 
+            ':' => self.buffer.push(':'), 
             _ => (),
         };
 
@@ -118,6 +141,14 @@ impl<R: Read> Parser<R> {
 
         if let Some(c) = c { self.step(c).unwrap(); }
 
+    }
+
+    fn exit_until(&mut self, mode: TokenKind, c: Option<char>) {
+        while self.tree.last().unwrap().kind != mode {
+            self.exit(None);
+        }
+
+        if let Some(c) = c { self.step(c).unwrap() }
     }
 
     fn delimit(&mut self) {

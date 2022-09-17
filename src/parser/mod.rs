@@ -73,7 +73,7 @@ impl FromToken for Command {
 
             let child = token.get_child(CommandArg)?;
 
-            match child.get_child(MultiLine) {
+            match child.get_child(Block) {
                 Some(multi_line) => multi_line.value.as_deref(),
                 None => child.value.as_deref(),
             }
@@ -110,7 +110,8 @@ pub fn parse_route_file(path: &Path) -> Result<RouteTable, Error> {
     let mut parser = Parser::new(file);
     let result = parser.parse()?;
 
-    println!("{}", result);
+    // println!("test");
+    println!("\n{}", result);
 
     let builder = RouteTableBuilder { tree: result };
     builder.generate()

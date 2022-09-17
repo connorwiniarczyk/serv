@@ -11,7 +11,7 @@ pub enum TokenKind {
     CommandName,
     CommandArg,
     Comment,
-    MultiLine,
+    Block,
 }
 
 #[derive(Clone, Debug)]
