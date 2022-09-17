@@ -50,7 +50,9 @@ impl FromToken for Pattern {
             match child.kind {
                 PathAttribute => output.attributes.push(child.value.as_ref().unwrap().clone()),
                 PathNode => output.path.push(Node::from_str(&child.value.as_ref().unwrap_or(&String::new()))),
-                PathExt => output.extension.push(Node::from_str(&child.value.as_ref().unwrap_or(&String::new()))),
+
+                PathExt => output.extension = Some(Node::from_str(&child.value.as_ref().unwrap_or(&String::new()))),
+                // PathExt => output.extension.push(Node::from_str(&child.value.as_ref().unwrap_or(&String::new()))),
                 _ => return Err(()),
             }
         }
