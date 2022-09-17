@@ -2,10 +2,13 @@ pub mod token;
 pub mod parser;
 pub mod error;
 
+
 use error::{Error, ParseResult};
 use parser::Parser;
 use std::fs::File;
 use std::path::Path;
+use std::str::FromStr;
+use std::io::Read;
 
 use token::{Token, TokenKind, TokenKind::*};
 
@@ -34,10 +37,7 @@ impl FromToken for Route {
             commands.push(command);
         }
 
-        Ok(Route{
-            request: pattern,
-            commands,
-        })
+        Ok(Route{ pattern, commands })
     }
 }
 
@@ -48,7 +48,26 @@ impl FromToken for Pattern {
 
         for child in token.children.iter() {
             match child.kind {
-                PathAttribute => output.attributes.push(child.value.as_ref().unwrap().clone()),
+                PathAttribute => {
+                    let attribute = match &child.value {
+                        Some(attr) => attr.as_str(),
+                        None => continue,
+                    };
+                    // let attribute = child.value.as_ref().unwrap_or(continue).as_str();
+                    // println!("{:?}", child.value.as_ref().unwrap_or());
+
+                    match attribute {
+                        method @ ("GET" | "POST" | "PUT" | "CONNECT" | "DELETE" | "HEAD" | "OPTIONS" | "PATCH" | "TRACE") => {
+                            output.methods.insert(FromStr::from_str(method).unwrap());
+                        },
+
+                        name => output.name = Some(name.to_string()),
+                        _ => todo!(),
+                    };
+
+
+                    output.attributes.push(attribute.to_string());
+                }
                 PathNode => output.path.push(Node::from_str(&child.value.as_ref().unwrap_or(&String::new()))),
 
                 PathExt => output.extension = Some(Node::from_str(&child.value.as_ref().unwrap_or(&String::new()))),
@@ -95,7 +114,7 @@ struct RouteTableBuilder {
 
 impl RouteTableBuilder {
     pub fn generate(self) -> Result<RouteTable, Error> {
-        let mut output = RouteTable { table: vec![] };
+        let mut output = RouteTable::new();
 
         for route_token in self.tree.children.into_iter().filter(|x| x.kind == Route) {
             output.add(Route::from_token(&route_token).unwrap()); 
@@ -106,17 +125,27 @@ impl RouteTableBuilder {
 }
 
 
-pub fn parse_route_file(path: &Path) -> Result<RouteTable, Error> {
-
-    let file = File::open(&path)?;
-    let mut parser = Parser::new(file);
-    let result = parser.parse()?;
-
-    // println!("test");
-    println!("\n{}", result);
-
-    let builder = RouteTableBuilder { tree: result };
+pub fn parse<R: Read>(input: R) -> Result<RouteTable, Error> {
+    let syntax_tree = Parser::new(input).parse()?;
+    let builder = RouteTableBuilder { tree: syntax_tree };
     builder.generate()
+}
+
+// pub fn parse_route_file(path: &Path) -> Result<RouteTable, Error> {
+
+//     let file = File::open(&path)?;
+//     let mut parser = Parser::new(file);
+//     let result = parser.parse()?;
+
+//     // println!("test");
+//     println!("\n{}", result);
+
+//     let builder = RouteTableBuilder { tree: result };
+//     builder.generate()
+// }
+
+pub fn parse_str(input: &str) -> Result<RouteTable, Error> {
+    parse(input.as_bytes())
 }
 
 

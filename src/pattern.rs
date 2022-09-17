@@ -11,10 +11,16 @@ use itertools::{Itertools, EitherOrBoth::*};
 use hyper::{Request, Body};
 use Node::*;
 
+use std::collections::HashSet;
+use hyper::Method;
 
 /// A pattern representing a set of http requests
 #[derive(Debug, Clone)]
 pub struct Pattern {
+
+    pub name: Option<String>,
+    pub methods: HashSet<Method>,
+
     pub attributes: Vec<String>,
     pub path: Vec<Node>,
     pub extension: Option<Node>,
@@ -25,12 +31,24 @@ type Vars = HashMap<String, String>;
 
 impl Pattern {
 
+    pub fn new(mut path: Vec<Node>) -> Self {
+        path.insert(0, Node::val(""));
+        Self { name: None, methods: HashSet::new(), path, attributes: vec![], extension: None }
+    }
+
     /// Check the equality of `self` and a given http request. Return an Err
     /// if they are not equal, or returns a `RequestMatch` with metadata about
     /// the match, including a `Vec` of wildcards filled in by the request.
     pub fn compare<'request>(&'request self, request: &'request Request<Body>) -> Result<Vars, ()> {
 
         let mut output = Vars::new();
+
+        // check to see that the method is valid
+        if !(self.methods.len() == 0 || self.methods.contains(request.method())) { return Err(()) }
+
+        // if let Some(methods) = &self.methods {
+        //     if methods.contains(request.method()) == false { return Err(()) }
+        // }
 
         let path_full = request.uri().path();
 
@@ -90,31 +108,8 @@ impl Pattern {
         }
 
         Ok(output)
-        
-
-        // match (self.extension.as_ref(), ext) {
-        //     (Some(node), Some(e)) => node.compare(&mut std::iter::once(e), &mut output)?,
-        //     (None, None) => (),
-        //     _ => return Err(()),
-        // };
-
-        // let mut path_iter = path.split("/");
-
-        // let result: Result<(), ()> = self.path.iter()
-        //     .map(|node| node.compare(&mut path_iter, &mut output))
-        //     .collect();
-
-        // if let Some(_) = path_iter.next() {
-        //     return Err(());
-        // } 
-
-        // result.map(|_| output)
     }
 
-    pub fn new(mut path: Vec<Node>) -> Self {
-        path.insert(0, Node::val(""));
-        Self { path, attributes: vec![], extension: None }
-    }
 }
 
 
@@ -127,27 +122,6 @@ pub enum Node {
 }
 
 impl Node {
-    pub fn compare<'a, I: Iterator<Item = &'a str>>(&'a self, path: &mut I, vars: &mut HashMap<String, String>) -> Result<(), ()> {
-
-        let next: &str = path.next().ok_or(())?;
-
-        match self {
-            Value(value) => match value == next {
-                true => Ok(()),
-                false => Err(()),
-            },
-            Variable(name) => {
-                vars.insert(name.to_string(), next.to_string());
-                Ok(())
-
-            },
-            Rest(name) => {
-                vars.insert(name.to_string(), path.join("/"));
-                Ok(())
-            }
-        }
-    }
-
     pub fn val(input: &str) -> Self {
         Self::Value(input.to_string())
     }
@@ -185,6 +159,12 @@ impl fmt::Display for Node {
 
 impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+
+        for attr in self.attributes.iter() {
+            f.write_str("@")?;
+            write!(f, "{}", attr)?;
+        }
+        
         write!(f, "{}", self.path.iter().join("/"))?;
 
         if let Some(ext) = &self.extension {

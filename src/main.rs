@@ -10,6 +10,7 @@ mod command;
 mod request_state;
 mod body;
 
+
 use std::convert::Infallible;
 use route_table::Route;
 
@@ -35,6 +36,10 @@ use std::fs::File;
 use tls_listener::TlsListener;
 use std::sync::Arc;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
+
+use route_table::RouteTable;
+
+// use std::default::Default;
 
 pub type Acceptor = tokio_rustls::TlsAcceptor;
 
@@ -141,13 +146,15 @@ async fn main() -> hyper::Result<()> {
         keypair,
     };
 
-    let routefile = config.root.join("routes.conf");
+    let route_table = {
+        let routefile = config.root.join("routes.conf");
+        let output = match File::open(&routefile) {
+            Ok(file) => parser::parse(file).expect("syntax error:"),
+            Err(_) => RouteTable::default(),
+        };
 
-    // Need to wrap the Route Table in an ARC so that we can move multiple references to it into
-    // the different request handling closures
-    let route_table = Arc::new(
-        route_table::RouteTable::from_file(&routefile)
-    );
+        Arc::new(output)
+    };
 
     println!("Generated the following Route Table:");
     println!("{}", route_table);
