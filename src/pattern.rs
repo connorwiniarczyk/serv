@@ -39,12 +39,12 @@ impl Pattern {
     /// Check the equality of `self` and a given http request. Return an Err
     /// if they are not equal, or returns a `RequestMatch` with metadata about
     /// the match, including a `Vec` of wildcards filled in by the request.
-    pub fn compare<'request>(&'request self, request: &'request Request<Body>) -> Result<Vars, ()> {
+    pub fn compare<'request>(&'request self, request: &'request Request<Body>) -> Result<Vars, &'static str> {
 
         let mut output = Vars::new();
 
         // check to see that the method is valid
-        if !(self.methods.len() == 0 || self.methods.contains(request.method())) { return Err(()) }
+        if !(self.methods.len() == 0 || self.methods.contains(request.method())) { return Err("methods don't match") }
 
         // if let Some(methods) = &self.methods {
         //     if methods.contains(request.method()) == false { return Err(()) }
@@ -61,10 +61,10 @@ impl Pattern {
         let mut path_iter = path.split("/");
         for node in self.path.iter() {
             match node {
-                Value(v) if path_iter.next().ok_or(())? != v => return Err(()), 
+                Value(v) if path_iter.next().ok_or("path too short")? != v => return Err("value does not match"), 
                 Value(v) => (), 
                 Variable(key) => {
-                    let value = path_iter.next().ok_or(())?;
+                    let value = path_iter.next().ok_or("path too short")?;
                     output.insert(key.to_string(), value.to_string());
                 },
                 Rest(key) => {
@@ -89,17 +89,17 @@ impl Pattern {
         }
 
         // make sure the request path is not longer than the pattern
-        if path_iter.next() != None { return Err(()) }
+        if path_iter.next() != None { return Err("path is too long") }
 
         match (self.extension.as_ref(), ext) {
             (Some(Value(l)), Some(r)) if l == r => (),
-            (Some(Value(l)), Some(r)) => return Err(()),
-            (Some(Value(l)), None) => return Err(()),
+            (Some(Value(l)), Some(r)) => return Err("extension doesn't match"),
+            (Some(Value(l)), None) => return Err("extension required"),
 
-            (Some(Variable(key)), None) => return Err(()),
+            (Some(Variable(key)), None) => return Err("extension required"),
             (Some(Variable(key)), Some(r)) => {output.insert(key.to_string(), r.to_string());},
 
-            (None, Some(_)) => return Err(()), 
+            (None, Some(_)) => return Err("extension forbidden"), 
             (None, None) => (),
 
             // extensions should not be allowed to be of type Rest

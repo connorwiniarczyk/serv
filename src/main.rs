@@ -10,7 +10,6 @@ mod command;
 mod request_state;
 mod body;
 
-
 use std::convert::Infallible;
 use route_table::Route;
 
@@ -28,68 +27,18 @@ use futures_util::stream::StreamExt;
 use futures_util::future::ready;
 use hyper::server::accept;
 
-use rustls_pemfile::{Item, read_all, read_one};
 
 use std::io::BufReader;
 use std::fs::File;
 
+use rustls_pemfile::{Item, read_all, read_one};
 use tls_listener::TlsListener;
 use std::sync::Arc;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 use route_table::RouteTable;
 
-// use std::default::Default;
-
-pub type Acceptor = tokio_rustls::TlsAcceptor;
-
-
-#[derive(Clone, Debug)]
-struct KeyPair {
-    key: PathBuf,
-    cert: PathBuf,
-}
-
-impl KeyPair {
-    pub fn into_tls_acceptor(&self) -> Acceptor {
-        let mut key_file = BufReader::new(File::open(&self.key).unwrap());
-        let key_der = match read_one(&mut key_file).unwrap().unwrap() {
-            Item::X509Certificate(_) => panic!("not a valid key"),
-            Item::RSAKey(key) => key,
-            Item::PKCS8Key(key) => key,
-            Item::ECKey(key) => key,
-            _ => panic!("item not covered"),
-        };
-
-        let mut cert_file = BufReader::new(File::open(&self.cert).unwrap());
-        let cert_der = match read_one(&mut cert_file).unwrap().unwrap() {
-            Item::X509Certificate(cert) => cert,
-            _ => panic!("not a valid certificate"),
-        };
-
-        let key = PrivateKey(key_der.into());
-        let cert = Certificate(cert_der.into());
-
-        let server_config = ServerConfig::builder()
-            .with_safe_defaults()
-            .with_no_client_auth()
-            .with_single_cert(vec![cert], key)
-            .unwrap();
-         
-        Arc::new(server_config).into()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Config {
-    // route_table: RouteTable,
-    root: PathBuf,
-    port: u32,
-    host: String,
-
-    keypair: Option<KeyPair>,
-}
-
+use config::{Config, KeyPair};
 
 #[tokio::main]
 async fn main() -> hyper::Result<()> {
@@ -159,52 +108,72 @@ async fn main() -> hyper::Result<()> {
     println!("Generated the following Route Table:");
     println!("{}", route_table);
 
-    let listen_addr = ([0,0,0,0], port.parse::<u16>().unwrap_or(4000)).into();
+    //run the on-start commands if they are specified
+    if let Some(_) = route_table.get("onstart") {
+        let route_table = route_table.clone();
+        std::thread::spawn(move || {
+            let route = route_table.get("onstart").unwrap();
+            let dummy_request = Request::new(hyper::Body::empty());
+            let mut state = request_state::RequestState::new(&route, &dummy_request);
+            for command in &route.commands {
+                command.run(&mut state);
+            }
+        });
+    }
 
     match config.keypair {
-        None => {
-            let service = make_service_fn(move |_| {
-                let route_table = route_table.clone();
-                async move {
-                    Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
-                        let route_table = route_table.clone();
-                        async move {
-                            route_table.resolve(req).await
-                        }
-                    }))
-                }
-            });
-
-            Server::bind(&listen_addr).serve(service).await;
-        },
-
-        Some(keypair) => {
-            let service = make_service_fn(move |_| {
-                let route_table = route_table.clone();
-                async move {
-                    Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
-                        let route_table = route_table.clone();
-                        async move {
-                            route_table.resolve(req).await
-                        }
-                    }))
-                }
-            });
-
-            let addr = AddrIncoming::bind(&listen_addr)?;
-            let incoming = TlsListener::new(keypair.into_tls_acceptor(), addr).filter(|conn|{
-                if let Err(err) = conn {
-                    eprintln!("Error: {:?}", err);
-                    ready(false)
-                } else {
-                    ready(true)
-                }
-            });
-
-            Server::builder(accept::from_stream(incoming)).serve(service).await;
-
-        }
+        None => start_unencrypted(route_table.clone(), &config).await?,
+        Some(ref keypair) => start_encrypted(route_table.clone(), &config, keypair.clone()).await?,
     };
 
     Ok(())
+}
+
+async fn start_encrypted(route_table: Arc<RouteTable>, config: &Config, keypair: KeyPair) -> hyper::Result<()>{
+
+    let service = make_service_fn(move |_| {
+        let route_table = route_table.clone();
+        async move {
+            Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
+                let route_table = route_table.clone();
+                async move {
+                    route_table.resolve(req).await
+                }
+            }))
+        }
+    });
+
+    let listen_addr = ([0,0,0,0], config.port).into();
+    let addr = AddrIncoming::bind(&listen_addr)?;
+    let incoming = TlsListener::new(keypair.into_tls_acceptor(), addr).filter(|conn|{
+        if let Err(err) = conn {
+            println!("Error: {:?}", err);
+            ready(false)
+        } else {
+            ready(true)
+        }
+    });
+
+    Server::builder(accept::from_stream(incoming)).serve(service).await;
+    Ok(())
+}
+
+async fn start_unencrypted(route_table: Arc<RouteTable>, config: &Config) -> hyper::Result<()> {
+    let service = make_service_fn(move |_| {
+        let route_table = route_table.clone();
+        async move {
+            Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
+                let route_table = route_table.clone();
+                async move {
+                    route_table.resolve(req).await
+                }
+            }))
+        }
+    });
+
+    let listen_addr = ([0,0,0,0], config.port).into();
+    let addr = AddrIncoming::bind(&listen_addr)?;
+    Server::builder(addr).serve(service).await; 
+    Ok(())
+    // Server::bind(&listen_addr).serve(service).await;
 }

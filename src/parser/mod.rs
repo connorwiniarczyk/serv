@@ -36,8 +36,6 @@ impl FromToken for Route {
             let command = Command::from_token(&command_token)?;
             commands.push(command);
         }
-
-        Ok(Route{ pattern, commands })
     }
 }
 
@@ -60,7 +58,6 @@ impl FromToken for Pattern {
                         method @ ("GET" | "POST" | "PUT" | "CONNECT" | "DELETE" | "HEAD" | "OPTIONS" | "PATCH" | "TRACE") => {
                             output.methods.insert(FromStr::from_str(method).unwrap());
                         },
-
                         name => output.name = Some(name.to_string()),
                         _ => todo!(),
                     };
