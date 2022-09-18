@@ -1,6 +1,6 @@
 // #![deny(warnings)e
-// #![allow(unused_imports, unused_mut, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
-#![allow(warnings)]
+#![allow(unused_imports, unused_mut, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
+// #![allow(warnings)]
 
 mod config;
 mod route_table;

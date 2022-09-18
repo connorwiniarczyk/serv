@@ -2,7 +2,6 @@ pub mod token;
 pub mod parser;
 pub mod error;
 
-
 use error::{Error, ParseResult};
 use parser::Parser;
 use std::fs::File;
@@ -43,7 +42,7 @@ impl FromToken for Route {
 
 impl FromToken for Pattern {
     fn from_token(token: &Token) -> Result<Self, ()> {
-        if (token.kind != Path) { return Err(()); }
+        if token.kind != Path { return Err(()); }
         let mut output = Pattern::new(vec![]);
 
         for child in token.children.iter() {
@@ -61,9 +60,7 @@ impl FromToken for Pattern {
                             output.methods.insert(FromStr::from_str(method).unwrap());
                         },
                         name => output.name = Some(name.to_string()),
-                        _ => todo!(),
                     };
-
 
                     output.attributes.push(attribute.to_string());
                 }
@@ -81,7 +78,7 @@ impl FromToken for Pattern {
 
 impl FromToken for Command {
     fn from_token(token: &Token) -> Result<Self, ()> {
-        if (token.kind != Command) { return Err(()); }
+        if token.kind != Command { return Err(()); }
 
         let name = token
             .get_child(CommandName)
