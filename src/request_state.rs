@@ -4,9 +4,10 @@ use itertools::Itertools;
 use url::Url;
 use std::io::Read;
 
+
 use hyper;
 use hyper::{Request, Response};
-use crate::route_table::Route;
+use crate::route_table::{Route, RouteTable};
 use lazy_static::lazy_static;
 
 use bytes::Bytes;
@@ -17,6 +18,7 @@ use crate::body::Body;
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
 
+    pub table: &'request RouteTable,
     pub route: &'request Route,
     pub request: &'request Request<hyper::Body>,
 
@@ -31,7 +33,7 @@ pub struct RequestState<'request> {
 
 impl<'request> RequestState<'request> {
 
-    pub fn new(route: &'request Route, request: &'request Request<hyper::Body>) -> Self  {
+    pub fn new(route: &'request Route, request: &'request Request<hyper::Body>, table: &'request RouteTable) -> Self  {
 
         // populate variables with key value pairs in the query string
         let mut variables = HashMap::new();
@@ -44,6 +46,7 @@ impl<'request> RequestState<'request> {
         }
 
         Self {
+            table,
             route,
             request,
             variables,

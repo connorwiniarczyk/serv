@@ -45,8 +45,8 @@ impl RouteTable {
             };
 
             // if the request matches, resolve it
-            let mut state = RequestState::new(&route, &req);
-            state.variables = vars;
+            let mut state = RequestState::new(&route, &req, &self);
+            for (key, value) in vars { state.variables.insert(key, value); }
             for command in &route.commands {
                 command.run(&mut state);
             }

@@ -114,7 +114,7 @@ async fn main() -> hyper::Result<()> {
         std::thread::spawn(move || {
             let route = route_table.get("onstart").unwrap();
             let dummy_request = Request::new(hyper::Body::empty());
-            let mut state = request_state::RequestState::new(&route, &dummy_request);
+            let mut state = request_state::RequestState::new(&route, &dummy_request, &route_table);
             for command in &route.commands {
                 command.run(&mut state);
             }

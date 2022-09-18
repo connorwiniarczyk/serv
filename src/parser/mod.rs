@@ -36,6 +36,8 @@ impl FromToken for Route {
             let command = Command::from_token(&command_token)?;
             commands.push(command);
         }
+
+        Ok(Route{pattern, commands})
     }
 }
 

@@ -21,7 +21,6 @@ impl<R: Read> Parser<R> {
     }
 
     fn step(&mut self, character: char) -> ParseResult {
-        println!("{:?}", self.mode());
         match (self.mode(), character) {
             (context, '#') if context != Comment && context != Block => self.enter(Comment, None),
             (Comment, '\n') => self.exit(None),
@@ -58,7 +57,7 @@ impl<R: Read> Parser<R> {
             (PathAttribute | PathNode | PathExt , c) if self.is_whitespace(c) => self.exit_until(Path, Some(c)),
 
             // Define valid characters for path elements
-            (PathNode | PathExt | PathAttribute, c @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '*')) => self.buffer.push(c),
+            (PathNode | PathExt | PathAttribute, c @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '*' | '_')) => self.buffer.push(c),
 
 
             // Exit CommandList parsing when we see the beginning of a new Path
@@ -72,7 +71,7 @@ impl<R: Read> Parser<R> {
 
             // support for multiple line command args if put inside of quotes
             (CommandArg, '`') if self.buffer.len() == 0 => self.enter(Block, None),
-            (Block, '`') => self.exit_until(Command, None),
+            (Block, '`') => self.exit_until(CommandList, None),
 
             // CommandArgs support an escape sequence to input special characters
             (CommandArg | Block, '\\') => self.escape_char()?,
@@ -82,10 +81,10 @@ impl<R: Read> Parser<R> {
             // Handle the invalid character, mode combinations
             (PathNode | PathExt | Path, c) => return Err(Error::new(&format!("{} is not a valid character", c))),
             status => {
-                for token in self.tree.iter() {
-                    println!("{}", token);
-                }
-                todo!("{:?}", status);
+                // for token in self.tree.iter() {
+                //     println!("{}", token);
+                // }
+                // todo!("{:?}", status);
             },
         };
 

@@ -43,6 +43,15 @@ macro_rules! command_function {
     };
 }
 
+command_function!(jumpto, (state, args) => {
+    let route_name = args.expect("need to specifiy a route to jump to");
+    let route = state.table.get(route_name).expect("that route does not exist");
+    
+    for command in &route.commands {
+        command.run(state);
+    }
+});
+
 
 command_function!(set, (state, args) => {
     let mut args_iter = args.unwrap().split(" ");
@@ -162,6 +171,7 @@ pub fn get_command_function(name: &str) -> CommandFunction{
         "filetype" | "ft" | "type" => filetype,
         "shell" | "sh" => shell,
         "debug" => debug,
+        "jumpto" | "jump" => jumpto,
         "parse_query" => parse_query,
         _ => panic!("command_function {} isn't defined", name), 
     }
