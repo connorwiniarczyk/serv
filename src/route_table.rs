@@ -38,7 +38,8 @@ impl RouteTable {
             // if so, store the result in vars, otherwise continue
             let vars = match route.pattern.compare(&req) {
                 Ok(vars) => vars,
-                Err(e) => {println!("{:?}", e); continue},
+                // Err(e) => {println!("{:?}", e); continue},
+                Err(e) => continue,
             };
 
             // if the request matches, resolve it

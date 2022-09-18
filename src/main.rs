@@ -21,9 +21,10 @@ use hyper::server::accept;
 use futures_util::stream::StreamExt;
 use futures_util::future::ready;
 use tls_listener::TlsListener;
+use tokio_rustls::TlsAcceptor;
 
 use route_table::RouteTable;
-use config::{Config, KeyPair};
+use config::{Config};
 
 #[tokio::main]
 async fn main() -> hyper::Result<()> {
@@ -41,20 +42,15 @@ async fn main() -> hyper::Result<()> {
         (@arg PATH: "the directory to serve files from")
     ).get_matches();
 
-    let config = Config::from_args(&matches);
+    let mut config = Config::from_args(&matches);
 
     // It is important to cd into the target directory so that shell scripts invoked in that
     // directory will know what directory they are being run from
     std::env::set_current_dir(&config.root).expect("could not cd into that directory!");
     println!("\nServing Directory: {:?}\n", config.root);
 
-    // let config = Config {
-    //     root: current_dir().unwrap(),
-    //     port: port.parse().unwrap(), // parse port value into an integer
-    //     host: host.to_string(),
-    //     keypair,
-    // };
 
+    // Generate the Route Table
     let route_table = {
         let routefile = config.root.join("routes.conf");
         let output = match File::open(&routefile) {
@@ -62,11 +58,18 @@ async fn main() -> hyper::Result<()> {
             Err(_) => RouteTable::default(),
         };
 
+        // The Route Table needs to be behind an Arc smart pointer because it will be shared
+        // between multiple async processes. We do not need a Mutex here because once generated,
+        // the Route Table can not be mutated
         Arc::new(output)
     };
 
+
     println!("Generated the following Route Table:");
     println!("{}", route_table);
+
+    config = config.from_routes(&route_table.clone());
+
 
     //run the on-start commands if they are specified
     if let Some(_) = route_table.get("onstart") {
@@ -81,15 +84,26 @@ async fn main() -> hyper::Result<()> {
         });
     }
 
-    match config.keypair {
+    // Start the server
+    let keypair = config.keypair.clone();
+    match keypair.map(|keypair| keypair.into_tls_acceptor()) {
         None => start_unencrypted(route_table.clone(), &config).await?,
-        Some(ref keypair) => start_encrypted(route_table.clone(), &config, keypair.clone()).await?,
+        Some(Err(e)) => {
+            println!("failed to load valid certificates and keys");
+            println!("error: {:?}", e);
+            println!("falling back to unencrypted mode...");
+            start_unencrypted(route_table.clone(), &config).await?
+        }
+        Some(Ok(ref acceptor)) => start_encrypted(route_table.clone(), &config, acceptor.clone()).await?,
     };
 
     Ok(())
 }
 
-async fn start_encrypted(route_table: Arc<RouteTable>, config: &Config, keypair: KeyPair) -> hyper::Result<()>{
+// async fn start_encrypted(route_table: Arc<RouteTable>, config: &Config, keypair: KeyReader) -> hyper::Result<()>{
+async fn start_encrypted(route_table: Arc<RouteTable>, config: &Config, acceptor: TlsAcceptor) -> hyper::Result<()>{
+
+    println!("starting encrypted server\n");
 
     let service = make_service_fn(move |_| {
         let route_table = route_table.clone();
@@ -105,7 +119,8 @@ async fn start_encrypted(route_table: Arc<RouteTable>, config: &Config, keypair:
 
     let listen_addr = ([0,0,0,0], config.port).into();
     let addr = AddrIncoming::bind(&listen_addr)?;
-    let incoming = TlsListener::new(keypair.into_tls_acceptor(), addr).filter(|conn|{
+    // let incoming = TlsListener::new(keypair.into_tls_acceptor().unwrap(), addr).filter(|conn|{
+    let incoming = TlsListener::new(acceptor, addr).filter(|conn|{
         if let Err(err) = conn {
             println!("Error: {:?}", err);
             ready(false)
@@ -119,6 +134,7 @@ async fn start_encrypted(route_table: Arc<RouteTable>, config: &Config, keypair:
 }
 
 async fn start_unencrypted(route_table: Arc<RouteTable>, config: &Config) -> hyper::Result<()> {
+    println!("starting unencrypted server\n");
     let service = make_service_fn(move |_| {
         let route_table = route_table.clone();
         async move {

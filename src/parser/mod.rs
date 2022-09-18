@@ -122,19 +122,6 @@ pub fn parse<R: Read>(input: R) -> Result<RouteTable, Error> {
     builder.generate()
 }
 
-// pub fn parse_route_file(path: &Path) -> Result<RouteTable, Error> {
-
-//     let file = File::open(&path)?;
-//     let mut parser = Parser::new(file);
-//     let result = parser.parse()?;
-
-//     // println!("test");
-//     println!("\n{}", result);
-
-//     let builder = RouteTableBuilder { tree: result };
-//     builder.generate()
-// }
-
 pub fn parse_str(input: &str) -> Result<RouteTable, Error> {
     parse(input.as_bytes())
 }

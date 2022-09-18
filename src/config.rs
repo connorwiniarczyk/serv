@@ -1,12 +1,17 @@
-use rustls_pemfile::{Item, read_one};
+use rustls_pemfile::{Item, read_all};
 use std::sync::Arc;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{Read, BufReader};
 
 use std::env::current_dir;
+
+use crate::route_table::RouteTable;
+use crate::request_state;
+use crate::body::Body;
+use hyper::Request;
 
 
 pub type Acceptor = tokio_rustls::TlsAcceptor;
@@ -17,23 +22,55 @@ pub struct Config {
     pub port: u16,
     pub host: String,
 
-    pub keypair: Option<KeyPair>,
+    pub keypair: Option<KeyReader>,
 }
 
 impl Config {
+
+    pub fn from_routes<R: AsRef<RouteTable>>(mut self, table: &R) -> Self {
+        let route_table = table.as_ref();
+
+        if self.keypair == None {
+            if let Some(_) = route_table.get("ssl") {
+                let route = route_table.get("ssl").unwrap();
+                let dummy_request = Request::new(hyper::Body::empty());
+                let mut state = request_state::RequestState::new(&route, &dummy_request, &route_table);
+                for command in &route.commands {
+                    command.run(&mut state);
+                }
+
+                println!("{:?}", state.body);
+
+                match state.body {
+                    Body::Txt(txt) => {
+                        let keyreader = KeyReader::new().read_pem(&mut txt.as_bytes());
+                        self.keypair = Some(keyreader);
+                    },
+                    Body::Raw(bytes) => {
+                        let keyreader = KeyReader::new().read_pem(&mut bytes.as_slice());
+                        self.keypair = Some(keyreader);
+                    },
+                    _ => { println!("could not load key file") },
+                }
+            }
+        }
+
+        self
+    }
+
     pub fn from_args(matches: &clap::ArgMatches) -> Self {
         let port = matches.value_of("port").unwrap_or("4000");
         let host = matches.value_of("host").unwrap_or("0.0.0.0");
 
         let keypair = match (matches.value_of("cert"), matches.value_of("key")) {
-            (Some(cert), Some(key)) => Some(KeyPair {
-                cert: Path::new(&cert).to_path_buf(),
-                key: Path::new(&key).to_path_buf(),
-            }),
-            (None, None) => None,
+            (Some(cert), Some(key)) => {
+                let keyreader = KeyReader::new()
+                    .read_pem(&mut File::open(&cert).unwrap())
+                    .read_pem(&mut File::open(&key).unwrap());
+                Some(keyreader)
 
-            // if one is set but not the other
-            _ => panic!("please specify both a key and a cert or neither"),
+            },
+            _ => None,
         };
 
         // Determine the local path to serve files out of 
@@ -55,39 +92,48 @@ impl Config {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct KeyPair {
-    pub key: PathBuf,
-    pub cert: PathBuf,
+#[derive(Clone, Debug, PartialEq)]
+pub struct KeyReader {
+    key: Option<Vec<u8>>,
+    certs: Vec<Vec<u8>>,
 }
 
-impl KeyPair {
-    pub fn into_tls_acceptor(&self) -> Acceptor {
-        let mut key_file = BufReader::new(File::open(&self.key).unwrap());
-        let key_der = match read_one(&mut key_file).unwrap().unwrap() {
-            Item::X509Certificate(_) => panic!("not a valid key"),
-            Item::RSAKey(key) => key,
-            Item::PKCS8Key(key) => key,
-            Item::ECKey(key) => key,
-            _ => panic!("item not covered"),
-        };
+impl KeyReader {
+    pub fn new() -> Self { 
+        Self {key: None, certs: Vec::new() }
+    }
 
-        let mut cert_file = BufReader::new(File::open(&self.cert).unwrap());
-        let cert_der = match read_one(&mut cert_file).unwrap().unwrap() {
-            Item::X509Certificate(cert) => cert,
-            _ => panic!("not a valid certificate"),
-        };
+    pub fn read_pem<R: Read>(mut self, input: &mut R) -> Self {
+        let mut buf_read = BufReader::new(input);
+        let items = read_all(&mut buf_read).unwrap();
+        for item in items {
+            match item {
+                Item::X509Certificate(cert) => self.certs.push(cert),
+                Item::RSAKey(key) => self.key = Some(key),
+                Item::PKCS8Key(key) => self.key = Some(key),
+                Item::ECKey(key) => self.key = Some(key),
+                _ => todo!(),
+            }
+        }
 
-        let key = PrivateKey(key_der.into());
-        let cert = Certificate(cert_der.into());
+        self
+    }
+
+    pub fn into_tls_acceptor(self) -> Result<Acceptor, ()> {
+
+        if self.certs.len() == 0 { return Err(()) }
+        let key_bytes = self.key.ok_or(())?;
+        let cert_bytes = self.certs.into_iter().next().ok_or(())?;
+
+        let key = PrivateKey(key_bytes.into());
+        let cert = Certificate(cert_bytes.into());
 
         let server_config = ServerConfig::builder()
             .with_safe_defaults()
             .with_no_client_auth()
             .with_single_cert(vec![cert], key)
             .unwrap();
-         
-        Arc::new(server_config).into()
+
+        Ok(Arc::new(server_config).into())
     }
 }
-
