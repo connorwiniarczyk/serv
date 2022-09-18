@@ -1,13 +1,8 @@
 use crate::request_state::RequestState;
-use std::process;
 use lazy_static::lazy_static;
 use regex::Regex;
 use regex::Captures;
-use std::fs;
-use itertools::Itertools;
-use tree_magic;
 use super::get_command_function;
-use std::io::Write;
 
 lazy_static! {
     /// defines syntax for variables within an argument.

@@ -1,15 +1,9 @@
 /// Declare CommandFunctions here
-
 use super::command::CommandFunction;
 
 use crate::request_state::RequestState;
 use std::process;
-use lazy_static::lazy_static;
-use regex::Regex;
-use regex::Captures;
 use std::fs;
-use itertools::Itertools;
-use tree_magic;
 use std::io::Write;
 
 /// Declare a command using a javascript style arrow function syntax.

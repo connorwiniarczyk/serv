@@ -1,12 +1,9 @@
 use std::fmt;
-use std::path::Path;
-use prettytable::{ Table, Row, Cell, row, cell };
+use prettytable::{ Table, row, cell };
 use itertools::Itertools;
-use crate::pattern;
-use crate::pattern::{Pattern, Node };
+use crate::pattern::{Pattern};
 use crate::parser;
 use crate::request_state::{RequestState};
-use crate::body::Body;
 use crate::command::Command;
 use hyper::{Request, Response};
 use std::collections::HashMap;
@@ -40,7 +37,7 @@ impl RouteTable {
             // check to see if the request matches
             // if so, store the result in vars, otherwise continue
             let vars = match route.pattern.compare(&req) {
-                Ok(vars) => { println!("{:?}", vars); vars },
+                Ok(vars) => vars,
                 Err(e) => {println!("{:?}", e); continue},
             };
 

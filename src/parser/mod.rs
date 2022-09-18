@@ -2,20 +2,15 @@ pub mod token;
 pub mod parser;
 pub mod error;
 
-use error::{Error, ParseResult};
+use error::{Error};
 use parser::Parser;
-use std::fs::File;
-use std::path::Path;
 use std::str::FromStr;
 use std::io::Read;
 
-use token::{Token, TokenKind, TokenKind::*};
+use token::{Token, TokenKind::*};
 
 use super::route_table::{RouteTable, Route};
 use super::pattern::{Pattern, Node};
-
-// use crate::command::command::Command;
-// use crate::command::Command;
 
 use crate::command::Command;
 

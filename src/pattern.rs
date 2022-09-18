@@ -3,11 +3,9 @@
 /// potential http requests, and ResourcePatterns represent a set of potential
 /// resources on the host machine. 
 
-use crate::request_state::RequestState;
 
-use std::path::{Path, PathBuf};
 use std::fmt;
-use itertools::{Itertools, EitherOrBoth::*};
+use itertools::{Itertools};
 use hyper::{Request, Body};
 use Node::*;
 
