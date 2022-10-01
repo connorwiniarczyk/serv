@@ -7,6 +7,7 @@ use std::fs;
 use std::io::Write;
 
 use sqlite;
+use json;
 
 
 
@@ -40,9 +41,6 @@ macro_rules! command_function {
         }
     };
 }
-
-
-// struct Row(Vec<()>)
 
 fn json_encode_object(object: Vec<(String, String)>) -> String {
     let mut output = String::new();
@@ -218,6 +216,54 @@ command_function!(debug, (state) => {
     println!("{:#?}", state);
 });
 
+use json::JsonValue;
+
+// parse the body 
+command_function!(parse_body, (state, args) => {
+    let json = json::parse(std::str::from_utf8(state.body.data()).unwrap()).unwrap();       
+
+    fn insert_value(parent_prefix: &str, value: JsonValue, state: &mut RequestState) {
+        match value {
+            JsonValue::Short(value) => state.variables.insert(format!("{}", parent_prefix), value.as_str().to_string()),
+            JsonValue::String(value) => state.variables.insert(format!("{}", parent_prefix), value.as_str().to_string()),
+            JsonValue::Number(value) => {
+                let number: f32 = value.clone().into();
+                state.variables.insert(format!("{}", parent_prefix), number.to_string())
+            },
+            JsonValue::Object(ref _object) => {
+                for (key, value) in value.entries() {
+                    insert_value(&format!("{}.{}", parent_prefix, key), value.clone(), state);
+                }
+                None
+            },
+
+            JsonValue::Array(ref _array) => {
+                for (key, value) in value.members().enumerate() {
+                    insert_value(&format!("{}.{}", parent_prefix, key), value.clone(), state);
+                }
+                None
+            },
+
+            _ => todo!(),
+        };
+    }
+
+    insert_value("body", json, state);
+
+    // for (key, value) in json.entries() {
+    //     match value {
+    //         JsonValue::Short(value) => state.variables.insert(format!("body.{}", key), value.as_str().to_string()),
+    //         JsonValue::String(value) => state.variables.insert(format!("body.{}", key), value.as_str().to_string()),
+    //         JsonValue::Number(value) => {
+    //             let number: f32 = value.clone().into();
+    //             state.variables.insert(format!("body.{}", key), number.to_string())
+    //         },
+    //         _ => todo!(),
+    //     };
+    //     // println!("{:?} {:?}", key, value);
+    // }
+});
+
 
 command_function!(parse_query, (state, args) =>{
 
@@ -255,6 +301,7 @@ pub fn get_command_function(name: &str) -> CommandFunction{
         "jumpto" | "jump" | "use" => jumpto,
         "parse_query" => parse_query,
         "sql" => sql,
+        "parse_body" => parse_body,
         _ => panic!("command_function {} isn't defined", name), 
     }
 }
