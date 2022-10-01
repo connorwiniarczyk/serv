@@ -76,7 +76,14 @@ impl fmt::Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.name)?;
         f.write_str(" ")?;
-        f.write_str(&self.arg.clone().unwrap_or(String::new()))?;
+
+        let arg = self.arg.clone().unwrap_or(String::new());
+        if arg.chars().count() >= 80 {
+            f.write_str(" ... ")?;
+        } else {
+            f.write_str(&arg)?;
+        }
+
 
         Ok(())
     }
