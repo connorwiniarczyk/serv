@@ -6,6 +6,10 @@ use std::process;
 use std::fs;
 use std::io::Write;
 
+use sqlite;
+
+
+
 /// Declare a command using a javascript style arrow function syntax.
 /// Generates a function pointer that can be used in the `func` field of
 /// RouteOptions in the RouteTable. This is mainly useful as a way of
@@ -36,6 +40,89 @@ macro_rules! command_function {
         }
     };
 }
+
+
+// struct Row(Vec<()>)
+
+fn json_encode_object(object: Vec<(String, String)>) -> String {
+    let mut output = String::new();
+    output.push('{');
+
+    let mut iter = object.into_iter().peekable();
+
+    loop {
+        match iter.next() {
+            Some((key, value)) => {
+                output.push_str(&format!("\"{}\": \"{}\"", key, value));
+                if let Some(_) = iter.peek() { output.push(','); }
+            },
+            None => break,
+        }
+    }
+    output.push('}');
+    output
+}
+
+fn json_encode_array(array: Vec<String>) -> String {
+    let mut output = String::new();
+    output.push('[');
+
+    let mut iter = array.into_iter().peekable();
+
+    while let Some(value) = iter.next() {
+        output.push_str(&value);
+
+        if let Some(_) = iter.peek() {
+            output.push_str(",\n");
+        }
+    }
+    output.push(']');
+    output
+}
+
+struct SqlParams<'request> {
+    state: &'request RequestState<'request>,
+    index: u32,
+}
+
+impl<'request> SqlParams<'request> {
+    fn new(state: &'request RequestState<'request>) -> Self {
+        Self { state, index: 0 }
+    }
+}
+
+impl<'request> Iterator for SqlParams<'request> {
+    type Item = &'request str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        let name = format!("sql.params.{}", self.index);
+        self.state.get_variable(&name)
+    }
+}
+
+
+command_function!(sql, (state, args) => {
+    let db_name = "local.sqlite";
+    let connection = sqlite::open(&db_name).unwrap();
+
+    // create the sql query and bind parameters
+    let mut query = connection.prepare(&args.unwrap()).unwrap();
+    for (index, param) in SqlParams::new(&state).enumerate() {
+        query = query.bind(index + 1, param).expect("failed to bind sql parameter");
+    }
+
+    let mut output: Vec<String> = Vec::new();
+
+    while let sqlite::State::Row = query.next().unwrap() {
+        let mut row: Vec<(String, String)> = Vec::new();
+        for (index, column) in query.column_names().iter().enumerate() {
+            row.push((column.to_string(), query.read(index).unwrap()));
+        }
+        output.push(json_encode_object(row));
+    }
+    state.body.append(json_encode_array(output).as_str());
+});
 
 command_function!(jumpto, (state, args) => {
     let route_name = args.expect("need to specifiy a route to jump to");
@@ -165,8 +252,9 @@ pub fn get_command_function(name: &str) -> CommandFunction{
         "filetype" | "ft" | "type" => filetype,
         "shell" | "sh" => shell,
         "debug" => debug,
-        "jumpto" | "jump" => jumpto,
+        "jumpto" | "jump" | "use" => jumpto,
         "parse_query" => parse_query,
+        "sql" => sql,
         _ => panic!("command_function {} isn't defined", name), 
     }
 }

@@ -41,7 +41,7 @@ impl Command {
                 // otherwise, perform variable substitution
                 false => {
                     let var_name = caps.name("name").unwrap().as_str();
-                    state.get_variable(&var_name).to_string()
+                    state.get_variable(&var_name).unwrap_or("").to_string()
                 },
             }
         });

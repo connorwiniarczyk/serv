@@ -55,7 +55,7 @@ impl<'request> RequestState<'request> {
         self.variables.insert(key.to_string(), value.to_string());
     }
 
-    pub fn get_variable(&'request self, name: &str) -> &'request str {
+    pub fn get_variable(&'request self, name: &str) -> Option<&'request str> {
 
         // TODO: add back a way to access the body as a variable.
         // Because the body is a stream now this gets more complicated since you need to await the
@@ -70,7 +70,7 @@ impl<'request> RequestState<'request> {
         //     // return std::str::from_utf8(&self.request_body.unwrap_or(Vec::new())).unwrap_or("");
         // }
 
-        self.variables.get(name).and_then(|val| Some(val.as_str())).unwrap_or("")
+        self.variables.get(name).and_then(|val| Some(val.as_str())) //.unwrap_or("")
     }
 
     // Automatically detect the mime type of the response
