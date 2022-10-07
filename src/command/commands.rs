@@ -5,6 +5,7 @@ use crate::request_state::RequestState;
 use std::process;
 use std::fs;
 use std::io::Write;
+use crate::body;
 
 use sqlite;
 use json;
@@ -115,7 +116,7 @@ command_function!(sql, (state, args) => {
     while let sqlite::State::Row = query.next().unwrap() {
         let mut row: Vec<(String, String)> = Vec::new();
         for (index, column) in query.column_names().iter().enumerate() {
-            row.push((column.to_string(), query.read(index).unwrap()));
+            row.push((column.to_string(), query.read(index).unwrap_or(String::new())));
         }
         output.push(json_encode_object(row));
     }
@@ -141,7 +142,8 @@ command_function!(set, (state, args) => {
 });
 
 command_function!(echo, (state, args) => {
-    state.body.append(args.unwrap_or(""));
+    state.body = body::Body::from_str(args.unwrap_or(""));
+    // state.body.append(args.unwrap_or(""));
 });
 
 command_function!(exec, (state, args) => {
@@ -249,19 +251,6 @@ command_function!(parse_body, (state, args) => {
     }
 
     insert_value("body", json, state);
-
-    // for (key, value) in json.entries() {
-    //     match value {
-    //         JsonValue::Short(value) => state.variables.insert(format!("body.{}", key), value.as_str().to_string()),
-    //         JsonValue::String(value) => state.variables.insert(format!("body.{}", key), value.as_str().to_string()),
-    //         JsonValue::Number(value) => {
-    //             let number: f32 = value.clone().into();
-    //             state.variables.insert(format!("body.{}", key), number.to_string())
-    //         },
-    //         _ => todo!(),
-    //     };
-    //     // println!("{:?} {:?}", key, value);
-    // }
 });
 
 

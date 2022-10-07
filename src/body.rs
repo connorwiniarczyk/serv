@@ -45,6 +45,10 @@ impl Body {
         Txt(input.to_string())
     }
 
+    pub fn from_bytes(input: impl Into<Vec<u8>>) -> Self {
+        Raw(input.into())
+    }
+
     // TODO: this should probably be a proper trait
     fn add(mut l: Self, mut r: Self) -> Self {
         match (l, r) {

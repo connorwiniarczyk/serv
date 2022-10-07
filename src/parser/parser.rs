@@ -57,7 +57,7 @@ impl<R: Read> Parser<R> {
             (PathAttribute | PathNode | PathExt , c) if self.is_whitespace(c) => self.exit_until(Path, Some(c)),
 
             // Define valid characters for path elements
-            (PathNode | PathExt | PathAttribute, c @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '*' | '_')) => self.buffer.push(c),
+            (PathNode | PathExt | PathAttribute, c @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '*' | '_' | '-')) => self.buffer.push(c),
 
 
             // Exit CommandList parsing when we see the beginning of a new Path
