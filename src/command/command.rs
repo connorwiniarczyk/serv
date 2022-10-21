@@ -81,7 +81,7 @@ impl fmt::Display for Command {
         if arg.chars().count() >= 80 {
             f.write_str(" ... ")?;
         } else {
-            f.write_str(&arg)?;
+            f.write_str(&arg.replace("\t", " "))?;
         }
 
 

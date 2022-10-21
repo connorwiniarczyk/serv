@@ -84,6 +84,9 @@ impl<'request> RequestState<'request> {
 
     // Automatically detect the mime type of the response
     pub fn set_mime_type(&mut self) {
+        // println!("{:?}", &self.mime);
+        println!("{:?}", tree_magic::from_u8(&self.body.data()));
+
         match &self.mime {
             Some(mime_type) => self.headers.insert("Content-Type".to_string(), mime_type.to_string()),
             None => self.headers.insert("Content-Type".to_string(), tree_magic::from_u8(&self.body.data())),
@@ -98,7 +101,7 @@ impl Into<Response<hyper::Body>> for RequestState<'_> {
     fn into(mut self) -> Response<hyper::Body> {
         let mut out = hyper::Response::builder().status(self.status);
 
-        self.set_mime_type();
+        // self.set_mime_type();
         // if let Some(mime) = self.mime {
         //     out = out.header("Content-Type", mime);
         // }
