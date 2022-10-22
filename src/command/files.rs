@@ -37,7 +37,7 @@ impl Cmd for ReadFile {
     async fn run(&self, state: &mut RequestState) {
 
         let mut file = File::open(&self.path).await.unwrap();
-        let metadata = file.metadata().await.uwnrap();
+        let metadata = file.metadata().await.unwrap();
 
         // if the file length is under a certain size, just read the whole thing into memory and
         // write it out all at once. Not sure if I'll keep this or if so what the ideal size would
@@ -45,7 +45,7 @@ impl Cmd for ReadFile {
         if metadata.len() < 1000 * 10 {
             let mut buffer: Vec<u8> = vec![];
             file.read_to_end(&mut buffer).await;
-            state.body = buffer.freeze().into();
+            state.body = buffer.into();
         }
 
         // if the file is over a certain size, build a Stream that read and outputs the file in
