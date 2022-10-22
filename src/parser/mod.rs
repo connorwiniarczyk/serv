@@ -100,11 +100,8 @@ impl TryFrom<Token> for Arc<dyn Cmd> {
                 Some(multi_line) => multi_line.value.as_deref(),
                 None => child.value.as_deref(),
             }
-
-            // token.get_child(CommandArg)?.value.as_deref()
         }
 
-        // let result = Command::new(&name, get_arg(token));
         let result = command::parse_cmd(&name, get_arg(&token))?;
 
         Ok(result)

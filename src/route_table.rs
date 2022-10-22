@@ -8,6 +8,7 @@ use crate::request_state::{RequestState};
 use crate::command::cmd::Cmd;
 use hyper::{Request, Response};
 use std::collections::HashMap;
+// use std::pin::Pin;
 
 use std::sync::Arc;
 
@@ -48,9 +49,17 @@ impl RouteTable {
             // if the request matches, resolve it
             let mut state = RequestState::new(&route, req, &self);
             for (key, value) in vars { state.variables.insert(key, value); }
+
+
             for command in &route.commands {
                 command.run(&mut state).await;
             }
+
+            let futures = std::mem::take(&mut state.futures);
+            tokio::spawn(async move {
+                println!("{:?}", futures.len());
+                futures_util::future::join_all(futures).await;
+            });
 
             return Ok(state.into());
         }

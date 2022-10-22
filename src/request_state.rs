@@ -11,6 +11,9 @@ use crate::body::Body;
 use http::request::Parts;
 
 use hyper::body::Body as HyperBody;
+use std::sync::Arc;
+use std::future::Future;
+use std::pin::Pin;
 
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
@@ -27,7 +30,11 @@ pub struct RequestState<'request> {
 
     // pub body: Body,
     pub body: HyperBody,
+    // pub body: Arc<HyperBody>,
     pub mime: Option<String>,
+
+    pub futures: Vec<Pin<Box<dyn Sync + Send + Future<Output = ()>>>>,
+    // pub futures: Vec<dyn Future<Output = ()>>,
 
     pub status: u16,
 }
@@ -58,10 +65,18 @@ impl<'request> RequestState<'request> {
             variables,
             headers: HashMap::new(),
             body: body,
+            // body: Arc::new(body),
             // body: Body::from_bytes(body_bytes),
             mime: None,
-            status: 200
+            status: 200,
+            futures: vec![],
+            
         }
+    }
+
+    pub fn register_task<T>(&mut self, task: T)
+    where T: Future<Output = ()> + Sync + Send + 'static {
+        self.futures.push(Box::pin(task));
     }
 
     pub fn set_variable(&'request mut self, key: &str, value: &str) {
@@ -115,7 +130,7 @@ impl Into<Response<hyper::Body>> for RequestState<'_> {
             out = out.header(key.as_str(), value.as_str());
         }
 
-        out.body(self.body).unwrap()
+        out.body((self.body)).unwrap()
     }
 }
 
