@@ -10,6 +10,8 @@ use pollster::FutureExt as _;
 use crate::body::Body;
 use http::request::Parts;
 
+use hyper::body::Body as HyperBody;
+
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
@@ -23,7 +25,8 @@ pub struct RequestState<'request> {
     pub variables: HashMap<String, String>,
     pub headers: HashMap<String, String>,
 
-    pub body: Body,
+    // pub body: Body,
+    pub body: HyperBody,
     pub mime: Option<String>,
 
     pub status: u16,
@@ -45,7 +48,7 @@ impl<'request> RequestState<'request> {
         }
 
         let (parts, body) = request.into_parts();
-        let body_bytes = hyper::body::to_bytes(body).block_on().unwrap();
+        // let body_bytes = hyper::body::to_bytes(body).block_on().unwrap();
 
         Self {
             table,
@@ -54,7 +57,8 @@ impl<'request> RequestState<'request> {
             // request,
             variables,
             headers: HashMap::new(),
-            body: Body::from_bytes(body_bytes),
+            body: body,
+            // body: Body::from_bytes(body_bytes),
             mime: None,
             status: 200
         }
@@ -85,14 +89,14 @@ impl<'request> RequestState<'request> {
     // Automatically detect the mime type of the response
     pub fn set_mime_type(&mut self) {
         // println!("{:?}", &self.mime);
-        println!("{:?}", tree_magic::from_u8(&self.body.data()));
+        // println!("{:?}", tree_magic::from_u8(&self.body.data()));
 
-        match &self.mime {
-            Some(mime_type) => self.headers.insert("Content-Type".to_string(), mime_type.to_string()),
-            None => self.headers.insert("Content-Type".to_string(), tree_magic::from_u8(&self.body.data())),
-            // None => Some("text/plain".to_string()),
-            // None => todo!(),
-        };
+        // match &self.mime {
+        //     Some(mime_type) => self.headers.insert("Content-Type".to_string(), mime_type.to_string()),
+        //     None => self.headers.insert("Content-Type".to_string(), tree_magic::from_u8(&self.body.data())),
+        //     // None => Some("text/plain".to_string()),
+        //     // None => todo!(),
+        // };
     }
 
 }
@@ -111,7 +115,7 @@ impl Into<Response<hyper::Body>> for RequestState<'_> {
             out = out.header(key.as_str(), value.as_str());
         }
 
-        out.body(self.body.into()).unwrap()
+        out.body(self.body).unwrap()
     }
 }
 

@@ -41,17 +41,18 @@ impl Config {
 
                 println!("{:?}", state.body);
 
-                match state.body {
-                    Body::Txt(txt) => {
-                        let keyreader = KeyReader::new().read_pem(&mut txt.as_bytes());
-                        self.keypair = Some(keyreader);
-                    },
-                    Body::Raw(bytes) => {
-                        let keyreader = KeyReader::new().read_pem(&mut bytes.as_slice());
-                        self.keypair = Some(keyreader);
-                    },
-                    _ => { println!("could not load key file") },
-                }
+                //TODO:
+                // match state.body {
+                //     Body::Txt(txt) => {
+                //         let keyreader = KeyReader::new().read_pem(&mut txt.as_bytes());
+                //         self.keypair = Some(keyreader);
+                //     },
+                //     Body::Raw(bytes) => {
+                //         let keyreader = KeyReader::new().read_pem(&mut bytes.as_slice());
+                //         self.keypair = Some(keyreader);
+                //     },
+                //     _ => { println!("could not load key file") },
+                // }
             }
         }
 

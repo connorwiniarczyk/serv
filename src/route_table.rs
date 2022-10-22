@@ -4,9 +4,12 @@ use itertools::Itertools;
 use crate::pattern::{Pattern};
 use crate::parser;
 use crate::request_state::{RequestState};
-use crate::command::Command;
+// use crate::command::Command;
+use crate::command::cmd::Cmd;
 use hyper::{Request, Response};
 use std::collections::HashMap;
+
+use std::sync::Arc;
 
 pub struct RouteTable {
     pub table: Vec<Route>,
@@ -46,7 +49,7 @@ impl RouteTable {
             let mut state = RequestState::new(&route, req, &self);
             for (key, value) in vars { state.variables.insert(key, value); }
             for command in &route.commands {
-                command.run(&mut state);
+                command.run(&mut state).await;
             }
 
             return Ok(state.into());
@@ -79,7 +82,8 @@ impl fmt::Display for RouteTable {
 #[derive(Clone)]
 pub struct Route {
     pub pattern: Pattern,
-    pub commands: Vec<Command>,
+    // pub commands: Vec<Command>,
+    pub commands: Vec<Arc<dyn Cmd>>,
 }
 
 impl fmt::Debug for Route {

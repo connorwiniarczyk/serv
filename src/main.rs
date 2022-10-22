@@ -1,5 +1,5 @@
 #![allow(unused_mut, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
-// #![allow(warnings)]
+#![allow(warnings)]
 
 mod config;
 mod route_table;
@@ -31,7 +31,7 @@ async fn main() -> hyper::Result<()> {
 
     // Define this programs arguments
     let matches = clap_app!(serv =>
-        (version: "0.3")
+        (version: "0.4")
         (author: "Connor Winiarczyk")
         (about: "A Based Web Server")
         (@arg port: -p --port +takes_value "which tcp port to listen on")

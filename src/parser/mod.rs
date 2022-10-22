@@ -12,7 +12,12 @@ use token::{Token, TokenKind::*};
 use super::route_table::{RouteTable, Route};
 use super::pattern::{Pattern, Node};
 
-use crate::command::Command;
+use crate::command;
+use crate::command::Cmd;
+
+use std::sync::Arc;
+use std::convert::TryInto;
+
 
 trait FromToken {
     fn from_token(token: &Token) -> Result<Self, ()> where Self: Sized;
@@ -26,8 +31,9 @@ impl FromToken for Route {
         let command_list = token_cl.get_child(CommandList).unwrap().clone();
 
         let mut commands = vec![];
+
         for command_token in command_list.children.into_iter().filter(|x| x.kind == Command) {
-            let command = Command::from_token(&command_token)?;
+            let command = command_token.try_into().unwrap();
             commands.push(command);
         }
 
@@ -71,8 +77,13 @@ impl FromToken for Pattern {
     }
 }
 
-impl FromToken for Command {
-    fn from_token(token: &Token) -> Result<Self, ()> {
+use std::convert::TryFrom;
+
+// impl FromToken for Arc<dyn Cmd> {
+impl TryFrom<Token> for Arc<dyn Cmd> {
+    type Error = ();
+
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
         if token.kind != Command { return Err(()); }
 
         let name = token
@@ -93,7 +104,8 @@ impl FromToken for Command {
             // token.get_child(CommandArg)?.value.as_deref()
         }
 
-        let result = Command::new(&name, get_arg(token));
+        // let result = Command::new(&name, get_arg(token));
+        let result = command::parse_cmd(&name, get_arg(&token))?;
 
         Ok(result)
     }
