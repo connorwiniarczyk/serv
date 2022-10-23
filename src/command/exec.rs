@@ -61,22 +61,7 @@ impl Cmd for Exec {
 
         let mut input = std::mem::take(&mut state.body);
 
-        // tokio::spawn(async move {
-        //     match input.next().await {
-        //         Some(Ok(value)) => {
-        //             stdin.write_all(&value).await;
-        //             stdin.flush().await;
-        //         },
-        //         None => {
-        //             stdin.flush().await;
-        //             stdin.shutdown().await;
-        //         },
-        //         _ => todo!(),
-                
-        //      }
-        // });
-        
-        let stream = stream::unfold(((), Some(()), stdout), |(mut input, _, mut stdout)| async move {
+        let stream = stream::unfold(stdout, |mut stdout| async move {
             let mut buffer = BytesMut::with_capacity(1024);
             let bytes_read = stdout.read_buf(&mut buffer).await.unwrap();
 
@@ -85,28 +70,19 @@ impl Cmd for Exec {
             if bytes_read == 0 { return None }
 
             let result: Result<Bytes, std::io::Error> = Ok(buffer.freeze());
-            return Some((result, (input, None, stdout)));
+            return Some((result, stdout));
         });
 
         state.body = Body::wrap_stream(stream);
 
         state.register_task(async move { process.wait().await; });
-
-        // let task = Box::pin(async move { process.wait().await; });
-        // state.futures.push(task);
-
-        state.futures.push(Box::pin( async move {
+        state.register_task(async move {
             match input.next().await {
-                Some(Ok(value)) => {
-                    stdin.write_all(&value).await;
-                },
-                None => {
-                    stdin.shutdown().await;
-                },
+                Some(Ok(value)) => { stdin.write_all(&value).await; },
+                None => { stdin.shutdown().await; },
                 _ => todo!(),
-                
              };
-        }));
+        });
     }
 }
 

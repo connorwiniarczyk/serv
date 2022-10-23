@@ -21,20 +21,15 @@ pub struct RequestState<'request> {
 
     pub table: &'request RouteTable,
     pub route: &'request Route,
-    // pub request: &'request Request<hyper::Body>,
-    // pub parts: &'request Parts,
     pub parts: Parts,
 
     pub variables: HashMap<String, String>,
     pub headers: HashMap<String, String>,
 
-    // pub body: Body,
     pub body: HyperBody,
-    // pub body: Arc<HyperBody>,
     pub mime: Option<String>,
 
     pub futures: Vec<Pin<Box<dyn Sync + Send + Future<Output = ()>>>>,
-    // pub futures: Vec<dyn Future<Output = ()>>,
 
     pub status: u16,
 }
@@ -55,22 +50,17 @@ impl<'request> RequestState<'request> {
         }
 
         let (parts, body) = request.into_parts();
-        // let body_bytes = hyper::body::to_bytes(body).block_on().unwrap();
 
         Self {
             table,
             parts,
             route,
-            // request,
             variables,
             headers: HashMap::new(),
             body: body,
-            // body: Arc::new(body),
-            // body: Body::from_bytes(body_bytes),
             mime: None,
             status: 200,
             futures: vec![],
-            
         }
     }
 
@@ -79,7 +69,7 @@ impl<'request> RequestState<'request> {
         self.futures.push(Box::pin(task));
     }
 
-    pub fn set_variable(&'request mut self, key: &str, value: &str) {
+    pub fn set_variable(&mut self, key: &str, value: &str) {
         self.variables.insert(key.to_string(), value.to_string());
     }
 

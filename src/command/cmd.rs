@@ -8,6 +8,15 @@ use hyper::Body;
 
 use std::sync::Arc;
 
+use lazy_static::lazy_static;
+use regex::{Regex, Captures};
+
+lazy_static! {
+	/// defines syntax for variables within an argument.
+	/// syntax is based on Makefile variable syntax: ie. $(VAR)
+	static ref VAR: Regex = Regex::new(r"(?P<precede>\$?)\$\((?P<name>.+?)\)").unwrap();
+}
+
 #[async_trait]
 pub trait Cmd: Display + Send + Sync {
     async fn run(&self, state: &mut RequestState); 
@@ -17,6 +26,27 @@ pub trait Cmd: Display + Send + Sync {
         Arc::new(self)
     }
 
+    fn substitute_vars(text: &str, state: &RequestState) -> String where Self: Sized {
 
+		VAR.replace_all(text, |caps: &Captures|{
+
+			// check to see if the variable syntax is prefixed by a second dollar sign
+			// ie. $$(var) instead of $(var)
+			let is_double = caps.name("precede").unwrap().as_str() == "$";
+
+			match is_double {
+				// if so, strip the preceding dollar sign and use the string as is
+				true => {
+					caps.get(0).unwrap().as_str().strip_prefix("$").unwrap().to_string()
+				},
+
+				// otherwise, perform variable substitution
+				false => {
+					let var_name = caps.name("name").unwrap().as_str();
+					state.get_variable(&var_name).unwrap_or("").to_string()
+				},
+			}
+		}).to_string()
+    }
 }
 

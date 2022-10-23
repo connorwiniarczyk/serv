@@ -23,20 +23,22 @@ use bytes::Bytes;
 use tokio::io::AsyncReadExt;
 
 pub struct ReadFile {
-    path: PathBuf,
+    path: String,
 }
 
 #[async_trait]
 impl Cmd for ReadFile {
     fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
         return Self {
-            path: PathBuf::from_str(arg.unwrap()).unwrap()
+            path: arg.unwrap().to_string()
+            // path: PathBuf::from_str(arg.unwrap()).unwrap()
         };
     }
 
     async fn run(&self, state: &mut RequestState) {
 
-        let mut file = File::open(&self.path).await.unwrap();
+        let path = Self::substitute_vars(&self.path, &state);
+        let mut file = File::open(path).await.unwrap();
         let metadata = file.metadata().await.unwrap();
 
         // if the file length is under a certain size, just read the whole thing into memory and
@@ -70,7 +72,8 @@ impl Cmd for ReadFile {
 
 impl Display for ReadFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "read {}", self.path.to_str().unwrap())
+        // write!(f, "read {}", self.path.to_str().unwrap())
+        write!(f, "read {}", self.path)
     }
 }
 
