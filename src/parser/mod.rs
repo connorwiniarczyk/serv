@@ -12,8 +12,8 @@ use token::{Token, TokenKind::*};
 use super::route_table::{RouteTable, Route};
 use super::pattern::{Pattern, Node};
 
-use crate::command;
-use crate::command::Cmd;
+use crate::commands;
+use crate::commands::Cmd;
 
 use std::sync::Arc;
 use std::convert::TryInto;
@@ -102,7 +102,7 @@ impl TryFrom<Token> for Arc<dyn Cmd> {
             }
         }
 
-        let result = command::parse_cmd(&name, get_arg(&token))?;
+        let result = commands::parse_cmd(&name, get_arg(&token))?;
 
         Ok(result)
     }

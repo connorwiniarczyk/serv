@@ -18,9 +18,11 @@ lazy_static! {
 }
 
 #[async_trait]
-pub trait Cmd: Display + Send + Sync {
+pub trait Cmd: Send + Sync {
     async fn run(&self, state: &mut RequestState); 
     fn with_arg(arg: Option<&str>) -> Self where Self: Sized;
+    fn name(&self) -> &str;
+    fn arg(&self) -> &str;
 
     fn wrap(self) -> Arc<dyn Cmd> where Self: Sized + 'static {
         Arc::new(self)
@@ -50,3 +52,19 @@ pub trait Cmd: Display + Send + Sync {
     }
 }
 
+
+impl Display for Cmd {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_str(&self.name())?;
+		f.write_str(" ")?;
+
+		let arg = self.arg();
+		if arg.chars().count() >= 80 {
+			f.write_str(" ... ")?;
+		} else {
+			f.write_str(&arg.replace("\t", " "))?;
+		}
+
+		Ok(())
+	}
+}

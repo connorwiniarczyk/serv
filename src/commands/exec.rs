@@ -39,6 +39,9 @@ pub struct Exec {
 
 #[async_trait]
 impl Cmd for Exec {
+    fn name(&self) -> &str { "exec" }
+    fn arg(&self) -> &str { "" }
+
     fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
         let mut arg_iter = arg.unwrap().split(" ");
         Self {
@@ -89,5 +92,30 @@ impl Cmd for Exec {
 impl Display for Exec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "exec {}", self.program)
+    }
+}
+
+pub struct Shell(Exec);
+
+#[async_trait]
+impl Cmd for Shell {
+    fn name(&self) -> &str { "shell" }
+    fn arg(&self) -> &str { "" }
+
+    fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
+        Self(Exec{
+            program: "/bin/sh".to_string(),
+            args: vec!["-c".to_string(), arg.unwrap().to_string()],
+        })
+    }
+
+    async fn run(&self, state: &mut RequestState) {
+        self.0.run(state).await;
+    }
+}
+
+impl Display for Shell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "shell")
     }
 }

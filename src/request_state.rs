@@ -5,9 +5,6 @@ use hyper;
 use hyper::{Request, Response};
 use crate::route_table::{Route, RouteTable};
 
-use pollster::FutureExt as _;
-
-use crate::body::Body;
 use http::request::Parts;
 
 use hyper::body::Body as HyperBody;
@@ -69,6 +66,11 @@ impl<'request> RequestState<'request> {
         self.futures.push(Box::pin(task));
     }
 
+    pub async fn wait(&mut self) {
+        let futures = std::mem::take(&mut self.futures);
+        futures_util::future::join_all(futures).await;
+    } 
+
     pub fn set_variable(&mut self, key: &str, value: &str) {
         self.variables.insert(key.to_string(), value.to_string());
     }
@@ -78,14 +80,11 @@ impl<'request> RequestState<'request> {
         // TODO: add back a way to access the body as a variable.
         // Because the body is a stream now this gets more complicated since you need to await the
         // end of the stream in order to get all its data
-        //
         // if name == "body" {
-        //     return match &self.request.body() {
-        //         Some(bytes) => std::str::from_utf8(bytes).unwrap_or(""),
-        //         None => "",
-
-        //     };
-        //     // return std::str::from_utf8(&self.request_body.unwrap_or(Vec::new())).unwrap_or("");
+        //     self.wait().await;
+        //     let body = std::mem::take(&mut self.body);
+        //     let bytes = hyper::body::to_bytes(body).await.unwrap();
+        //     return Some(std::str::from_utf8(&bytes).unwrap());
         // }
 
         self.variables.get(name).and_then(|val| Some(val.as_str())) //.unwrap_or("")
@@ -111,9 +110,9 @@ impl Into<Response<hyper::Body>> for RequestState<'_> {
         let mut out = hyper::Response::builder().status(self.status);
 
         // self.set_mime_type();
-        // if let Some(mime) = self.mime {
-        //     out = out.header("Content-Type", mime);
-        // }
+        if let Some(mime) = self.mime {
+            out = out.header("Content-Type", mime);
+        }
 
         for (key, value) in self.headers.iter() {
             // out.headers_mut().insert(hyper::header::HeaderName.from_lowercase())

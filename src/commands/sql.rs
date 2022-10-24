@@ -45,6 +45,9 @@ pub struct Sql {
 
 #[async_trait]
 impl Cmd for Sql {
+    fn name(&self) -> &str { "exec" }
+    fn arg(&self) -> &str { &self.statement }
+
     fn with_arg(arg_opt: Option<&str>) -> Self where Self: Sized {
         lazy_static! {
             /// defines syntax for variables within an argument.
@@ -61,14 +64,13 @@ impl Cmd for Sql {
             "?".to_string()
         }).to_string();
 
-        println!("{}, {:?}", statement, parameters);
-
         Self { statement, parameters }
     }
 
     async fn run(&self, state: &mut RequestState) {
 
-        let connection = sqlite::open("local.sqlite").unwrap();
+        //TODO: custom database paths
+        let connection = sqlite::open("serv.sqlite").unwrap();
         let mut query = connection.prepare(&self.statement).unwrap();
 
         for (index, param) in self.parameters.iter().map(|x| state.get_variable(x).unwrap()).enumerate() {
@@ -143,39 +145,5 @@ impl Display for SqlResult {
 
 
         Ok(())
-    }
-}
-
-
-// let db_name = "local.sqlite";
-// let connection = sqlite::open(&db_name).unwrap();
-
-// // create the sql query and bind parameters
-// let mut query = connection.prepare(&args.unwrap()).unwrap();
-// for (index, param) in SqlParams::new(&state).enumerate() {
-//     query = query.bind(index + 1, param).expect("failed to bind sql parameter");
-// }
-
-
-
-/// helper function for iterating over parameters for the SQL statement
-struct SqlParams<'request> {
-    state: &'request RequestState<'request>,
-    index: u32,
-}
-
-impl<'request> SqlParams<'request> {
-    fn new(state: &'request RequestState<'request>) -> Self {
-        Self { state, index: 0 }
-    }
-}
-
-impl<'request> Iterator for SqlParams<'request> {
-    type Item = &'request str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.index += 1;
-        let name = format!("sql.params.{}", self.index);
-        self.state.get_variable(&name)
     }
 }

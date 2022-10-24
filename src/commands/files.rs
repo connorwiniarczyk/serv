@@ -28,6 +28,9 @@ pub struct ReadFile {
 
 #[async_trait]
 impl Cmd for ReadFile {
+    fn name(&self) -> &str { "read" }
+    fn arg(&self) -> &str { self.path.as_str() }
+
     fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
         return Self {
             path: arg.unwrap().to_string()
@@ -78,3 +81,45 @@ impl Display for ReadFile {
 }
 
 
+pub struct WriteFile {
+    path: String,
+}
+
+use futures_util::StreamExt;
+use tokio::io::{AsyncWrite, AsyncWriteExt};
+use std::path::Path;
+
+#[async_trait]
+impl Cmd for WriteFile {
+    fn name(&self) -> &str { "write" }
+    fn arg(&self) -> &str { self.path.as_str() }
+
+    fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
+        return Self {
+            path: arg.unwrap().to_string()
+        };
+    }
+
+    async fn run(&self, state: &mut RequestState) {
+
+        let mut body = std::mem::take(&mut state.body);
+        let path_str = Self::substitute_vars(&self.path, &state);
+        let mut file = File::create(path_str).await.unwrap();
+
+        // TODO: file uploads traditionally contain metadata in the body which needs to be parsed
+        // and filtered out of the write command before this can work properly
+        let task = body.fold(file, |mut file, bytes| async move {
+            let data = bytes.unwrap();
+            file.write(&data).await;
+            file
+        });
+
+        state.register_task(async move { task.await; });
+    }
+}
+
+impl Display for WriteFile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "write {}", self.path)
+    }
+}

@@ -5,9 +5,8 @@ mod config;
 mod route_table;
 mod pattern;
 mod parser;
-mod command;
+mod commands;
 mod request_state;
-mod body;
 
 use std::sync::Arc;
 use std::fs::File;
