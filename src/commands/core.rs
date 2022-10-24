@@ -118,3 +118,27 @@ impl Cmd for ParseBody {
         insert_value("body", json, state);
     }
 }
+
+
+pub struct Jump {
+    route: String,
+}
+
+#[async_trait]
+impl Cmd for Jump {
+    fn name(&self) -> &str { "jump" }
+    fn arg(&self) -> &str { &self.route }
+
+    fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
+        Self { route: arg.unwrap().to_string() }
+    }
+
+    async fn run(&self, state: &mut RequestState) {
+        let route = state.table.get(&self.route).expect("that route does not exist");
+        
+        for command in &route.commands {
+            command.run(state).await;
+        }
+    }
+}
+

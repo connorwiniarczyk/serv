@@ -23,6 +23,7 @@ pub fn parse_cmd(name: &str, arg: Option<&str>) -> Result<Arc<dyn Cmd>, ()> {
         "sql" => Ok(Sql::with_arg(arg).wrap()),
         "set" => Ok(core::SetVar::with_arg(arg).wrap()),
         "parse" => Ok(core::ParseBody::with_arg(arg).wrap()),
+        "run" => Ok(core::Jump::with_arg(arg).wrap()),
         _ => Err(()),
     }
 }
