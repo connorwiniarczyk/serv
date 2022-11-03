@@ -51,8 +51,11 @@ impl Cmd for Exec {
     }
 
     async fn run(&self, state: &mut RequestState) {
+
+        let args: Vec<String> = self.args.iter().map(|x| Self::substitute_vars(x, &state)).collect();
+        // let path = Self::substitute_vars(&self.path, &state);
         let mut process = Command::new(&self.program)
-            .args(&self.args)
+            .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .kill_on_drop(true)
