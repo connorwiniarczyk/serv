@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use crate::request_state::RequestState;
 
+use multer::Multipart;
+
 use std::fmt::Display;
 use std::fmt;
 
@@ -101,20 +103,30 @@ impl Cmd for WriteFile {
     }
 
     async fn run(&self, state: &mut RequestState) {
+        let path = Self::substitute_vars(&self.path, &state);
+
+        let boundary = &state.parts.headers
+            .get(hyper::header::CONTENT_TYPE)
+            .and_then(|ct| ct.to_str().ok())
+            .and_then(|ct| multer::parse_boundary(ct).ok())
+            .unwrap();
 
         let mut body = std::mem::take(&mut state.body);
-        let path_str = Self::substitute_vars(&self.path, &state);
-        let mut file = File::create(path_str).await.unwrap();
+        let mut multipart = Multipart::new(body, boundary);
 
-        // TODO: file uploads traditionally contain metadata in the body which needs to be parsed
-        // and filtered out of the write command before this can work properly
-        let task = body.fold(file, |mut file, bytes| async move {
-            let data = bytes.unwrap();
-            file.write(&data).await;
-            file
+        // open file for writing
+        let mut file = File::create(&path).await.unwrap();
+
+        state.register_task(async move {
+
+            while let Some(mut field) = multipart.next_field().await.unwrap() {
+                // Process the field data chunks e.g. store them in a file.
+                let mut field_bytes_len = 0;
+                while let Some(field_chunk) = field.chunk().await.unwrap() {
+                    file.write_all(&field_chunk).await;
+                }
+            }
         });
-
-        state.register_task(async move { task.await; });
     }
 }
 

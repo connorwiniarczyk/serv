@@ -48,9 +48,12 @@ async fn main() -> hyper::Result<()> {
     std::env::set_current_dir(&config.root).expect("could not cd into that directory!");
     println!("\nServing Directory: {:?}\n", config.root);
 
-
     // Generate the Route Table
     let route_table = {
+
+        // TODO
+        // let output = parser::parse(std::io::stdin()).expect("parser error");
+
         let routefile = config.root.join("routes.conf");
         let output = match File::open(&routefile) {
             Ok(file) => parser::parse(file).expect("syntax error:"),

@@ -56,6 +56,7 @@ impl RouteTable {
             let futures = std::mem::take(&mut state.futures);
             tokio::spawn(async move {
                 futures_util::future::join_all(futures).await;
+                println!("done");
             });
 
             return Ok(state.into());

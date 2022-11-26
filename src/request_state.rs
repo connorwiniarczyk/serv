@@ -130,7 +130,7 @@ impl<'request> Debug for RequestState<'request> {
         f.debug_struct("State")
             .field("status", &self.status)
             // .field("request_body", &self.request.body())
-            .field("body", &format!("{:?}", self.body))
+            // .field("body", &format!("{:?}", self.body))
             .field("headers", &self.headers)
             .field("vars", &self.variables)
             .finish()
