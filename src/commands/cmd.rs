@@ -19,16 +19,16 @@ lazy_static! {
 
 #[async_trait]
 pub trait Cmd: Send + Sync {
-    async fn run(&self, state: &mut RequestState); 
-    fn with_arg(arg: Option<&str>) -> Self where Self: Sized;
-    fn name(&self) -> &str;
-    fn arg(&self) -> &str;
+	async fn run(&self, state: &mut RequestState); 
+	fn with_arg(arg: Option<&str>) -> Self where Self: Sized;
+	fn name(&self) -> &str;
+	fn arg(&self) -> &str;
 
-    fn wrap(self) -> Arc<dyn Cmd> where Self: Sized + 'static {
-        Arc::new(self)
-    }
+	fn wrap(self) -> Arc<dyn Cmd> where Self: Sized + 'static {
+		Arc::new(self)
+	}
 
-    fn substitute_vars(text: &str, state: &RequestState) -> String where Self: Sized {
+	fn substitute_vars(text: &str, state: &RequestState) -> String where Self: Sized {
 
 		VAR.replace_all(text, |caps: &Captures|{
 
@@ -45,11 +45,11 @@ pub trait Cmd: Send + Sync {
 				// otherwise, perform variable substitution
 				false => {
 					let var_name = caps.name("name").unwrap().as_str();
-					state.get_variable(&var_name).unwrap_or("").to_string()
+					state.get_variable(&var_name).unwrap_or(String::new())
 				},
 			}
 		}).to_string()
-    }
+	}
 }
 
 

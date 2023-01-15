@@ -32,6 +32,24 @@ impl Cmd for Echo {
     }
 }
 
+pub struct Debug;
+
+#[async_trait]
+impl Cmd for Debug {
+    fn name(&self) -> &str { "debug" }
+    fn arg(&self) -> &str { "" }
+
+    fn with_arg(arg: Option<&str>) -> Self where Self: Sized {
+        return Self;
+    }
+
+    async fn run(&self, state: &mut RequestState) {
+        println!("{:#?}", state);
+        // let value = Self::substitute_vars(&self.value, &state);
+        // state.body = value.into();
+    }
+}
+
 pub struct SetVar {
     key: String,
     value: String,

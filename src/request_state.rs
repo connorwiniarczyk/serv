@@ -12,6 +12,11 @@ use std::sync::Arc;
 use std::future::Future;
 use std::pin::Pin;
 
+use json;
+use json::JsonValue;
+
+type Task = Pin<Box<dyn Sync + Send + Future<Output = ()>>>;
+
 
 /// A RequestState tracks the state of an incoming HTTP request across its entire lifetime.
 pub struct RequestState<'request> {
@@ -23,10 +28,13 @@ pub struct RequestState<'request> {
     pub variables: HashMap<String, String>,
     pub headers: HashMap<String, String>,
 
+    // pub object: JsonValue,
+    pub object: json::object::Object,
+
     pub body: HyperBody,
     pub mime: Option<String>,
 
-    pub futures: Vec<Pin<Box<dyn Sync + Send + Future<Output = ()>>>>,
+    pub futures: Vec<Task>,
 
     pub status: u16,
 }
@@ -53,8 +61,12 @@ impl<'request> RequestState<'request> {
             parts,
             route,
             variables,
+
+            // object: JsonValue::new_object(),
+            object: json::object::Object::new(),
+            body,
+
             headers: HashMap::new(),
-            body: body,
             mime: None,
             status: 200,
             futures: vec![],
@@ -72,10 +84,15 @@ impl<'request> RequestState<'request> {
     } 
 
     pub fn set_variable(&mut self, key: &str, value: &str) {
-        self.variables.insert(key.to_string(), value.to_string());
+        self.object.insert(key, JsonValue::String(value.to_owned()));
+        // self.variables.insert(key.to_string(), value.to_string());
     }
 
-    pub fn get_variable(&'request self, name: &str) -> Option<&'request str> {
+    // pub fn get_variable(&'request self, name: &str) -> Option<&'request str> {
+    pub fn get_variable(&'request self, name: &str) -> Option<String> {
+
+        let value = self.object.get(name)?;
+        return Some(value.dump())
 
         // TODO: add back a way to access the body as a variable.
         // Because the body is a stream now this gets more complicated since you need to await the
@@ -87,7 +104,7 @@ impl<'request> RequestState<'request> {
         //     return Some(std::str::from_utf8(&bytes).unwrap());
         // }
 
-        self.variables.get(name).and_then(|val| Some(val.as_str())) //.unwrap_or("")
+        // self.variables.get(name).and_then(|val| Some(val.as_str())) //.unwrap_or("")
     }
 
     // Automatically detect the mime type of the response
@@ -132,7 +149,8 @@ impl<'request> Debug for RequestState<'request> {
             // .field("request_body", &self.request.body())
             // .field("body", &format!("{:?}", self.body))
             .field("headers", &self.headers)
-            .field("vars", &self.variables)
+            // .field("vars", &self.variables)
+            .field("vars", &self.object.pretty(2))
             .finish()
         
     }

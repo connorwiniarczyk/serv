@@ -7,6 +7,7 @@ mod pattern;
 mod parser;
 mod commands;
 mod request_state;
+mod variables;
 
 use std::sync::Arc;
 use std::fs::File;

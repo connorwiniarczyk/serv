@@ -74,7 +74,7 @@ impl Cmd for Sql {
         let mut query = connection.prepare(&self.statement).unwrap();
 
         for (index, param) in self.parameters.iter().map(|x| state.get_variable(x).unwrap()).enumerate() {
-            query = query.bind(index + 1, param).expect("failed to bind sql parameter");
+            query = query.bind(index + 1, param.as_str()).expect("failed to bind sql parameter");
         }
 
         state.body = SqlResult::new(query).to_string().into();

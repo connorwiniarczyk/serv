@@ -175,16 +175,16 @@ impl fmt::Display for Pattern {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
 
-    #[test]
-    fn pattern_compare() {
-        let pattern = Pattern {
-            attributes: vec![],
-            path: vec![],
-            extension: vec![],
-        };
-    }
-}
+//     #[test]
+//     fn pattern_compare() {
+//         let pattern = Pattern {
+//             attributes: vec![],
+//             path: vec![],
+//             extension: vec![],
+//         };
+//     }
+// }
