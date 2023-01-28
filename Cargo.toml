@@ -30,3 +30,5 @@ pollster = "0.2.5"
 
 async-trait = "0.1.58"
 multer = "2.0"
+
+rhai = "1.12.0"

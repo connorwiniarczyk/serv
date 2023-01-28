@@ -3,180 +3,216 @@ use json::JsonValue;
 
 use std::collections::{HashSet, HashMap};
 
-struct StrIndex(usize, usize);
+#[derive(Hash, PartialEq, Eq, Clone)]
+struct Key(Vec<String>);
 
-#[derive(Clone, Copy, Hash)]
-struct Entry {
-    key_index: (usize, usize),
-    value_index: (usize, usize),
-}
-
-enum Value {
-    String(Entry),
-    Collection(HashSet<Entry>),
-}
-
-pub struct Vars {
-    value_buffer: String,
-    value_cursor: usize,
-    key_buffer: String,
-    key_cursor: usize,
-
-    variables: HashMap<String, Value>,
-}
-
-impl Vars {
-    pub fn new() -> Self {
-        todo!()
-        // Self { buffer: String::with_capacity(128), cursor: 0, variables: HashMap::new() }
+impl Key {
+    fn from_str(input: &str) -> Self {
+        let mut inner = Vec::new();
+        for key in input.split(".") {
+            inner.push(key.to_owned());
+        }
+        Self(inner)
     }
 
-    pub fn insert(&mut self, key: &str, value: &str) {
-        let entry = Entry {
-            key_index: (self.key_cursor, self.key_cursor + key.len()),
-            value_index: (self.value_cursor, self.value_cursor + value.len()),
-        };
+    fn with_depth(&self, depth: usize) -> &[String] {
+        &self.0[0..depth]
+    }
 
-        self.key_buffer.push_str(key);
-        self.key_cursor += value.len();
+    fn depth(&self) -> usize {
+        self.0.len()
+    }
 
-        self.value_buffer.push_str(value);
-        self.value_cursor += value.len();
+    fn new() -> Self {
+        Self(Vec::new())
+    }
 
-        self.variables.insert(key.to_owned(), Value::String(entry));
+    fn push(&mut self, input: &str) {
+        self.0.push(input.to_owned());
+    }
 
-        let mut key_iter = key;
-        let mut acc = String::new();
-
-        while let Some((next, rest)) = key_iter.split_once(".") {
-            acc.push_str(next); 
-            match self.variables.get(acc.as_str()) {
-                Some(Value::String(_)) => todo!(),
-                Some(Value::Collection(s)) => s.insert(acc),
-                None => todo!(),
-            }
-
-        }
-
+    fn traverse(&self) -> KeyTraverseIter {
         todo!();
     }
 }
 
+struct KeyTraverseIter<'key> {
+    inner: &'key Key,
+    cursor: usize,
+}
 
-// pub struct Object(JsonValue);
+impl<'key> Iterator for KeyTraverseIter<'key> {
+    type Item = Key;
 
-// impl Object {
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!();
+    }
+}
 
-//     pub fn new() -> Self {
-//         todo!();
-//     }
+enum Value {
+    String(String),
+    Collection(HashSet<Key>),
+}
 
-//     fn insert_inner<I>(&mut self, mut key: std::iter::Peekable<I>, value: &str) -> Result<(), &'static str>
-//     where I: Iterator<Item = &'static str>, {
+impl Value {
+    fn from_str(input: &str) -> Self {
+        Self::String(input.to_owned())
+    }
 
-//         let next = key.next();
-//         let is_last = key.peek().is_none();
+    fn collection_with_element(input: &str) -> Self {
+        let mut inner = HashSet::new();
+        inner.insert(Key::from_str(input));
+        Self::Collection(inner)
+    }
 
-//         if is_last {
-//             current_obj.insert(key.next(), value);
-//             return Ok(());
-//         }
+    fn empty_collection() -> Self {
+        Self::Collection(HashSet::new())
+    }
 
-//         todo!();
-//     }
+    fn to_str(&self) -> Result<&str, ()> {
+        match self {
+            Self::String(c) => Ok((c.as_str())),
+            _ => Err(())
+        }
+    }
+}
 
-//     pub fn insert(&mut self, key: &str, value: &str) -> Result<(), &'static str> {
+pub struct Vars {
+    data: HashMap<Key, Value>,
+}
 
-//         let mut current_obj = &mut self.0;
-//         let mut key_iter = key.split(".").peekable();
+impl Vars {
+    pub fn new() -> Self {
+        Self { data: HashMap::new() }
+    }
 
-//         // while let Some(component) = key_iter.next() {
+    fn insert_value(&mut self, key: Key, value: &str) {
+        self.data.insert(key, Value::from_str(value));
+    }
 
-//         //     let is_last = key_iter.peek().is_none();
-//         //     if is_last {
-//         //         current_obj.insert(component, value);
-//         //     }
+    pub fn insert(&mut self, key_str: &str, value: &str) {
+        let key = Key::from_str(key_str);
 
-//         //     else {
-//         //         let mut inner: &mut json::object::Object = if let JsonValue::Object(ref mut obj) = current_obj { obj } else { unreachable!() };
-//         //         let mut next_value = inner.get_mut(component).ok_or("value does not exist")?;
+        let mut i: usize = 0;
+        while (i < key.depth()) {
+            if i == key.depth() - 1 {
+                self.insert_value(key.clone(), value);
+            }
 
-//         //         match next_value {
-//         //             JsonValue::Object(_) => current_obj = next_value,
-//         //             JsonValue::Null => {
-//         //                 let next = JsonValue::new_object();
-//         //                 inner.insert(component, next);
-//         //             }
-//         //             _ => todo!(),
-//         //         }
+            i += 1;
+        }
 
-//         //         // match &next_value {
-//         //         //     JsonValue::Object(_) => current_obj = obj,
-//         //         //     _ => todo!(),
-//         //         // }
-//         //     }
 
-//             // let mut next_value = current_obj.get_mut(key_component).ok_or("value does not exist")?;
+        // let mut acc = Key::new();
+        // let mut prev = acc.clone();
 
-//             // if next_value.is_null() {
-//             //     next_value.insert(key_component, JsonValue::new_object());
+        // let mut key_steps = key.0.iter().peekable();
+        // while let Some(step) = key_steps.next() {
+        //     acc.push(step);
+        //     if key_steps.peek().is_some() {
+        //         todo!();
+        //     } else {
+        //         todo!();
+        //     }
+        // }
 
-//             // }
+        // todo!();
 
-//             // match next_value {
-//             //     JsonValue::Object(ref mut obj) => current_obj = obj,
-//             //     Null => {
+        // let key = Key::from_str(key_str);
+        // self.data.insert(key.clone(), Value::from_str(value));
 
-//             //     }
-//             //     _ => todo!(),
-//             // }
-//         // }
+        // let mut key_iter = key.split(".").peekable();
+        // let mut acc = String::new();
+        // acc.push_str(key_iter.next().unwrap());
 
-//         todo!();
-//     }
+        // while let Some(next) = key_iter.next() {
+        //     match self.data.get_mut(acc.as_str()) {
+        //         Some(Value::String(_)) => todo!(),
+        //         Some(Value::Collection(s)) => {
+        //             s.insert(key.to_owned());
+        //         },
+        //         None => {
+        //             let new_collection = Value::collection_with_element(key);
+        //             self.data.insert(acc.clone(), new_collection);
+        //         },
+        //     };
 
-//     pub fn get(&mut self, key: &str) -> Result<String, &'static str> {
-//         todo!();
-//         // let mut current_obj = &self.0;
-//         // let mut key_iter = key.split(".").peekable();
-//         // while let Some(key_component) = key_iter.next() {
-//         //     let next_value = current_obj.get(key_component).ok_or("Value does not exist")?;
-//         //     if let Some(_) = key_iter.peek() {
-//         //         match next_value {
-//         //             JsonValue::Object(obj) => current_obj = obj,
-//         //             JsonValue::Array(array) => todo!(),
-//         //             _ => return Err("invalid key"),
-//         //         };
-//         //     } else {
-//         //         match next_value {
-//         //             JsonValue::String(inner) => return Ok(inner.to_owned()),
-//         //             JsonValue::Object(inner) => return Ok(inner.pretty(2)),
-//         //             _ => todo!(),
-//         //         };
-//         //     }
-//         // }
+        //     acc.push_str("."); 
+        //     acc.push_str(next); 
+        // }
+    }
 
-//         // Err("failed")
-//     }
-// }
+    pub fn get(&self, key: &str) -> Option<String> {
+        todo!();
+        // let mut output = String::new();
 
-// struct KeyIter<'a>{
-//     inner: &'a str,
-//     cursor: usize,
-// }
+        // match self.data.get(key)?{
+        //     Value::String(v) => return Some(v.clone()),
+        //     Value::Collection(c) => {
+        //         let mut output = String::new();
+        //         let mut stack: Vec<String> = Vec::new();
+        //         let mut level = 1;
 
-// impl<'a> Iterator for KeyIter<'a> {
-//     type Item = Result<&'a str, &'static str>;
+        //         output.push_str("{\n");
+        //         for k in c.iter() {
+        //             output.push_str("\t");
+        //             output.push_str(k);
+        //             output.push_str(": ");
+        //             output.push_str(self.data.get(k).unwrap().to_str().unwrap());
+        //             output.push_str(",\n");
+        //         }
+        //         output.push_str("}\n");
 
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let mut current = 
+        //         return Some(output);
+        //     }
+        // }
+    }
+}
 
-//         todo!();
-//     }
-// }
+use std::fmt::{Debug, Formatter};
 
-// impl<'a> KeyIter<'a> {
-//     fn new(input: &'a str) -> Self {
-//         Self { inner: input, cursor: 0 }
-//     }
-// }
+impl Debug for Vars {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!();
+        // for (key, value) in self.data.iter() {
+        //     write!(f, "{}: ", key)?;
+        //     match value {
+        //         Value::String(v) => write!(f, "{}, \n", v)?, // f.write_str(v)?,
+        //         Value::Collection(c) => {
+        //             f.write_str("\n")?;
+        //             for k in c.iter() {
+        //                 f.write_str("\t");
+        //                 f.write_str(k);
+        //                 f.write_str("\n");
+        //             }
+
+        //         },
+        //     }
+        // }
+
+        // Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn insert() {
+        // let mut vars = Vars::new();
+        // vars.insert("object.first", "first");
+        // vars.insert("object.second", "second");
+        // vars.insert("object.third", "third");
+
+        // vars.insert("object.inner.first", "fourth");
+
+        // // println!("{:?}", vars);
+
+        // // assert_eq!(vars.get("hello"), Some("abcd".to_owned()));
+
+        // println!("{}", vars.get("object").unwrap());
+        // panic!();
+
+    }
+}
