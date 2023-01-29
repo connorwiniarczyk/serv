@@ -50,7 +50,8 @@ impl<R: Read> Parser<R> {
             // parsing
             (Path | PathNode | PathExt | PathAttribute, ':') => {
                 self.exit_until(Route, None);
-                self.enter(CommandList, None);
+                self.enter(Script, None);
+                // self.enter(CommandList, None);
             },
 
             // allow whitespace in between the end of the path and the colon
@@ -59,24 +60,27 @@ impl<R: Read> Parser<R> {
             // Define valid characters for path elements
             (PathNode | PathExt | PathAttribute, c @ ('a'..='z' | 'A'..='Z' | '0'..='9' | '*' | '_' | '-')) => self.buffer.push(c),
 
+            (Script, '\\') => self.escape_char()?,
+            (Script, c @ ('/' | '@')) => {self.exit_until(Root, Some(c))},
+            (Script, c) => self.buffer.push(c),
 
-            // Exit CommandList parsing when we see the beginning of a new Path
-            (CommandList, c @ ('/' | '@')) => {self.exit_until(Root, Some(c))},
+            // // Exit CommandList parsing when we see the beginning of a new Path
+            // (CommandList, c @ ('/' | '@')) => {self.exit_until(Root, Some(c))},
 
-            (CommandList, c @ ('a'..='z' | 'A'..='Z' | '0'..='9')) => self.enter(Command, Some(c)),
-            (Command, c @ ('a'..='z' | 'A'..='Z' | '0'..='9')) => self.enter(CommandName, Some(c)),
+            // (CommandList, c @ ('a'..='z' | 'A'..='Z' | '0'..='9')) => self.enter(Command, Some(c)),
+            // (Command, c @ ('a'..='z' | 'A'..='Z' | '0'..='9')) => self.enter(CommandName, Some(c)),
 
-            (CommandName | CommandArg, c @ (';' | '\n')) => self.exit_until(CommandList, None),
-            (CommandName, ' ') => { self.exit(None); self.enter(CommandArg, None); },
+            // (CommandName | CommandArg, c @ (';' | '\n')) => self.exit_until(CommandList, None),
+            // (CommandName, ' ') => { self.exit(None); self.enter(CommandArg, None); },
 
-            // support for multiple line command args if put inside of quotes
-            (CommandArg, '`') if self.buffer.len() == 0 => self.enter(Block, None),
-            (Block, '`') => self.exit_until(CommandList, None),
+            // // support for multiple line command args if put inside of quotes
+            // (CommandArg, '`') if self.buffer.len() == 0 => self.enter(Block, None),
+            // (Block, '`') => self.exit_until(CommandList, None),
 
-            // CommandArgs support an escape sequence to input special characters
-            (CommandArg | Block, '\\') => self.escape_char()?,
+            // // CommandArgs support an escape sequence to input special characters
+            // (CommandArg | Block, '\\') => self.escape_char()?,
 
-            (CommandName | CommandArg | Block, c) => self.buffer.push(c),
+            // (CommandName | CommandArg | Block, c) => self.buffer.push(c),
 
             // Handle the invalid character, mode combinations
             (PathNode | PathExt | Path, c) => return Err(Error::new(&format!("{} is not a valid character", c))),

@@ -31,14 +31,16 @@ impl Config {
 
         if self.keypair == None {
             if let Some(_) = route_table.get("ssl") {
-                let route = route_table.get("ssl").unwrap();
-                let dummy_request = Request::new(hyper::Body::empty());
-                let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
-                for command in &route.commands {
-                    command.run(&mut state);
-                }
 
-                println!("{:?}", state.body);
+                todo!();
+                // let route = route_table.get("ssl").unwrap();
+                // let dummy_request = Request::new(hyper::Body::empty());
+                // let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
+                // for command in &route.commands {
+                //     command.run(&mut state);
+                // }
+
+                // println!("{:?}", state.body);
 
                 //TODO:
                 // match state.body {

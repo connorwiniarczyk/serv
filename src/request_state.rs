@@ -24,17 +24,11 @@ pub struct RequestState<'request> {
     pub table: &'request RouteTable,
     pub route: &'request Route,
     pub parts: Parts,
-
     pub variables: HashMap<String, String>,
-    pub headers: HashMap<String, String>,
-
-    // pub object: JsonValue,
-    pub object: json::object::Object,
 
     pub body: HyperBody,
-    pub mime: Option<String>,
 
-    pub futures: Vec<Task>,
+    // pub futures: Vec<Task>,
 
     pub status: u16,
 }
@@ -62,37 +56,40 @@ impl<'request> RequestState<'request> {
             route,
             variables,
 
-            // object: JsonValue::new_object(),
-            object: json::object::Object::new(),
             body,
 
-            headers: HashMap::new(),
-            mime: None,
+            // headers: HashMap::new(),
+            // mime: None,
             status: 200,
-            futures: vec![],
+            // futures: vec![],
         }
     }
 
     pub fn register_task<T>(&mut self, task: T)
     where T: Future<Output = ()> + Sync + Send + 'static {
-        self.futures.push(Box::pin(task));
+        todo!();
+        // self.futures.push(Box::pin(task));
     }
 
     pub async fn wait(&mut self) {
-        let futures = std::mem::take(&mut self.futures);
-        futures_util::future::join_all(futures).await;
+        todo!();
+        // let futures = std::mem::take(&mut self.futures);
+        // futures_util::future::join_all(futures).await;
     } 
 
     pub fn set_variable(&mut self, key: &str, value: &str) {
-        self.object.insert(key, JsonValue::String(value.to_owned()));
+        todo!();
+        // self.object.insert(key, JsonValue::String(value.to_owned()));
         // self.variables.insert(key.to_string(), value.to_string());
     }
 
     // pub fn get_variable(&'request self, name: &str) -> Option<&'request str> {
     pub fn get_variable(&'request self, name: &str) -> Option<String> {
+        todo!();
+        
 
-        let value = self.object.get(name)?;
-        return Some(value.dump())
+        // let value = self.object.get(name)?;
+        // return Some(value.dump())
 
         // TODO: add back a way to access the body as a variable.
         // Because the body is a stream now this gets more complicated since you need to await the
@@ -109,6 +106,7 @@ impl<'request> RequestState<'request> {
 
     // Automatically detect the mime type of the response
     pub fn set_mime_type(&mut self) {
+        todo!();
         // println!("{:?}", &self.mime);
         // println!("{:?}", tree_magic::from_u8(&self.body.data()));
 
@@ -124,19 +122,20 @@ impl<'request> RequestState<'request> {
 
 impl Into<Response<hyper::Body>> for RequestState<'_> {
     fn into(mut self) -> Response<hyper::Body> {
-        let mut out = hyper::Response::builder().status(self.status);
+        todo!();
+        // let mut out = hyper::Response::builder().status(self.status);
 
-        // self.set_mime_type();
-        if let Some(mime) = self.mime {
-            out = out.header("Content-Type", mime);
-        }
+        // // self.set_mime_type();
+        // if let Some(mime) = self.mime {
+        //     out = out.header("Content-Type", mime);
+        // }
 
-        for (key, value) in self.headers.iter() {
-            // out.headers_mut().insert(hyper::header::HeaderName.from_lowercase())
-            out = out.header(key.as_str(), value.as_str());
-        }
+        // for (key, value) in self.headers.iter() {
+        //     // out.headers_mut().insert(hyper::header::HeaderName.from_lowercase())
+        //     out = out.header(key.as_str(), value.as_str());
+        // }
 
-        out.body((self.body)).unwrap()
+        // out.body((self.body)).unwrap()
     }
 }
 
@@ -148,9 +147,9 @@ impl<'request> Debug for RequestState<'request> {
             .field("status", &self.status)
             // .field("request_body", &self.request.body())
             // .field("body", &format!("{:?}", self.body))
-            .field("headers", &self.headers)
-            // .field("vars", &self.variables)
-            .field("vars", &self.object.pretty(2))
+            // .field("headers", &self.headers)
+            .field("vars", &self.variables)
+            // .field("vars", &self.object.pretty(2))
             .finish()
         
     }

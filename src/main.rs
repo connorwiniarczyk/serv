@@ -5,7 +5,7 @@ mod config;
 mod route_table;
 mod pattern;
 mod parser;
-mod commands;
+// mod commands;
 mod request_state;
 mod variables;
 
@@ -78,12 +78,13 @@ async fn main() -> hyper::Result<()> {
     if let Some(_) = route_table.get("onstart") {
         let route_table = route_table.clone();
         std::thread::spawn(move || {
-            let route = route_table.get("onstart").unwrap();
-            let dummy_request = Request::new(hyper::Body::empty());
-            let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
-            for command in &route.commands {
-                command.run(&mut state);
-            }
+            todo!();
+           // let route = route_table.get("onstart").unwrap();
+            // let dummy_request = Request::new(hyper::Body::empty());
+            // let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
+            // for command in &route.commands {
+            //     command.run(&mut state);
+            // }
         });
     }
 

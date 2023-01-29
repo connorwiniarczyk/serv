@@ -6,6 +6,9 @@ pub enum TokenKind {
     PathAttribute,
     PathNode,
     PathExt,
+
+    Script,
+
     CommandList,
     Command,
     CommandName,
