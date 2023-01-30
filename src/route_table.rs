@@ -6,17 +6,19 @@ use crate::parser;
 use crate::request_state::{RequestState};
 use std::cell::RefCell;
 
+use std::future::Future;
+use std::pin::Pin;
+
 use std::sync::Mutex;
-// use std::borrow::Borrow;
+use std::sync::Arc;
+
+use pollster::FutureExt as _;
 
 use rhai::{Engine, EvalAltResult, Scope, NativeCallContext};
 
 // use crate::commands::cmd::Cmd;
 use hyper::{Request, Response};
 use std::collections::HashMap;
-// use std::pin::Pin;
-
-use std::sync::Arc;
 
 pub struct RouteTable {
 	pub table: Vec<Route>,
@@ -45,15 +47,15 @@ impl RouteTable {
 		for route in self.table.iter() {
 
 			match route.pattern.compare(&req) {
-				Ok(_) => return route.resolve(req),
+				Ok(_) => return route.resolve(req).await,
 				Err(_) => continue,
 			};
 
 			// check to see if the request matches
 			// if so, store the result in vars, otherwise continue
 			// let vars = match route.pattern.compare(&req) {
-			// 	Ok(vars) => vars,
-			// 	Err(e) => continue,
+			//	Ok(vars) => vars,
+			//	Err(e) => continue,
 			// };
 
 			// // if the request matches, resolve it
@@ -67,8 +69,8 @@ impl RouteTable {
 
 			// let futures = std::mem::take(&mut state.futures);
 			// tokio::spawn(async move {
-			// 	futures_util::future::join_all(futures).await;
-			// 	println!("done");
+			//	futures_util::future::join_all(futures).await;
+			//	println!("done");
 			// });
 
 			// return Ok(state.into());
@@ -105,48 +107,148 @@ pub struct Route {
 	pub script: String,
 }
 
-#[derive(Clone)]
-struct State(RefCell<String>);
+// type Task = Pin<Box<dyn Sync + Send + Future<Output = ()>>>;
+type Task = Pin<Box<dyn Sync + Send + Future<Output = ()>>>;
+
+use hyper::Body;
+
+#[derive(Default)]
+struct State {
+	tasks: Vec<Task>,
+	body: Body,
+
+	test: String,
+}
 
 impl State {
-	fn new() -> Self {
-		Self(RefCell::new(String::new()))
+	fn new() -> Self{
+		Self::default()
 	}
+	fn arc(self) -> ArcState {
+		let arc = Arc::new(Mutex::new(self));
+		ArcState(arc)
+	}
+}
+
+use std::ops::Deref;
+use futures_util::StreamExt;
+use futures_util::stream;
+
+#[derive(Clone)]
+struct ArcState(Arc<Mutex<State>>);
+
+impl ArcState {
+
+	fn body(&self) -> &Body {
+		todo!();
+	}
+
+	fn body_mut(&self) -> &mut Body {
+		todo!();
+	}
+
+	fn append(&self, value: &str) {
+		let test = &mut self.0.lock().unwrap().test;
+		test.push_str(value);
+		// let body = &mut self.0.lock().unwrap().body;
+		// let mut result = hyper::body::to_bytes(body).block_on().unwrap();
+
+
+		// *body = Body::wrap_stream(body.chain(next));
+
+		// *body = Body::from(value.to_owned());
+
+
+		// let next = body.chain(Body::from(value.to_owned()));
+		// *body = Body::wrap_stream(next);
+	}
+
 	fn push(&mut self, x: &str) {
 		todo!();
 		// self.0.push_str(x);
 	}
+
+	fn inner(self) -> State {
+		todo!();
+	}
+
+    fn register_task<T>(&self, task: T)
+    where T: Future<Output = ()> + Sync + Send + 'static {
+		self.0.lock().unwrap().tasks.push(Box::pin(task));
+    }
 }
 
-use std::rc::Rc;
+use hyper::body::Bytes;
+// use tokio::fs::File;
+use bytes::BytesMut;
+// use tokio::io::AsyncReadExt;
+
+use std::fs::File;
+use std::io::Read;
 
 impl Route {
-	pub fn resolve(&self, mut request: Request<hyper::Body>) -> Result<Response<hyper::Body>, hyper::Error> {
+	pub async fn resolve(&self, mut request: Request<hyper::Body>) -> Result<Response<hyper::Body>, hyper::Error> {
 		let vars = self.pattern.compare(&request).unwrap();
-		let mut scope = Scope::new();
-		for (key, value) in vars {
-			scope.push(key, value);	
-		}
+		let script = self.script.clone();
+		let output = State::new().arc();
 
-		let mut output = Rc::new(RefCell::new(String::new()));
-		let mut output_cl = output.clone();
+        let (sender, body) = Body::channel();
+        let sender_mux = Arc::new(Mutex::new(sender));
 
-		let mut engine = Engine::new();
+		let worker = std::thread::spawn(move || {
+            let output = output.clone();
+			let mut engine = Engine::new();
+			let ast = engine.compile(script).unwrap();
 
-		engine.register_fn("echo", move |x: &str| {
-			output_cl.borrow_mut().push_str(x);
+			let mut scope = Scope::new();
+			for (key, value) in vars {
+				scope.push(key, value);	
+			}
+
+            {
+                let sender_mux = sender_mux.clone();
+                let output = output.clone();
+                engine.register_fn("read", move |path: &str| {
+                    let mut file = File::open(path).unwrap();
+                    let mut buffer = [0u8; 1024];
+                    loop {
+                        let n = file.read(&mut buffer).unwrap();
+                        if n == 0 { break }
+
+                        let lock = &mut sender_mux.lock().unwrap();
+                        lock.send_data(Bytes::copy_from_slice(&buffer[0..n])).block_on();
+                    }
+                });
+            }
+
+            {
+                let sender_mux = sender_mux.clone();
+                engine.register_fn("echo", move |x: &str| {
+                    sender_mux.lock().unwrap().send_data(Bytes::from(x.to_owned())).block_on();
+
+                    // let next_element: Result<Bytes, hyper::Error> = Ok(Bytes::from(x.to_owned()));
+                    // let next_element_str = stream::once(async {next_element});
+
+                    // let current_body = &mut output_cl.0.lock().unwrap().body;
+                    // let current_stream = std::mem::take(current_body);
+
+                    // let sum = current_stream.chain(next_element_str);	
+                    // *current_body = Body::wrap_stream(sum);
+                });
+
+            }
+
+			engine.run_ast_with_scope(&mut scope, &ast).unwrap();
 		});
 
-		let ast = engine.compile(self.script.as_str()).unwrap();
+        // tokio::spawn(state)
 
-		engine.run_ast_with_scope(&mut scope, &ast).unwrap();
+		// worker.join().unwrap();
 
-		println!("{}", output.borrow());
-
-		// let test = output.borrow_mut();
-		let inner = output.replace(String::new());
-        let mut out = hyper::Response::builder().status(200);
-		Ok(out.body(inner.into()).unwrap())
+		// let body = std::mem::take(&mut output.0.lock().unwrap().body);
+		// let body = Body::from(output.0.lock().unwrap().test.clone());
+		let mut out = hyper::Response::builder().status(200);
+		Ok(out.body(body).unwrap())
 	}
 }
 
