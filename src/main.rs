@@ -1,6 +1,7 @@
 #![allow(unused_mut, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
 #![allow(warnings)]
 
+mod script;
 mod config;
 mod route_table;
 mod pattern;
