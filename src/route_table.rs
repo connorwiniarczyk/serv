@@ -89,6 +89,10 @@ impl Route {
 		let res: StreamHandle = engine.eval(text).unwrap();
 		let res_inner = Arc::try_unwrap(res.inner).unwrap();
 
+		res_inner.into_future().await;
+		todo!();
+
+
 		let mut out = hyper::Response::builder().status(200);
 		out.body(res_inner)
 		// let body = hyper::Body::wrap_stream(res_inner);
