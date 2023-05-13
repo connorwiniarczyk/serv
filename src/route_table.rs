@@ -6,6 +6,8 @@ use crate::parser;
 use crate::request_state::{RequestState};
 use std::cell::RefCell;
 
+use crate::stream_handle::{StreamHandle};
+
 use std::future::Future;
 use std::pin::Pin;
 
@@ -35,42 +37,42 @@ type Task = Pin<Box<dyn Sync + Send + Future<Output = ()>>>;
 use hyper::body::Sender;
 
 struct Resolver {
-    engine: Engine,
-    sender: Arc<Mutex<Sender>>,
+	engine: Engine,
+	sender: Arc<Mutex<Sender>>,
 
-    // idk
+	// idk
 	tasks: Vec<Task>,
 	body: Body,
 }
 
 impl Resolver {
 	fn new(engine: Engine) -> Self {
-        let (sender_r, body) = Body::channel();
-        let sender = Arc::new(Mutex::new(sender_r));
+		let (sender_r, body) = Body::channel();
+		let sender = Arc::new(Mutex::new(sender_r));
 
-        Self {engine, sender, tasks: Vec::default(), body }
-    }
+		Self {engine, sender, tasks: Vec::default(), body }
+	}
 
-    fn sender(&self) -> Sender {
-        todo!();
-    }
+	fn sender(&self) -> Sender {
+		todo!();
+	}
 
-    fn register_read_fn(&mut self) {
-        let sender = self.sender.clone();
-        self.engine.register_fn("read", move |path: &str| {
-            let mut file = File::open(path).expect("no file"); 
-            let mut buffer = [0u8; 1024];
-            loop {
-                let n = file.read(&mut buffer).expect("reading from file failed");
-                if n == 0 { break }
-                sender.lock().unwrap().send_data(Bytes::copy_from_slice(&buffer[0..n])).block_on();
-            }
-        });
-    }
+	fn register_read_fn(&mut self) {
+		let sender = self.sender.clone();
+		self.engine.register_fn("read", move |path: &str| {
+			let mut file = File::open(path).expect("no file"); 
+			let mut buffer = [0u8; 1024];
+			loop {
+				let n = file.read(&mut buffer).expect("reading from file failed");
+				if n == 0 { break }
+				sender.lock().unwrap().send_data(Bytes::copy_from_slice(&buffer[0..n])).block_on();
+			}
+		});
+	}
 
-    fn resolve(self) -> Body {
-        todo!();
-    }
+	fn resolve(self) -> Body {
+		todo!();
+	}
 }
 
 
@@ -82,14 +84,15 @@ pub struct Route {
 
 impl Route {
 	pub async fn resolve(&self, mut request: Request<hyper::Body>) -> Result<Response<hyper::Body>, http::Error> {
-        let engine = create_engine();
-        let res: StreamHandle = engine.eval("file(\"/home/connor/data.csv\")").unwrap();
-        let res_inner = Arc::try_unwrap(res.inner).unwrap();
+		let engine = create_engine();
+		let text = r#"file("main.rs")"#;
+		let res: StreamHandle = engine.eval(text).unwrap();
+		let res_inner = Arc::try_unwrap(res.inner).unwrap();
 
-        let mut out = hyper::Response::builder().status(200);
-        out.body(res_inner)
-        // let body = hyper::Body::wrap_stream(res_inner);
-        // todo!();
+		let mut out = hyper::Response::builder().status(200);
+		out.body(res_inner)
+		// let body = hyper::Body::wrap_stream(res_inner);
+		// todo!();
 	}
 }
 

@@ -7,12 +7,15 @@ use std::sync::Arc;
 use std::fs::File;
 use std::io::{Read, BufRead};
 
+use crate::stream_handle::StreamHandle;
+
 
 pub fn create_engine() -> rhai::Engine {
 	let mut engine = Engine::new();
 	engine.register_type_with_name::<StreamHandle>("Stream");
 	engine.register_fn("empty", StreamHandle::empty);
 	engine.register_fn("file", StreamHandle::from_file);
+    engine.register_fn("exec", StreamHandle::exec);
 
 	return engine
 }

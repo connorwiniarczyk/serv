@@ -6,6 +6,8 @@ mod config;
 mod route_table;
 mod pattern;
 mod parser;
+mod stream_handle;
+
 // mod commands;
 mod request_state;
 mod variables;
