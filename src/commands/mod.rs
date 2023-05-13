@@ -3,14 +3,12 @@ pub mod core;
 pub mod files;
 pub mod exec;
 pub mod sql;
-pub mod script;
 
 pub use cmd::Cmd;
 pub use self::core::Echo;
 pub use self::files::{ReadFile, WriteFile};
 pub use self::exec::{Exec, Shell};
 pub use self::sql::Sql;
-pub use self::script::Script;
 
 use std::sync::Arc;
 
@@ -27,7 +25,6 @@ pub fn parse_cmd(name: &str, arg: Option<&str>) -> Result<Arc<dyn Cmd>, ()> {
         "set" => Ok(core::SetVar::with_arg(arg).wrap()),
         "parse" => Ok(core::ParseBody::with_arg(arg).wrap()),
         "run" => Ok(core::Jump::with_arg(arg).wrap()),
-        "rhai" => Ok(Script::with_arg(arg).wrap()),
         _ => Err(()),
     }
 }
