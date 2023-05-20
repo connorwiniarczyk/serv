@@ -6,10 +6,58 @@ use crate::parser;
 use crate::request_state::{RequestState};
 use crate::commands::cmd::Cmd;
 use hyper::{Request, Response};
-use std::collections::HashMap;
-// use std::pin::Pin;
+use std::collections::{HashSet, HashMap};
+
+use std::iter::Peekable;
 
 use std::sync::Arc;
+
+
+
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub enum NodeType {
+    Value(String),
+    Wildcard(String),
+    DeepWildcard(String),
+}
+
+use NodeType::*;
+
+pub struct PathNode {
+    node_type: NodeType,
+    expression: String,
+    children: HashMap<String, PathNode>,
+}
+
+impl PathNode {
+    fn new(node_type: NodeType) -> Self {
+        Self { node_type, expression: String::new(), children: HashMap::new() }
+    }
+
+    pub fn add_child(&mut self, child: NodeType) {
+        match child.NodeType
+        self.children.insert(child.clone(), Self::new(child));
+    }
+
+    pub fn resolve<I>(&self, mut path: Peekable<I>, acc: HashMap<String, String>) -> Result<HashMap<String, String>, ()> 
+    where I: Iterator<Item = String> {
+        match (&self.node_type, path.next(), path.peek()) {
+
+            // (Value(x), None, None) => return Err(()),
+
+            // (Value(x), Some(y), None) if x == y => Ok(acc),
+            // (Value(x), Some(y), None) => Err(()),
+
+            // (Value(x), Some(y), Some(z)) if (x == y) => {
+            //     todo!();
+            //     // if (self.children.)
+            // },
+            _ => todo!(),
+        };
+
+        todo!();
+    }
+}
 
 pub struct RouteTable {
     pub table: Vec<Route>,
@@ -68,7 +116,7 @@ impl RouteTable {
 
 impl Default for RouteTable {
     fn default() -> Self {
-        parser::parse_str("/**path: read $(path)").unwrap()
+        parser::parse("/**path: read $(path)".as_bytes()).unwrap()
     }
 }
 

@@ -3,7 +3,6 @@
 /// potential http requests, and ResourcePatterns represent a set of potential
 /// resources on the host machine. 
 
-
 use std::fmt;
 use itertools::{Itertools};
 use hyper::{Request, Body};
@@ -17,9 +16,9 @@ use hyper::Method;
 pub struct Pattern {
 
     pub name: Option<String>,
-    pub methods: HashSet<Method>,
+    // pub methods: HashSet<Method>,
 
-    pub attributes: Vec<String>,
+    // pub attributes: Vec<String>,
     pub path: Vec<Node>,
     pub extension: Option<Node>,
 }
@@ -30,8 +29,9 @@ type Vars = HashMap<String, String>;
 impl Pattern {
 
     pub fn new(mut path: Vec<Node>) -> Self {
-        path.insert(0, Node::val(""));
-        Self { name: None, methods: HashSet::new(), path, attributes: vec![], extension: None }
+        todo!();
+        // path.insert(0, Node::val(""));
+        // Self { name: None, methods: HashSet::new(), path, attributes: vec![], extension: None }
     }
 
     /// Check the equality of `self` and a given http request. Return an Err
@@ -42,7 +42,7 @@ impl Pattern {
         let mut output = Vars::new();
 
         // check to see that the method is valid
-        if !(self.methods.len() == 0 || self.methods.contains(request.method())) { return Err("methods don't match") }
+        // if !(self.methods.len() == 0 || self.methods.contains(request.method())) { return Err("methods don't match") }
 
         // if let Some(methods) = &self.methods {
         //     if methods.contains(request.method()) == false { return Err(()) }
@@ -110,38 +110,11 @@ impl Pattern {
 
 }
 
-
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     Value(String),
     Variable(String),
     Rest(String),
-}
-
-impl Node {
-    pub fn val(input: &str) -> Self {
-        Self::Value(input.to_string())
-    }
-
-    pub fn var(input: &str) -> Self {
-        Self::Variable(input.to_string())
-    }
-
-    pub fn rest(input: &str) -> Self {
-        Self::Rest(input.to_string())
-    }
-
-    pub fn from_str(input: &str) -> Self {
-        if let Some(value) = input.strip_prefix("**") { 
-            return Self::rest(value);
-        } else if let Some(value) = input.strip_prefix("*") {
-            return Self::var(value);
-        } else {
-            return Self::val(input);
-        }
-    }
-
 }
 
 // Implement Display for Paths and Nodes
@@ -158,10 +131,10 @@ impl fmt::Display for Node {
 impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 
-        for attr in self.attributes.iter() {
-            f.write_str("@")?;
-            write!(f, "{}", attr)?;
-        }
+        // for attr in self.attributes.iter() {
+        //     f.write_str("@")?;
+        //     write!(f, "{}", attr)?;
+        // }
         
         write!(f, "{}", self.path.iter().join("/"))?;
 
@@ -174,17 +147,3 @@ impl fmt::Display for Pattern {
 
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn pattern_compare() {
-//         let pattern = Pattern {
-//             attributes: vec![],
-//             path: vec![],
-//             extension: vec![],
-//         };
-//     }
-// }

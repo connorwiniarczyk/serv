@@ -9,6 +9,12 @@ mod commands;
 mod request_state;
 mod variables;
 
+mod expression;
+
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
+
 use std::sync::Arc;
 use std::fs::File;
 

@@ -1,0 +1,23 @@
+
+
+file = { route+ }
+
+route = { pattern ~ ":" ~ "{" ~ action ~ "}"}
+
+pattern = { (path_node+ ~ extension?) | "/" }
+	path_node = { "/" ~ (value | wildcard | double_wildcard) }
+	extension = {"." ~ (value | wildcard)}
+		value = { ident }
+		wildcard = { "*" ~ ident }
+		double_wildcard = {"**" ~ ident+}
+		ident = @{ character+ }
+
+action = { expression+ }
+	expression = { literal | variable }
+		literal = @{ character+ }
+		variable = @{ "$" ~ character+ }
+	op = { "|" | "+" }
+
+character = _{'a'..'z' | 'A'..'Z' | '0'..'9'}
+WHITESPACE = _{ " " | "\t" | "\n" }
+
