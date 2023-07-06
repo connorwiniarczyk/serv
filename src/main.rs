@@ -9,6 +9,8 @@ mod command;
 mod request_state;
 mod body;
 
+mod routetree;
+
 use std::sync::Arc;
 use std::fs::File;
 
