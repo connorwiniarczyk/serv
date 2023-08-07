@@ -1,0 +1,30 @@
+
+
+file = { route+ }
+
+route = { pattern ~ ":" ~ action }
+
+pattern = { (path_node+ ~ extension?) | "/" }
+	path_node = { "/" ~ (value | wildcard | double_wildcard) }
+	extension = {"." ~ (value | wildcard)}
+		value = { #name = ident }
+		wildcard = { "*" ~ ident }
+		double_wildcard = {"**" ~ ident+}
+		ident = @{ character+ }
+
+action = { expression }
+
+expression = { prefix | template | compound }
+
+	prefix = { "@" ~ ident ~ expression? }
+
+	compound = {"[" ~ expression ~ (infix_op ~ expression)* ~ "]"}
+		infix_op = { "+" | "|" }
+
+	template = ${ "{" ~ (PUSH("#"*)) ~ template_inner ~ POP ~ "}" }
+		template_inner = { (!(PEEK ~ "}") ~ ANY)* }
+
+
+character = _{'a'..'z' | 'A'..'Z' | '0'..'9'}
+WHITESPACE = _{ " " | "\t" | "\n" }
+

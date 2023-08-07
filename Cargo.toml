@@ -27,3 +27,6 @@ bytes = "1.2.1"
 sqlite = "0.27"
 json = "0.12.4"
 pollster = "0.2.5"
+
+pest = "2.6.0"
+pest_derive = {version = "2.6.0", features = []}

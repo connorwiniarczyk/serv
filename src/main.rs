@@ -1,15 +1,21 @@
-#![allow(unused_mut, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
-// #![allow(warnings)]
+#![allow(unused_mut, unused_imports, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
+#![allow(warnings)]
 
 mod config;
-mod route_table;
-mod pattern;
-mod parser;
+// mod pattern;
 mod command;
 mod request_state;
 mod body;
 
+mod route_table;
+
+mod parser;
 mod routetree;
+mod ast;
+
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
 
 use std::sync::Arc;
 use std::fs::File;
@@ -33,9 +39,9 @@ async fn main() -> hyper::Result<()> {
 
     // Define this programs arguments
     let matches = clap_app!(serv =>
-        (version: "0.3")
+        (version: "0.4")
         (author: "Connor Winiarczyk")
-        (about: "A Based Web Server")
+        (about: "A DSL for HTTP servers")
         (@arg port: -p --port +takes_value "which tcp port to listen on")
         (@arg host: -h --host +takes_value "which ip addresses to accept connections from")
         (@arg cert: -c --cert +takes_value "path to ssl certificate")
@@ -53,19 +59,20 @@ async fn main() -> hyper::Result<()> {
 
 
     // Generate the Route Table
-    let route_table = {
-        let routefile = config.root.join("routes.conf");
-        let output = match File::open(&routefile) {
-            Ok(file) => parser::parse(file).expect("syntax error:"),
-            Err(_) => RouteTable::default(),
-        };
+    let route_table: Arc<RouteTable> = {
+        todo!();
+        // let routefile = config.root.join("routes.conf");
+        // let output = match File::open(&routefile) {
+        //     Ok(file) => parser::parse(file).expect("syntax error:"),
+        //     Err(_) => todo!(),
+        //     // Err(_) => RouteTable::default(),
+        // };
 
-        // The Route Table needs to be behind an Arc smart pointer because it will be shared
-        // between multiple async processes. We do not need a Mutex here because once generated,
-        // the Route Table can not be mutated
-        Arc::new(output)
+        // // The Route Table needs to be behind an Arc smart pointer because it will be shared
+        // // between multiple async processes. We do not need a Mutex here because once generated,
+        // // the Route Table can not be mutated
+        // Arc::new(output)
     };
-
 
     println!("Generated the following Route Table:");
     println!("{}", route_table);
@@ -80,9 +87,9 @@ async fn main() -> hyper::Result<()> {
             let route = route_table.get("onstart").unwrap();
             let dummy_request = Request::new(hyper::Body::empty());
             let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
-            for command in &route.commands {
-                command.run(&mut state);
-            }
+            // for command in &route.commands {
+            //     command.run(&mut state);
+            // }
         });
     }
 

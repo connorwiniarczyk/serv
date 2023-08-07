@@ -28,67 +28,69 @@ pub struct Config {
 impl Config {
 
     pub fn from_routes<R: AsRef<RouteTable>>(mut self, table: &R) -> Self {
-        let route_table = table.as_ref();
+        todo!();
+        // let route_table = table.as_ref();
 
-        if self.keypair == None {
-            if let Some(_) = route_table.get("ssl") {
-                let route = route_table.get("ssl").unwrap();
-                let dummy_request = Request::new(hyper::Body::empty());
-                let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
-                for command in &route.commands {
-                    command.run(&mut state);
-                }
+        // if self.keypair == None {
+        //     if let Some(_) = route_table.get("ssl") {
+        //         let route = route_table.get("ssl").unwrap();
+        //         let dummy_request = Request::new(hyper::Body::empty());
+        //         let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
+        //         for command in &route.commands {
+        //             command.run(&mut state);
+        //         }
 
-                println!("{:?}", state.body);
+        //         println!("{:?}", state.body);
 
-                match state.body {
-                    Body::Txt(txt) => {
-                        let keyreader = KeyReader::new().read_pem(&mut txt.as_bytes());
-                        self.keypair = Some(keyreader);
-                    },
-                    Body::Raw(bytes) => {
-                        let keyreader = KeyReader::new().read_pem(&mut bytes.as_slice());
-                        self.keypair = Some(keyreader);
-                    },
-                    _ => { println!("could not load key file") },
-                }
-            }
-        }
+        //         match state.body {
+        //             Body::Txt(txt) => {
+        //                 let keyreader = KeyReader::new().read_pem(&mut txt.as_bytes());
+        //                 self.keypair = Some(keyreader);
+        //             },
+        //             Body::Raw(bytes) => {
+        //                 let keyreader = KeyReader::new().read_pem(&mut bytes.as_slice());
+        //                 self.keypair = Some(keyreader);
+        //             },
+        //             _ => { println!("could not load key file") },
+        //         }
+        //     }
+        // }
 
-        self
+        // self
     }
 
     pub fn from_args(matches: &clap::ArgMatches) -> Self {
-        let port = matches.value_of("port").unwrap_or("4000");
-        let host = matches.value_of("host").unwrap_or("0.0.0.0");
+        todo!();
+        // let port = matches.value_of("port").unwrap_or("4000");
+        // let host = matches.value_of("host").unwrap_or("0.0.0.0");
 
-        let keypair = match (matches.value_of("cert"), matches.value_of("key")) {
-            (Some(cert), Some(key)) => {
-                let keyreader = KeyReader::new()
-                    .read_pem(&mut File::open(&cert).unwrap())
-                    .read_pem(&mut File::open(&key).unwrap());
-                Some(keyreader)
+        // let keypair = match (matches.value_of("cert"), matches.value_of("key")) {
+        //     (Some(cert), Some(key)) => {
+        //         let keyreader = KeyReader::new()
+        //             .read_pem(&mut File::open(&cert).unwrap())
+        //             .read_pem(&mut File::open(&key).unwrap());
+        //         Some(keyreader)
 
-            },
-            _ => None,
-        };
+        //     },
+        //     _ => None,
+        // };
 
-        // Determine the local path to serve files out of 
-        let path = Path::new(matches.value_of("PATH").unwrap_or("."));
+        // // Determine the local path to serve files out of 
+        // let path = Path::new(matches.value_of("PATH").unwrap_or("."));
 
-        // if the path given has a root, ie. /home/www/public, use it as is,
-        // if not, ie. server/public join it to the end of the current directory
-        let path_abs = match path.has_root() {
-            true => path.to_path_buf(),
-            false => current_dir().unwrap().join(path),
-        }.canonicalize().unwrap();
+        // // if the path given has a root, ie. /home/www/public, use it as is,
+        // // if not, ie. server/public join it to the end of the current directory
+        // let path_abs = match path.has_root() {
+        //     true => path.to_path_buf(),
+        //     false => current_dir().unwrap().join(path),
+        // }.canonicalize().unwrap();
 
-        Self {
-            root: path_abs,
-            port: port.parse::<u16>().unwrap(),
-            host: host.to_string(),
-            keypair
-        }
+        // Self {
+        //     root: path_abs,
+        //     port: port.parse::<u16>().unwrap(),
+        //     host: host.to_string(),
+        //     keypair
+        // }
     }
 }
 

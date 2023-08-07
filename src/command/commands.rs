@@ -127,9 +127,9 @@ command_function!(jumpto, (state, args) => {
     let route_name = args.expect("need to specifiy a route to jump to");
     let route = state.table.get(route_name).expect("that route does not exist");
     
-    for command in &route.commands {
-        command.run(state);
-    }
+    // for command in &route.commands {
+    //     command.run(state);
+    // }
 });
 
 
