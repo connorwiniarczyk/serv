@@ -23,18 +23,23 @@ pub trait FromSyntax {
 
 impl FromSyntax for PathNode {
 	fn from_syntax(input: Tree) -> Result<Self, ParseError> {
-		let inner = input.into_inner().next().unwrap();
-		let rule = inner.as_rule();
-		let value = inner.into_inner().flatten()
-			.find(|p| p.as_rule() == Rule::ident)
-			.unwrap()
-			.as_str();
 
-		let output = match rule {
-			Rule::value => PathNode::Literal(value.to_owned()),
-			Rule::wildcard => PathNode::Wildcard(value.to_owned()),
-			Rule::double_wildcard => PathNode::Doublewildcard(value.to_owned()),
-			_ => panic!(),
+		let output = match input.into_inner().next() {
+			None => PathNode::Literal(String::new()),
+			Some(inner) => {
+				let rule = inner.as_rule();
+				let value = inner.into_inner().flatten()
+					.find(|p| p.as_rule() == Rule::ident)
+					.unwrap()
+					.as_str();
+
+				match rule {
+					Rule::value => PathNode::Literal(value.to_owned()),
+					Rule::wildcard => PathNode::Wildcard(value.to_owned()),
+					Rule::double_wildcard => PathNode::Doublewildcard(value.to_owned()),
+					_ => panic!(),
+				}
+			},
 		};
 
 		Ok(output)
@@ -85,15 +90,16 @@ pub fn parse<R: Read>(mut input: R) -> Result<RouteTree<AstNode>, &'static str> 
 
 	   let mut route_elements_iter = route.into_inner();
 	   let pattern_syntax = route_elements_iter.next().unwrap();
-	   let expression_syntax = route_elements_iter.next().unwrap();
+	   let action_syntax = route_elements_iter.next().unwrap();
+	   let expression_syntax = action_syntax.into_inner().next().unwrap();
 
 	   let mut nodes = pattern_syntax.into_inner().map(PathNode::from_syntax);
 	   let nodes_vec: Result<Vec<PathNode>, ParseError> = nodes.collect();
 
 	   // let pattern = PathNode::from_syntax(pattern_syntax).expect("invalid pattern");
-	   let expression = AstNode::from_syntax(expression_syntax).expect("invalid expression");
+	   let action = AstNode::from_syntax(expression_syntax).expect("invalid expression");
 
-	   output.insert(&mut nodes_vec.unwrap().iter(), expression);
+	   output.insert(&mut nodes_vec.unwrap().iter(), action);
 
 	}
 
@@ -121,7 +127,6 @@ impl AstNode {
 						x.insert(o);
 						Some(Box::new(x))
 					},
-
 					None => None,
 				};
 
@@ -136,7 +141,10 @@ impl AstNode {
 				let inner = syntax.into_inner().flatten().find(|x| x.as_rule() == Rule::template_inner).unwrap();
 				AstNode::Text(inner.as_str().to_owned())
 			}
-			_ => todo!(),
+
+			rule @ _ => {
+				panic!("invalid rule: {:?}", rule);
+			},
 		};
 
 		Ok(())
@@ -184,7 +192,5 @@ mod tests {
 		println!("{:#?}", syntax);
 
 		node.insert(syntax);
-
-		panic!();
 	}
 }

@@ -1,6 +1,7 @@
 use crate::parser::{FromSyntax, ParseError, Tree};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use hyper;
 
 struct Template;
 
@@ -36,16 +37,48 @@ pub enum AstNode {
     }
 }
 
-struct Value(String);
+pub struct Value {
+    headers: Vec<(String, String)>,
+    body: String,
+}
+
+impl From<Value> for hyper::Response<hyper::Body> {
+    fn from(value: Value) -> Self {
+        let mut output = hyper::Response::builder().status(200);
+
+        output.body(value.body.into()).unwrap()
+    }
+}
 
 pub struct ExecutionEngine;
 
 impl ExecutionEngine {
-    pub fn ResolveExpression(&mut self, expression: &AstNode) -> Result<Value, ()> {
+
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn resolve_expression(&mut self, expression: &AstNode) -> Result<Value, ()> {
 
         let output: Value = match expression {
-            AstNode::Text(s) => {
-                Value(s.to_string())
+            AstNode::Text(s) => Value { headers: Vec::new(), body: s.clone() },
+            AstNode::Prefix { op, options, value } => { 
+                let input: Option<Value> = match value {
+                    Some(v) => Some(self.resolve_expression(v)?),
+                    None => None,
+                };
+
+                match op {
+                    Operator::Html => {
+                        let mut output = String::new();
+                        output.push_str("<html>\n<body>\n");
+                        if let Some(ref v) = input { output.push_str(v.body.as_str()); }
+                        output.push_str("\n</body>\n</html>");
+
+                        Value { headers: Vec::new(), body: output }
+                    },
+                    _ => todo!(),
+                }
             },
 
             _ => todo!(),

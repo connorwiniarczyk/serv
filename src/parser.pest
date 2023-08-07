@@ -4,8 +4,8 @@ file = { route+ }
 
 route = { pattern ~ ":" ~ action }
 
-pattern = { (path_node+ ~ extension?) | "/" }
-	path_node = { "/" ~ (value | wildcard | double_wildcard) }
+pattern = { (path_node+ ~ extension?) }
+	path_node = { "/" ~ (value | wildcard | double_wildcard)? }
 	extension = {"." ~ (value | wildcard)}
 		value = { #name = ident }
 		wildcard = { "*" ~ ident }

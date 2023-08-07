@@ -96,14 +96,12 @@ impl<A> RouteTree<A> {
 	pub fn insert<'a, 'b, I>(&'a mut self, path: &mut I, value: A) -> Result<(), &'static str>
 	where I: Iterator<Item = &'b PathNode> {
 		self.0.insert(path, value)?;
-
 		return Ok(())
 	}
 
 	pub fn insert_vec(&mut self, path: Vec<PathNode>, value: A) -> Result<(), &'static str> {
 		let mut iter = path.iter();
 		self.insert(&mut iter, value)?;
-
 		return Ok(())
 	}
 
@@ -111,8 +109,17 @@ impl<A> RouteTree<A> {
 	pub fn get(&self, path: &str) -> Option<&A> {
 		let mut vars: HashMap<String, String> = HashMap::new();
 		let mut iter = path.split("/");
+
 		iter.next();
 		return self.0.get(&mut iter, &mut vars);
+	}
+
+	pub fn get_special(&self, name: &str) -> Option<A> {
+		todo!();
+	}
+
+	pub fn insert_special(name: &str, value: A) {
+		todo!();
 	}
 }
 
@@ -127,13 +134,12 @@ where A: Debug {
 
 		Ok(())
 	}
-	
 }
 
 #[cfg(test)]
 mod test {
 	use super::*;
-    use crate::parser::parse_str_id_only as parse;
+	use crate::parser::parse_str_id_only as parse;
 
 	fn create_tree() -> RouteTree<i32> {
 		let mut output = RouteTree::new();
@@ -143,6 +149,12 @@ mod test {
 		return output
 	}
 
+	#[test]
+	fn test_root() {
+		let tree = parse("/: {1}").expect("failed to parse");
+		assert_eq!(tree.get("/"), Some(&0));
+
+	}
 
 	#[test]
 	fn test1() {
@@ -156,9 +168,9 @@ mod test {
 		assert_eq!(tree.get("/one"), None);
 	}
 
-    #[test]
-    fn test3() {
-        let tree = parse("/one/*two/three: {1}").expect("failed to parse");
-        assert_eq!(tree.get("/one/a/three"), Some(&0));
-    }
+	#[test]
+	fn test3() {
+		let tree = parse("/one/*two/three: {1}").expect("failed to parse");
+		assert_eq!(tree.get("/one/a/three"), Some(&0));
+	}
 }

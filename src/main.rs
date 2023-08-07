@@ -3,7 +3,7 @@
 
 mod config;
 // mod pattern;
-mod command;
+// mod command;
 mod request_state;
 mod body;
 
@@ -60,38 +60,40 @@ async fn main() -> hyper::Result<()> {
 
     // Generate the Route Table
     let route_table: Arc<RouteTable> = {
-        todo!();
-        // let routefile = config.root.join("routes.conf");
-        // let output = match File::open(&routefile) {
-        //     Ok(file) => parser::parse(file).expect("syntax error:"),
-        //     Err(_) => todo!(),
-        //     // Err(_) => RouteTable::default(),
-        // };
+        let routefile = config.root.join("test.serv");
+        let tree = match File::open(&routefile) {
+            Ok(file) => parser::parse(file).expect("syntax error:"),
+            Err(_) => todo!(),
+            // Err(_) => RouteTable::default(),
+        };
 
-        // // The Route Table needs to be behind an Arc smart pointer because it will be shared
-        // // between multiple async processes. We do not need a Mutex here because once generated,
-        // // the Route Table can not be mutated
-        // Arc::new(output)
+        let output = RouteTable::new(tree);
+
+
+        // The Route Table needs to be behind an Arc smart pointer because it will be shared
+        // between multiple async processes. We do not need a Mutex here because once generated,
+        // the Route Table can not be mutated
+        Arc::new(output)
     };
 
     println!("Generated the following Route Table:");
-    println!("{}", route_table);
+    // println!("{}", route_table);
 
-    config = config.from_routes(&route_table.clone());
+    // config = config.from_routes(&route_table.clone());
 
 
     //run the on-start commands if they are specified
-    if let Some(_) = route_table.get("onstart") {
-        let route_table = route_table.clone();
-        std::thread::spawn(move || {
-            let route = route_table.get("onstart").unwrap();
-            let dummy_request = Request::new(hyper::Body::empty());
-            let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
-            // for command in &route.commands {
-            //     command.run(&mut state);
-            // }
-        });
-    }
+    // if let Some(_) = route_table.get("onstart") {
+    //     let route_table = route_table.clone();
+    //     std::thread::spawn(move || {
+    //         let route = route_table.get("onstart").unwrap();
+    //         let dummy_request = Request::new(hyper::Body::empty());
+    //         let mut state = request_state::RequestState::new(&route, dummy_request, &route_table);
+    //         // for command in &route.commands {
+    //         //     command.run(&mut state);
+    //         // }
+    //     });
+    // }
 
     // Start the server
     let keypair = config.keypair.clone();
