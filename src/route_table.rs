@@ -1,6 +1,7 @@
 use crate::ast::{AstNode, ExecutionEngine};
 use crate::routetree::RouteTree;
 use hyper::{Request, Response};
+use crate::value;
 
 pub struct RouteTable(RouteTree<AstNode>);
 
@@ -11,12 +12,22 @@ impl RouteTable {
 
     pub async fn resolve(&self, mut req: Request<hyper::Body>) -> Result<Response<hyper::Body>, hyper::Error> {
 
-        let expression = self.0.get(req.uri().path()).unwrap();
-        let mut engine = ExecutionEngine::new();
+        let expression = self.0.get(req.uri().path());
 
-        let result = engine.resolve_expression(expression).unwrap();
+        if let Some((e, vars)) = expression {
+            let mut engine = ExecutionEngine::new(vars.into());
+            let result = engine.resolve_expression(e).unwrap();
+            let response = value::Response {
+                headers: Vec::new(),
+                body: result,
+            };
+            Ok(response.into())
+        }
 
-        Ok(result.into())
+        else {
+		    let mut output = hyper::Response::builder().status(404);
+            Ok(output.body(String::new().into()).unwrap())
+        }
     }
 }
 

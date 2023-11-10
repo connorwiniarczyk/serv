@@ -106,12 +106,14 @@ impl<A> RouteTree<A> {
 	}
 
 
-	pub fn get(&self, path: &str) -> Option<&A> {
+	pub fn get(&self, path: &str) -> Option<(&A, HashMap::<String, String>)> {
 		let mut vars: HashMap<String, String> = HashMap::new();
 		let mut iter = path.split("/");
 
 		iter.next();
-		return self.0.get(&mut iter, &mut vars);
+        let result: &A = self.0.get(&mut iter, &mut vars)?;
+        return Some((result, vars));
+		// return self.0.get(&mut iter, &mut vars);
 	}
 
 	pub fn get_special(&self, name: &str) -> Option<A> {

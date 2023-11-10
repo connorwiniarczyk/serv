@@ -1,5 +1,6 @@
 
 use pest::*;
+use crate::template::Template;
 
 use crate::routetree::RouteTree;
 use crate::routetree::PathNode;
@@ -78,16 +79,14 @@ pub fn parse_str_id_only(input: &str) -> Result<RouteTree<i32>, &'static str> {
 pub fn parse<R: Read>(mut input: R) -> Result<RouteTree<AstNode>, &'static str> {
 	let mut input_string = String::new();
 	input.read_to_string(&mut input_string);
-	let syntax_tree = ServParser::parse(Rule::file, &input_string)
+	let mut syntax_tree = ServParser::parse(Rule::file, &input_string)
 	   .expect("parse error")
-	   .next()
+       .next()
 	   .unwrap();
 
 	let mut output: RouteTree<AstNode> = RouteTree::new();
 
-	for route in syntax_tree.into_inner() {
-	   println!("{:?}", route.as_str());
-
+	for route in syntax_tree.into_inner().filter(|x| x.as_rule() == Rule::route) {
 	   let mut route_elements_iter = route.into_inner();
 	   let pattern_syntax = route_elements_iter.next().unwrap();
 	   let action_syntax = route_elements_iter.next().unwrap();
@@ -137,10 +136,7 @@ impl AstNode {
 				}
 			},
 
-			Rule::template => {
-				let inner = syntax.into_inner().flatten().find(|x| x.as_rule() == Rule::template_inner).unwrap();
-				AstNode::Text(inner.as_str().to_owned())
-			}
+			Rule::template => AstNode::Template(Template::from_syntax(syntax).unwrap()),
 
 			rule @ _ => {
 				panic!("invalid rule: {:?}", rule);
@@ -159,6 +155,40 @@ impl FromSyntax for AstNode {
 
 		Ok(output)
 	}
+}
+
+fn unindent(input: &str) -> String {
+    fn count_spaces(line: &str) -> Option<usize> {
+        for (i, ch) in line.chars().enumerate() {
+            if ch != ' ' && ch != '\t' { return Some(i) }
+        }
+        return None
+    }
+
+    let mut lines = input.lines();
+    let spaces = lines
+        .clone()
+        .skip(1)
+        .filter_map(count_spaces)
+        .min()
+        .unwrap_or(0);
+
+    // println!("{}", spaces);
+
+    let mut output = Vec::with_capacity(input.len());
+    for line in lines {
+        if line.len() > spaces {
+            output.extend_from_slice(&line.as_bytes()[spaces..]);
+        } else {
+            output.extend_from_slice(&line.as_bytes());
+        }
+        output.push(b'\n');
+    }
+
+    let out = String::from_utf8(output).unwrap();
+    // println!("{}", out);
+    out
+
 }
 
 #[cfg(test)]

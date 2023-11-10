@@ -12,6 +12,9 @@ mod route_table;
 mod parser;
 mod routetree;
 mod ast;
+mod template;
+
+mod value;
 
 extern crate pest;
 #[macro_use]

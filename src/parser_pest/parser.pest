@@ -1,6 +1,5 @@
 
-
-file = { route+ }
+file = { SOI ~ route+ ~	EOI }
 
 route = { pattern ~ ":" ~ action }
 
@@ -21,8 +20,14 @@ expression = { prefix | template | compound }
 	compound = {"[" ~ expression ~ (infix_op ~ expression)* ~ "]"}
 		infix_op = { "+" | "|" }
 
-	template = ${ "{" ~ (PUSH("#"*)) ~ template_inner ~ POP ~ "}" }
-		template_inner = { (!(PEEK ~ "}") ~ ANY)* }
+	// template = ${ "{" ~ (PUSH("#"*)) ~ template_inner ~ POP ~ "}" }
+		// template_inner = { (!(PEEK ~ "}") ~ ANY)* }
+
+	template = ${ "{" ~ (PUSH("#"*)) ~ (prefix | template_variable | template_text)* ~ POP ~ "}" }
+		
+		template_variable = { "$" ~ ident }
+		template_expression = { "{%" ~ expression ~ "%}" }
+		template_text = { (!(PEEK ~ "}" | template_variable | template_expression) ~ ANY)+ }
 
 
 character = _{'a'..'z' | 'A'..'Z' | '0'..'9'}

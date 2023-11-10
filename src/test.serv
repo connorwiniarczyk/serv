@@ -1,1 +1,1 @@
-/: @html{<p> hello! <\p>}
+/**path: @file($path)	
