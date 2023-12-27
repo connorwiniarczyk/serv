@@ -1,5 +1,6 @@
 
 use std::collections::HashMap;
+use crate::parser::AstNode;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum PathNode {
@@ -89,6 +90,10 @@ impl<A> RouteTreeNode<A> {
 pub struct RouteTree<A>(RouteTreeNode<A>);
 
 impl<A> RouteTree<A> {
+	pub fn from_ast(input: &AstNode) -> Result<Self, ()> {
+		todo!();
+	}
+
 	pub fn new() -> Self {
 		Self(RouteTreeNode::new())
 	}
@@ -111,8 +116,8 @@ impl<A> RouteTree<A> {
 		let mut iter = path.split("/");
 
 		iter.next();
-        let result: &A = self.0.get(&mut iter, &mut vars)?;
-        return Some((result, vars));
+		let result: &A = self.0.get(&mut iter, &mut vars)?;
+		return Some((result, vars));
 		// return self.0.get(&mut iter, &mut vars);
 	}
 

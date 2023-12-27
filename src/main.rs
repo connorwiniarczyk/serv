@@ -2,23 +2,18 @@
 #![allow(warnings)]
 
 mod config;
-// mod pattern;
-// mod command;
 mod request_state;
 mod body;
-
 mod route_table;
-
+mod engine;
 mod parser;
 mod routetree;
-mod ast;
 mod template;
-
 mod value;
 
-extern crate pest;
-#[macro_use]
-extern crate pest_derive;
+mod matchit;
+
+use parser::AstNode;
 
 use std::sync::Arc;
 use std::fs::File;
@@ -35,7 +30,10 @@ use tls_listener::TlsListener;
 use tokio_rustls::TlsAcceptor;
 
 use route_table::RouteTable;
+use routetree::RouteTree;
 use config::{Config};
+
+use std::io::Read;
 
 #[tokio::main]
 async fn main() -> hyper::Result<()> {
@@ -63,14 +61,19 @@ async fn main() -> hyper::Result<()> {
 
     // Generate the Route Table
     let route_table: Arc<RouteTable> = {
-        let routefile = config.root.join("test.serv");
+        let routefile = config.root.join("src/test.serv");
         let tree = match File::open(&routefile) {
-            Ok(file) => parser::parse(file).expect("syntax error:"),
+            Ok(mut file) => {
+                let mut contents = String::new();
+                file.read_to_string(&mut contents);
+                parser::parse(&contents).expect("syntax error:")
+            },
             Err(_) => todo!(),
             // Err(_) => RouteTable::default(),
         };
 
-        let output = RouteTable::new(tree);
+        // let routetree = RouteTree::from_ast(&tree).unwrap(); 
+        let output = RouteTable::new(tree).unwrap();
 
 
         // The Route Table needs to be behind an Arc smart pointer because it will be shared
@@ -79,11 +82,8 @@ async fn main() -> hyper::Result<()> {
         Arc::new(output)
     };
 
-    println!("Generated the following Route Table:");
-    // println!("{}", route_table);
-
+    // println!("Generated the following Route Table:");
     // config = config.from_routes(&route_table.clone());
-
 
     //run the on-start commands if they are specified
     // if let Some(_) = route_table.get("onstart") {
@@ -155,6 +155,7 @@ async fn start_unencrypted(route_table: Arc<RouteTable>, config: &Config) -> hyp
             Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
                 let route_table = route_table.clone();
                 async move {
+                    println!("test");
                     route_table.resolve(req).await
                 }
             }))

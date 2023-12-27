@@ -1,0 +1,3 @@
+#!/bin/sh
+
+find -name "*.rs" -or -name "*.serv" | entr -r sh -c "clear && cargo run"

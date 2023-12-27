@@ -1,1 +1,3 @@
-/**path: @file($path)	
+/ @file { index.html }
+
+/hello/:test.extension $test

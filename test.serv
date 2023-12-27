@@ -1,0 +1,7 @@
+/index.html: @home {
+	<h1>Website!</h1>
+}
+
+/: @forward { /index.html }
+
+/api/date: @exec { date }
