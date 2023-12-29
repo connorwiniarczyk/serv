@@ -1,36 +1,45 @@
 // use crate::parser::{AstNode, ExecutionEngine};
 use crate::parser::{AstNode};
-use crate::routetree::RouteTree;
 use hyper::{Request, Response};
-use crate::value::{Table};
-use crate::value;
-use crate::engine::Engine;
 
 use crate::matchit::Router;
+use crate::engine::{Expression, ServFunction};
+use std::sync::Arc;
+use crate::engine::Value;
 
-pub struct RouteTable(Router<Vec<AstNode>>);
+pub struct RouteTable(Router<Expression>);
+
+// pub struct RouteTable(Router<Arc<dyn ServFunction>>);
 
 impl RouteTable {
     pub fn new(input: AstNode) -> Result<Self, ()> {
         let AstNode::Root(tree) = input else { return Err(()) };
-        let mut output: Router<Vec<AstNode>> = Router::new();
+        let mut output = Router::new();
         for route in tree {
             let AstNode::Route((pattern, expression)) = route else { return Err(()) }; 
-            let (AstNode::Pattern(p), AstNode::Expression(e)) = (*pattern, *expression) else { return Err(()) };
-            output.insert(p, e);
+            let AstNode::Pattern(p) = *pattern else { return Err(()) };
+            output.insert(p, Expression::from_node(*expression)?);
         }
         Ok(Self(output))
     }
 
     pub async fn resolve(&self, mut req: Request<hyper::Body>) -> Result<Response<hyper::Body>, hyper::Error> {
-        // println!("{:?}", req.uri().path());
-        let expression = self.0.at(req.uri().path()).unwrap();
-        println!("{:?}", expression);
+        let matched = self.0.at(req.uri().path()).unwrap();
 
-        let mut output = hyper::Response::builder().status(500);
-        Ok(output.body(String::new().into()).unwrap())
+        println!("{:?}", matched.value);
 
-        // todo!();
+        Ok(matched.value.eval().into())
+
+        // match matched.value.run() {
+        //     Value::Text(t) => {
+        //         println!("{}", t);
+        //     },
+
+        //     _ => todo!(),
+        // };
+
+        // let mut output = hyper::Response::builder().status(500);
+        // Ok(output.body(String::new().into()).unwrap())
 
         // let expression = self.0.get(req.uri().path());
 

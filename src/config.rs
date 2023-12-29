@@ -9,7 +9,7 @@ use std::io::{Read, BufReader};
 use std::env::current_dir;
 
 use crate::route_table::RouteTable;
-use crate::request_state;
+// use crate::request_state;
 use crate::body::Body;
 use hyper::Request;
 

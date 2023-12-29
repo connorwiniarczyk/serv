@@ -2,14 +2,11 @@
 #![allow(warnings)]
 
 mod config;
-mod request_state;
+// mod request_state;
 mod body;
 mod route_table;
 mod engine;
 mod parser;
-mod routetree;
-mod template;
-mod value;
 
 mod matchit;
 
@@ -30,7 +27,6 @@ use tls_listener::TlsListener;
 use tokio_rustls::TlsAcceptor;
 
 use route_table::RouteTable;
-use routetree::RouteTree;
 use config::{Config};
 
 use std::io::Read;

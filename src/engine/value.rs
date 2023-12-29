@@ -33,7 +33,7 @@ impl From<HashMap<String, String>> for Table {
 pub enum Value {
 	Empty,
 	Text(String),
-    Table(Table),
+        Table(Table),
 }
 
 impl Value {
