@@ -1,107 +1,137 @@
-/// Parses the routes file into a Route Table
+use crate::lexer;
+use crate::lexer::*;
+use crate::lexer::TokenKind::*;
+use crate::ast;
+use crate::ast::{TemplateElement, Template};
 
-
-use peg;
-
-use crate::route_table::{ Route, RouteTable };
-
-use crate::pattern::{Pattern, Node};
-use crate::command::*;
-
-use regex::Regex;
-use lazy_static::lazy_static;
-
-use std::path::Path;
-use std::io::{BufRead, BufReader};
-use std::fs::File;
-
-use std::fs::read_to_string;
-
-// A regular expression used to strip comments from the file before parsing
-lazy_static! {
-    static ref COMMENT: Regex = Regex::new(r"#.*").unwrap();
+struct Cursor<'tokens> {
+    input: &'tokens [Token],
+    index: usize,
 }
 
-pub fn parse_route_file(path: &Path) -> Result<RouteTable, ()> {
-    let file = read_to_string(path).expect("Cannot find a routes.conf file in this directory");
-    let route_table = route_parser::route_table(&file).expect("Failed to parse routes.conf file");
-    Ok(route_table)
-}
+impl<'tokens> Cursor<'tokens> {
+    fn new(input: &'tokens [Token]) -> Self {
+        Self { input, index: 0 }
+    }
 
-peg::parser! {
-    pub grammar route_parser() for str {
+    fn incr(&mut self, i: usize) {
+        self.index += i;
+    }
 
-        pub rule route_table() -> RouteTable = $(['\n'])* lines:line() ** ['\n'] $(['\n'])* {
-            // filter all lines for those that contain valid routes
-            let routes = lines.iter()
-                .filter_map(|route| route.as_ref())
-                .map(|route| route.clone())
-                .collect();
-
-            RouteTable { table:routes }   
+    fn get(&mut self, offset: usize) -> Result<&'tokens Token, &'static str> {
+        if self.index + offset < self.input.len() {
+            Ok(&self.input[self.index + offset])
+        } else {
+            Err("out of bounds")
         }
+    }
 
-        rule line() -> Option<Route> = whitespace()? route:route()? $(['#'] [^ '\n']*)? { route }
-
-        rule route_seperator() = quiet!{['\n']+}
-
-        pub rule route() -> Route = request:request() [':'] commands:(commands_multi_line() / commands()) {
-            Route { request, commands }
+    fn expect(&mut self, kind: TokenKind) -> Result<&'tokens Token, &'static str> {
+        let current = self.get(0)?;
+        if current.kind == kind {
+            Ok(current)
+        } else {
+            Err("failed assertion")
         }
-
-        pub rule request() -> Pattern = "/"? nodes:node() ** "/" {
-            if nodes.len() == 0 {
-                return Pattern::new(vec![Node::val("")])
-            } else {
-                return Pattern::new(nodes)
-            }
-        }
-
-        // pub rule node() -> Node = is_var:$(['*'])? is_rest:$(['*'])? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {
-        pub rule node() -> Node = is_var:"*"? is_rest:"*"? value:$([^ ':' | '/' | '\n' | '\t' | '#' | ' ']+) {
-            match (is_var, is_rest) {
-                (Some(_), Some(_)) => Node::rest(value),
-                (Some(_), None) => Node::var(value),
-                (None, None) => Node::val(value),
-                _  => Node::val(value), 
-            }
-        }
-
-        pub rule commands() -> Vec<Command> = commands:command() ** ";" ";"? whitespace()? {
-            commands
-        }
-        pub rule commands_multi_line() -> Vec<Command> =
-            whitespace()? "{" whitespace_with_line_breaks()?
-            commands:command() ** (";" whitespace_with_line_breaks()?)
-            ";"? whitespace_with_line_breaks()? "}" {
-            commands
-        }
-
-        pub rule command() -> Command = whitespace()? name:word() args:args()? whitespace()? {
-            match args {
-                Some(args) => Command::new(name, args),
-                None => Command::new(name, vec![]),
-            }
-        }
-
-        pub rule args() -> Vec<Arg> = whitespace()? args:arg() ** whitespace() { args }
-
-        pub rule arg() -> Arg = word:word() { Arg::new(None, word) }
-
-        rule word() -> &'input str = word:$([^ ' ' | '\t' | '\n' | ';' | '#']+) { word }
-        rule whitespace() = quiet!{[' ' | '\t']+}
-        rule whitespace_with_line_breaks() = quiet!{[' ' | '\t' | '\n' | '\r']+}
-        // rule whitespace() = quiet!{[' ' | '\t' | '\n']+}
     }
 }
 
+fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
+    let open = cursor.expect(TokenKind::TemplateOpen)?.clone();
+    cursor.incr(1);
+    
+	let mut elements: Vec<ast::TemplateElement> = Vec::new();
+	while cursor.get(0)?.kind != TokenKind::TemplateClose {
+    	let token = cursor.get(0)?;
+    	match token.kind {
+        	TokenKind::TemplateText => {
+            	cursor.incr(1);
+            	elements.push(ast::TemplateElement::Text(token.clone()))
+        	},
+        	TokenKind::Dollar => elements.push({
+            	cursor.incr(1);
+            	ast::TemplateElement::Expression(parse_word(cursor)?)
+        	}),
 
-#[cfg(test)]
-mod tests{
-    use super::*;
+        	TokenKind::TemplateOpen => {
+            	cursor.incr(1);
+            	elements.push(ast::TemplateElement::Template(parse_template(cursor)?))
+        	},
+        	TokenKind::TemplateClose => break,
+        	// TokenKind::LambdaBegin => elements.push(ast::TemplateElement::)
+        	_ => return Err("token not supported in template"),
+    	}
+	}
 
-    #[test]
-    fn test() {
-        let res = route_parser::route_table("/test : echo abcd;\n\n\n/hello: echo test; \n\n\n\n\n\n\n # comment \n").unwrap();
+	let close = cursor.expect(TokenKind::TemplateClose)?.clone();
+	Ok(ast::Template { open, close, elements })
+}
+
+fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, &'static str> {
+    let token = cursor.get(0)?;
+    let output = match token.kind {
+        TokenKind::Identifier => ast::Word::Function(token.clone()),
+        TokenKind::IntLiteral => ast::Word::Literal(token.contents.parse::<i64>().unwrap().into()),
+        TokenKind::TemplateOpen => ast::Word::Literal(parse_template(cursor)?.into()),
+        TokenKind::LambdaBegin => {
+            cursor.incr(1);
+            ast::Word::Parantheses(parse_expression(cursor)?)
+        },
+
+        k @ _ => return Err("unhandled token"),
+    };
+
+    cursor.incr(1);
+    Ok(output)
+}
+
+
+fn parse_expression(cursor: &mut Cursor) -> Result<ast::Expression, &'static str> {
+    let mut output: Vec<ast::Word> = Vec::new();
+    while let Ok(word) = parse_word(cursor) {
+        output.push(word);
     }
+   
+    Ok(ast::Expression(output))
+}
+
+
+fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
+	let mut output: Vec<ast::Declaration> = Vec::new();
+	
+	while cursor.get(0)?.kind != EndOfInput {
+    	let token = cursor.get(0).unwrap();
+    	let (kind, pattern) = match cursor.get(0).unwrap().kind {
+        	Route => ("route", token.contents.to_owned()),
+        	At    => ("word",  {cursor.incr(1); cursor.expect(Identifier).unwrap().contents.to_owned()} ),
+        	_     =>  panic!(),
+    	};
+
+    	cursor.incr(1);
+    	_ = cursor.expect(WideArrow).unwrap();
+
+    	cursor.incr(1);
+    	let value = parse_expression(cursor)?;
+    	// let value = parse_expression(cursor).map(Box::new)?;
+    	output.push(ast::Declaration {kind: kind.to_owned(), key: pattern.to_owned(), value});
+	}
+
+	Ok(ast::AstRoot(output))
+}
+
+pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, &'static str> {
+	let mut tokens = lexer::tokenize(input);
+	let mut cursor = Cursor::new(&tokens);
+	parse_expression(&mut cursor)
+}
+
+pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, &'static str> {
+	let tokens = lexer::tokenize(input);
+	// println!("{:#?}", tokens);
+	let mut cursor = Cursor::new(&tokens);
+	let ast = parse_root(&mut cursor)?;
+
+	// println!("{:#?}", ast);
+
+	Ok(ast)
 }

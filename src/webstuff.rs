@@ -1,48 +1,58 @@
-#![allow(unused)]
+// pub struct GlobalContext {
+// 	routes: Router<ServFunction>,
+// 	interpreter: Compiler,
+// 	values: HashMap<String, ServFunction>,
+// }
 
-// mod functions;
-// mod serv_value;
-// mod compiler;
-mod lexer;
-mod engine;
-mod parser;
-mod template;
-mod ast;
-mod value;
+// impl GlobalContext {
+// 	pub fn new(interpreter: Compiler) -> Self {
+// 		Self {
+// 			interpreter,
+// 			routes: Router::new(),
+// 			values: HashMap::new(),
+// 		}
+// 	}
+// 	pub fn insert_word(&mut self, name: &str, value: ServFunction) {
+// 		self.values.insert(name.to_string(), value);
+// 	}
 
-mod dictionary;
+// 	pub fn insert_route(&mut self, name: &str, value: ServFunction) {
+// 		self.routes.insert(name.to_string(), value);
+// 	}
+// }
 
-use lexer::TokenKind;
-use lexer::*;
-use parser::*;
+// #[derive(Clone)]
+// pub struct Context {
+// 	global: Arc<GlobalContext>,
+// 	values: HashMap<String, ServFunction>,
+// }
 
-use std::sync::Arc;
-use std::collections::HashMap;
-use std::collections::VecDeque;
-use std::iter::Peekable;
 
-use tokio::net::TcpListener;
-use hyper::server::conn;
-use hyper_util::rt::TokioIo;
+// impl Context {
 
-use hyper::service::Service;
-use hyper::body::Incoming as IncomingBody;
-use hyper::{ Request, Response };
-use std::future::Future;
-use std::pin::Pin;
+// 	pub fn from(global: &Arc<GlobalContext>) -> Self {
+// 		Self {
+// 			global: global.clone(),
+// 			values: HashMap::new(),
+// 		}
+// 	}
 
-use std::net::SocketAddr;
-use matchit::Router;
+// 	pub fn get(&self, input: &str) -> Option<ServFunction> {
+// 		self.values.get(input).or(self.global.values.get(input)).map(|x| x.clone())
+// 	}
 
-use engine::ServFunction;
+// 	pub fn push(&mut self, input: String, value: ServFunction) {
+// 		self.values.insert(input, value);
+// 	}
 
-pub type Context<'a> = dictionary::Scope
-     <'a, String, ServFunction>;
-use value::ServValue;
+// 	pub fn push_str(&mut self, name: &str, value: &str) {
+// 		self.values.insert(name.to_string(), ServFunction::new(value.to_owned()));
+// 	}
 
-pub trait ServFn {
-	fn call(&self, input: ServValue, ctx: &mut Context) -> Result<ServValue, &'static str>;
-}
+// 	pub fn interpreter(&self) -> &Compiler {
+// 		&self.global.interpreter
+// 	}
+// }
 
 
 // #[derive(Clone)]
@@ -72,63 +82,9 @@ pub trait ServFn {
 // }
 
 
-fn eval_function(word: lexer::Token, input: ServValue, ctx: &Context) -> ServValue {
-    match word.contents.as_str() {
-        "hello" => ServValue::Text("Hello World!".into()),
-        "incr" => (input.expect_int().unwrap() + 1).into(),
-        _ => todo!(),
-
-    }
-}
-
-fn eval(expression: &mut VecDeque<ast::Word>, ctx: &Context) -> ServValue {
-    while let Some(n) = expression.pop_front() {
-		let v = match n {
-    		ast::Word::Function(t) => {
-        		eval_function(t, ServValue::Int(0), ctx)
-    		},
-
-    // 		ast::Word::Template(t) => {
-				// t.render();
-    // 		},
-    		_ => todo!(),
-		};
-    }
-
-    todo!();
-}
-
-fn compile_word(input: ast::Word) -> ServFunction {
-    todo!();
-    // match input {
-    //     ast::Word::Function(t) => 
-
-    // }
-}
-
-fn compile(input: Vec<ast::Word>) -> ServFunction {
-    todo!();
-}
 
 
-#[tokio::main]
-async fn main() {
-	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
-	let input = std::fs::read_to_string(&input_path).unwrap();
 
-	let ast = parser::parse_root_from_text(&input).unwrap();
-
-	println!("{:#?}", ast);
-
-	let mut ctx: Context = Context::empty();
-
-	for declaration in ast.0 {
-    	if declaration.kind == "word" {
-        	ctx.insert(declaration.key.to_owned(), compile(declaration.value.0));
-    	}
-	}
-
-	return;
 	// let input = std::fs::read_to_string("src/test.serv").unwrap();
 	// let AstNode::Root(ast) = parser::parse_root_from_text(&input).unwrap() else { panic!(); };
 
@@ -163,6 +119,4 @@ async fn main() {
 	// // 			.await
 	// // 			.unwrap();
 	// // 	});
-
-	// // }
-}
+// // }
