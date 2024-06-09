@@ -11,14 +11,11 @@ pub trait ServFn: Send + Sync {
 
 #[derive(Clone)]
 pub struct ServFunction(Arc<dyn ServFn>);
-
-impl ServFunction {
-	pub fn call(&self, input: ServValue, ctx: &Context) -> Result<ServValue, &'static str> {
+impl ServFn for ServFunction {
+	fn call(&self, input: ServValue, ctx: &Context) -> Result<ServValue, &'static str> {
     	self.0.call(input, ctx)
 	}
 }
-
-
 
 pub struct Word(String);
 
@@ -31,4 +28,6 @@ impl ServFn for Word {
 	}
 }
 
-// pub struct Context<'a>(Scope<'a, String, Vec<ServFunction>>);
+pub fn servfn_hello(input: ServValue, scope: &Context) -> Result<ServValue, &'static str> {
+    todo!();
+}

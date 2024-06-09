@@ -1,1 +1,2 @@
-@out => hello
+@name => hello
+@out  => test { hello $name }

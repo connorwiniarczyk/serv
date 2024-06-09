@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
 pub enum ServValue {
+    None,
     Int(i64),
     Template(ast::Template),
     List(VecDeque<ServValue>),
@@ -11,6 +12,12 @@ pub enum ServValue {
 }
 
 impl ServValue {
+    pub fn as_str(&self) -> &str {
+		match self {
+    		Self::Text(ref s) => s,
+    		_ => todo!(),
+		}
+    }
     pub fn expect_int(self) -> Result<i64, &'static str> {
         if let Self::Int(i) = self {
             Ok(i)

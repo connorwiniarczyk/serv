@@ -1,11 +1,10 @@
 use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
-use crate::dictionary::Scope;
+// use crate::dictionary::StackDictionary;
+// use crate::engine::{ServFn};
 
-use crate::eval;
-
-use crate::{ Context };
+use crate::{ Scope, ServResult };
 
 #[derive(Debug, Clone)]
 pub enum TemplateElement {
@@ -23,14 +22,14 @@ pub struct Template {
 }
 
 impl Template {
-    pub fn render(&self, ctx: &Context) -> Result<ServValue, &'static str>{
+    pub fn render(&self, ctx: &Scope) -> ServResult {
         let mut output = String::new();
         for elem in self.elements.iter() {
             match elem {
                 TemplateElement::Text(t) => output.push_str(&t.contents),
                 TemplateElement::Variable(v) => {
-                    ctx.get(&v.contents).ok_or("does not exist")?.call(ServValue::Int(0), ctx)?;
-                    todo!();
+                    let value = ctx.get(&v.contents.clone().into()).ok_or("does not exist")?.call(ServValue::None, ctx)?;
+                    output.push_str(value.as_str())
                 },
                 TemplateElement::Expression(t) => output.push_str("exp"),
                 TemplateElement::Template(t) => {

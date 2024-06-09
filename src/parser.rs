@@ -72,7 +72,8 @@ fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, &'static str> {
     let output = match token.kind {
         TokenKind::Identifier => ast::Word::Function(token.clone()),
         TokenKind::IntLiteral => ast::Word::Literal(token.contents.parse::<i64>().unwrap().into()),
-        TokenKind::TemplateOpen => ast::Word::Literal(parse_template(cursor)?.into()),
+        // TokenKind::TemplateOpen => ast::Word::Literal(parse_template(cursor)?.into()),
+        TokenKind::TemplateOpen => ast::Word::Template(parse_template(cursor)?.into()),
         TokenKind::LambdaBegin => {
             cursor.incr(1);
             ast::Word::Parantheses(parse_expression(cursor)?)

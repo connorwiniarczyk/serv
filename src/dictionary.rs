@@ -3,12 +3,12 @@ use std::collections::HashMap;
 pub trait Key: Eq + PartialEq + std::hash::Hash {}
 impl<T: Eq + PartialEq + std::hash::Hash> Key for T {}
 
-pub struct Scope<'parent, K, V> {
+pub struct StackDictionary<'parent, K, V> {
 	words: HashMap<K, V>,
-	parent: Option<&'parent Scope<'parent, K, V>>,
+	parent: Option<&'parent StackDictionary<'parent, K, V>>,
 }
 
-impl<'parent, K: Key, V: Clone> Scope<'parent, K, V> {
+impl<'parent, K: Key, V: Clone> StackDictionary<'parent, K, V> {
     pub fn empty() -> Self {
         Self { words: HashMap::new(), parent: None }
     }
@@ -36,9 +36,9 @@ mod tests {
 
 	#[test]
 	fn test() {
-    	let mut one: Scope<String, Vec<String>> = Scope::empty();
+    	let mut one: StackDictionary<String, Vec<String>> = StackDictionary::empty();
     	one.insert("hello".to_owned(), vec![])
-		// let mut test = Scope { words: HashMap::new(), parent: None };
+		// let mut test = StackDictionary { words: HashMap::new(), parent: None };
 		// test.insert("1", "2");
 
 		// abcd(&test);

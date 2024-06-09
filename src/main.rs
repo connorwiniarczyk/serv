@@ -1,10 +1,6 @@
 #![allow(unused)]
 
-// mod functions;
-// mod serv_value;
-// mod compiler;
 mod lexer;
-mod engine;
 mod parser;
 mod template;
 mod ast;
@@ -14,100 +10,97 @@ mod dictionary;
 
 use lexer::TokenKind;
 use lexer::*;
-use parser::*;
 
-use std::sync::Arc;
-use std::collections::HashMap;
+use template::Template;
+
 use std::collections::VecDeque;
 use std::iter::Peekable;
 
 use tokio::net::TcpListener;
-use hyper::server::conn;
-use hyper_util::rt::TokioIo;
-
-use hyper::service::Service;
-use hyper::body::Incoming as IncomingBody;
-use hyper::{ Request, Response };
-use std::future::Future;
-use std::pin::Pin;
+// use hyper::server::conn;
+// use hyper_util::rt::TokioIo;
+// use hyper::service::Service;
+// use hyper::body::Incoming as IncomingBody;
+// use hyper::{ Request, Response };
+// use std::scope::Future;
+// use std::pin::Pin;
 
 use std::net::SocketAddr;
 use matchit::Router;
 
-use engine::ServFunction;
-
-pub type Context<'a> = dictionary::Scope
-     <'a, String, ServFunction>;
+type ServResult = Result<ServValue, &'static str>;
+pub type Scope<'a> = dictionary::StackDictionary<'a, FnLabel, ServFunction>;
 use value::ServValue;
 
-pub trait ServFn {
-	fn call(&self, input: ServValue, ctx: &mut Context) -> Result<ServValue, &'static str>;
-}
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct FnLabel(String);
 
-
-// #[derive(Clone)]
-// struct Serv(Arc<GlobalContext>);
-
-// impl Service<Request<IncomingBody>> for Serv {
-// 	type Response = Response<ServBody>;
-// 	type Error = hyper::Error;
-// 	type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-// 	fn call(&self, req: Request<IncomingBody>) -> Self::Future {
-// 		let Ok(matched) = self.0.routes.at(req.uri().path()) else {
-// 			let not_found_message = ServValue::Text("Error 404: Page Not Found".to_owned());
-// 			let res = Ok(Response::builder().status(404).body(not_found_message.into()).unwrap());
-// 			return Box::pin(async { res })
-// 		};
-// 		let mut inner_context = Context::from(&self.0);
-
-// 		for (k, v) in matched.params.iter() {
-// 			inner_context.push_str(k, v);
-// 		}
-
-// 		let result = matched.value.call(ServValue::None, &mut inner_context).unwrap();
-// 		let res = Ok(Response::builder().body(result.into()).unwrap());
-// 		Box::pin(async { res })
-// 	}
-// }
-
-
-fn eval_function(word: lexer::Token, input: ServValue, ctx: &Context) -> ServValue {
-    match word.contents.as_str() {
-        "hello" => ServValue::Text("Hello World!".into()),
-        "incr" => (input.expect_int().unwrap() + 1).into(),
-        _ => todo!(),
-
+impl From<String> for FnLabel {
+    fn from(input: String) -> Self {
+        Self(input)
     }
 }
 
-fn eval(expression: &mut VecDeque<ast::Word>, ctx: &Context) -> ServValue {
-    while let Some(n) = expression.pop_front() {
-		let v = match n {
-    		ast::Word::Function(t) => {
-        		eval_function(t, ServValue::Int(0), ctx)
-    		},
+fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Text("hello world".to_owned()))
+}
 
-    // 		ast::Word::Template(t) => {
-				// t.render();
-    // 		},
-    		_ => todo!(),
-		};
+fn uppercase(input: ServValue, scope: &Scope) -> ServResult {
+    if let ServValue::Text(t) = input {
+        Ok(ServValue::Text(t.to_uppercase()))
+    } else {
+        Err("wrong value")
+    }
+}
+
+struct Words(VecDeque<FnLabel>);
+
+impl Words {
+    pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
+        let Some(next) = self.0.pop_front() else { return Ok(input) };
+        let rest = self.eval(input, scope)?;
+        scope.get(&next).unwrap().call(rest, scope)
+    }
+}
+
+
+#[derive(Clone)]
+pub enum ServFunction {
+    Core(fn(ServValue, &Scope) -> ServResult),
+    Template(Template),
+    Composition(Vec<FnLabel>),
+}
+
+impl ServFunction {
+    pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
+        match self {
+            Self::Core(f)        => f(input, scope),
+            Self::Template(t)    => t.render(scope),
+            Self::Composition(v) => {
+                let mut words: VecDeque<FnLabel> = v.clone().into();
+                Words(words).eval(input, scope)
+            },
+        }
+    }
+}
+
+
+fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
+    let mut output: Vec<FnLabel> = Vec::new();
+    for word in input.into_iter() {
+        let next = match word {
+            ast::Word::Function(t) => FnLabel(t.contents.to_owned()),
+            ast::Word::Template(t) => {
+                scope.insert(FnLabel("template.01".to_owned()), ServFunction::Template(t));
+                FnLabel("template.01".to_owned())
+            },
+            _ => todo!(),
+        };
+
+        output.push(next);
     }
 
-    todo!();
-}
-
-fn compile_word(input: ast::Word) -> ServFunction {
-    todo!();
-    // match input {
-    //     ast::Word::Function(t) => 
-
-    // }
-}
-
-fn compile(input: Vec<ast::Word>) -> ServFunction {
-    todo!();
+    ServFunction::Composition(output)
 }
 
 
@@ -118,51 +111,24 @@ async fn main() {
 
 	let ast = parser::parse_root_from_text(&input).unwrap();
 
-	println!("{:#?}", ast);
+	// println!("{:#?}", ast);
 
-	let mut ctx: Context = Context::empty();
+	let mut scope: Scope = Scope::empty();
+
+	scope.insert(FnLabel("hello".to_owned()), ServFunction::Core(hello_world));
+	scope.insert(FnLabel("uppercase".to_owned()), ServFunction::Core(uppercase));
 
 	for declaration in ast.0 {
     	if declaration.kind == "word" {
-        	ctx.insert(declaration.key.to_owned(), compile(declaration.value.0));
+        	let func = compile(declaration.value.0, &mut scope);
+        	scope.insert(declaration.key.to_owned().into(), func);
     	}
 	}
 
+	if let Some(out) = scope.get(&FnLabel("out".to_owned())) {
+    	let res = out.call(ServValue::None, &scope);
+    	println!("{:?}", res);
+	}
+
 	return;
-	// let input = std::fs::read_to_string("src/test.serv").unwrap();
-	// let AstNode::Root(ast) = parser::parse_root_from_text(&input).unwrap() else { panic!(); };
-
-	// let interpreter = Compiler::new();
-	// let mut ctx = GlobalContext::new(interpreter);
-
-	// for element in ast {
-	// 	match element {
-	// 		AstNode::Declaration { ref name, expression } => ctx.insert_word(name, ctx.interpreter.compile(*expression).unwrap()),
-	// 		AstNode::Route { ref pattern, expression } => ctx.insert_route(pattern, ctx.interpreter.compile(*expression).unwrap()),
-	// 		_ => panic!("unexpected AST node"),
-	// 	}
-	// }
-
-	// let global_context = Arc::new(ctx);
-	// let addr = SocketAddr::from(([0,0,0,0], 4000));
-	// let listener = TcpListener::bind(addr).await.unwrap();
-
-	// if let Some(out) = global_context.values.get("out") {
-	// 	let output = out.call(ServValue::None, &mut Context::from(&global_context)).unwrap();
-	// 	println!("{}", output);
-	// }
-
-	// // loop {
-	// // 	let (stream, _) = listener.accept().await.unwrap();
-	// // 	let io = TokioIo::new(stream);
-	// // 	let ctx_new = global_context.clone();
-
-	// // 	tokio::task::spawn(async {
-	// // 		conn::http1::Builder::new()
-	// // 			.serve_connection(io, Serv(ctx_new))
-	// // 			.await
-	// // 			.unwrap();
-	// // 	});
-
-	// // }
 }
