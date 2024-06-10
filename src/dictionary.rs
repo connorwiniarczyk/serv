@@ -4,17 +4,18 @@ pub trait Key: Eq + PartialEq + std::hash::Hash {}
 impl<T: Eq + PartialEq + std::hash::Hash> Key for T {}
 
 pub struct StackDictionary<'parent, K, V> {
+    unique_id: u32,
 	words: HashMap<K, V>,
 	parent: Option<&'parent StackDictionary<'parent, K, V>>,
 }
 
 impl<'parent, K: Key, V: Clone> StackDictionary<'parent, K, V> {
     pub fn empty() -> Self {
-        Self { words: HashMap::new(), parent: None }
+        Self { unique_id: 0, words: HashMap::new(), parent: None }
     }
 
     pub fn make_child(&'parent self) -> Self {
-        Self { words: HashMap::new(), parent: Some(self) }
+        Self { unique_id: self.unique_id, words: HashMap::new(), parent: Some(self) }
     }
 
     pub fn insert(&mut self, key: K, value: V) {
@@ -25,6 +26,12 @@ impl<'parent, K: Key, V: Clone> StackDictionary<'parent, K, V> {
         self.words.get(key).map(|s| s.clone()).or_else(|| {
             self.parent.and_then(|p| p.get(key))
         })
+    }
+
+    pub fn get_unique_id(&mut self) -> u32 {
+		let output = self.unique_id;
+		self.unique_id += 1;
+		return output
     }
 }
 

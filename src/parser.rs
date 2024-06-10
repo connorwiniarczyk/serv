@@ -51,6 +51,7 @@ fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
         	TokenKind::Dollar => elements.push({
             	cursor.incr(1);
             	ast::TemplateElement::Expression(parse_word(cursor)?)
+            	// ast::TemplateElement::Variable(token.clone())
         	}),
 
         	TokenKind::TemplateOpen => {

@@ -32,7 +32,7 @@ type ServResult = Result<ServValue, &'static str>;
 pub type Scope<'a> = dictionary::StackDictionary<'a, FnLabel, ServFunction>;
 use value::ServValue;
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct FnLabel(String);
 
 impl From<String> for FnLabel {
@@ -59,10 +59,10 @@ impl Words {
     pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
         let Some(next) = self.0.pop_front() else { return Ok(input) };
         let rest = self.eval(input, scope)?;
+        // println!("{:?}", next);
         scope.get(&next).unwrap().call(rest, scope)
     }
 }
-
 
 #[derive(Clone)]
 pub enum ServFunction {
@@ -84,15 +84,16 @@ impl ServFunction {
     }
 }
 
-
 fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
     let mut output: Vec<FnLabel> = Vec::new();
     for word in input.into_iter() {
         let next = match word {
             ast::Word::Function(t) => FnLabel(t.contents.to_owned()),
             ast::Word::Template(t) => {
-                scope.insert(FnLabel("template.01".to_owned()), ServFunction::Template(t));
-                FnLabel("template.01".to_owned())
+                let unique_id = scope.get_unique_id();
+                let label = format!("template.{}", unique_id);
+                scope.insert(FnLabel(label.clone()), ServFunction::Template(t));
+                FnLabel(label)
             },
             _ => todo!(),
         };
@@ -103,15 +104,13 @@ fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
     ServFunction::Composition(output)
 }
 
-
 #[tokio::main]
 async fn main() {
 	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
 	let input = std::fs::read_to_string(&input_path).unwrap();
 
 	let ast = parser::parse_root_from_text(&input).unwrap();
-
-	// println!("{:#?}", ast);
+	println!("{:#?}", ast);
 
 	let mut scope: Scope = Scope::empty();
 
@@ -129,6 +128,4 @@ async fn main() {
     	let res = out.call(ServValue::None, &scope);
     	println!("{:?}", res);
 	}
-
-	return;
 }
