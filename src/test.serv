@@ -1,1 +1,2 @@
-@out  => using {}
+@fib => *( choose in [{2} {3} {fib decr decr}] )
+@out =>  fib 2

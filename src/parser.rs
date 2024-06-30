@@ -55,16 +55,15 @@ fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
         	}),
 
         	TokenKind::TemplateOpen => {
+            	elements.push(ast::TemplateElement::Template(parse_template(cursor)?));
             	cursor.incr(1);
-            	elements.push(ast::TemplateElement::Template(parse_template(cursor)?))
         	},
-        	TokenKind::TemplateClose => break,
-        	// TokenKind::LambdaBegin => elements.push(ast::TemplateElement::)
+        	TokenKind::TemplateClose => { unreachable!(); },
         	_ => return Err("token not supported in template"),
     	}
 	}
 
-	let close = cursor.expect(TokenKind::TemplateClose)?.clone();
+	let close = cursor.expect(TokenKind::TemplateClose).unwrap().clone();
 	Ok(ast::Template { open, close, elements })
 }
 
@@ -106,7 +105,7 @@ fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
     	let (kind, pattern) = match cursor.get(0).unwrap().kind {
         	Route => ("route", token.contents.to_owned()),
         	At    => ("word",  {cursor.incr(1); cursor.expect(Identifier).unwrap().contents.to_owned()} ),
-        	_     =>  panic!(),
+        	_     =>  panic!("unexpected token {:?}", token),
     	};
 
     	cursor.incr(1);
@@ -133,7 +132,7 @@ pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, &'static str> {
 	let mut cursor = Cursor::new(&tokens);
 	let ast = parse_root(&mut cursor)?;
 
-	// println!("{:#?}", ast);
+// println!("{:#?}", ast);
 
 	Ok(ast)
 }

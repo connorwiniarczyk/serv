@@ -184,8 +184,8 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             '!'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
             '\n' => {cursor.incr(1); _ = cursor.emit_token(TokenKind::NewLine)},
             
-            '[' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::ListBegin))},
-            ']' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::ListEnd))},
+            '[' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
+            ']' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
             
             '(' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::LambdaBegin))},
             ')' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::LambdaEnd))},

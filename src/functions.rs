@@ -1,0 +1,107 @@
+use crate::ServValue;
+use crate::ServResult;
+use crate::Scope;
+use crate::Words;
+use crate::parser;
+use crate::compile;
+
+use std::collections::VecDeque;
+
+pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Text("hello world".to_owned()))
+}
+
+pub fn uppercase(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Text(input.to_string().to_uppercase()))
+}
+
+pub fn incr(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Int(input.expect_int()? + 1))
+}
+
+pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Int(input.expect_int()? - 1))
+}
+
+pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
+    let test = match input {
+        ServValue::List(l) => l.into_iter().map(|x| x.expect_int()),
+        _ => todo!(),
+    };
+    // println!("{:?}", test);
+    todo!();
+    // Ok(ServValue::Int(input.expect_int()? - 1))
+}
+
+pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    _ = words.0.pop_front();
+    words.eval(input, scope)
+}
+
+pub fn list_open(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let mut output: VecDeque<ServValue> = VecDeque::new();
+    loop {
+        let next = words.next().ok_or("unclosed list expression")?;
+        if next.0 == "]" { break };
+
+        let res = scope.get(&next).unwrap().call(input.clone(), scope)?;
+        output.push_back(res);
+    }
+
+    Ok(ServValue::List(output))
+}
+
+pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let next = words.next().ok_or("not enough arguments")?;
+    let arg = scope.get(&next).ok_or("not found")?;
+    let rest = words.eval(input, scope)?;
+
+	let mapped = match rest {
+    	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call(a, scope).unwrap()).collect()),
+    	_ => todo!(),
+	};
+
+	Ok(mapped)
+}
+
+pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let next = words.next().ok_or("not enought arguments")?;
+    let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
+
+	let mut new_scope = scope.make_child();
+	let ast = parser::parse_expression_from_text(arg.to_string().as_str()).unwrap();
+	let func = compile(ast.0, &mut new_scope);
+
+    let rest = words.eval(input, scope)?;
+
+    func.call(rest, &new_scope)
+}
+
+pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let next = words.next().ok_or("not enought arguments")?;
+    let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
+     // println!("{:?}", arg);
+    let rest = words.eval(input, scope)?;
+
+	let ServValue::List(list) = rest else { return Err("not a valid list") };
+
+	Ok(list[arg.expect_int()?.try_into().unwrap()].clone())
+}
+
+pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let arg_name = words.0.pop_front().unwrap();
+    let arg_fn = scope.get(&arg_name).unwrap();
+    let arg = arg_fn.call(ServValue::None, scope)?;
+
+	let ast = parser::parse_root_from_text(arg.to_string().as_str()).unwrap();
+	let mut new_scope = scope.make_child();
+
+	for declaration in ast.0 {
+    	if declaration.kind == "word" {
+        	let func = compile(declaration.value.0, &mut new_scope);
+        	new_scope.insert(declaration.key.to_owned().into(), func);
+    	}
+	}
+
+    words.eval(input, &new_scope)
+}

@@ -1,8 +1,6 @@
 use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
-// use crate::dictionary::StackDictionary;
-// use crate::engine::{ServFn};
 
 use crate::{ Scope, ServResult };
 
@@ -22,6 +20,22 @@ pub struct Template {
 }
 
 impl Template {
+
+    pub fn literal(&self) -> ServValue {
+		let mut output = String::new();
+		output.push_str(self.open.contents.as_str());
+		for e in self.elements.iter() {
+    		match e {
+        		TemplateElement::Text(t)     => output.push_str(t.contents.to_string().as_str()),
+                TemplateElement::Template(t) => output.push_str(t.literal().to_string().as_str()),
+        		_ => todo!(),
+    		}
+		}
+		output.push_str(self.close.contents.as_str());
+
+		ServValue::Text(output)
+    }
+
     pub fn render(&self, ctx: &Scope) -> ServResult {
         let mut output = String::new();
         for elem in self.elements.iter() {
@@ -29,23 +43,27 @@ impl Template {
                 TemplateElement::Text(t) => output.push_str(&t.contents),
                 TemplateElement::Variable(v) => {
                     let value = ctx.get(&v.contents.clone().into()).ok_or("does not exist")?.call(ServValue::None, ctx)?;
-                    output.push_str(value.as_str())
+                    output.push_str(value.to_string().as_str())
                 },
-                // TemplateElement::Expression(t) => output.push_str("exp"),
                 TemplateElement::Expression(t) => {
-					println!("{:?}", t);
                     match t {
                         ast::Word::Function(token) => {
-                            println!("{:?}", token);
                             let value = ctx.get(&token.contents.clone().into()).ok_or("does not exist")?.call(ServValue::None, ctx)?;
-                            output.push_str(value.as_str());
+                            output.push_str(value.to_string().as_str());
+                        },
+                        ast::Word::Parantheses(words) => {
+                            // println!("expr {:?}", words);
+                            let mut child = ctx.make_child();
+                        	let func = crate::compile(words.0.clone(), &mut child);
+                        	let value = func.call(ctx.get_str("in")?.call(ServValue::None, &child)?, &child)?;
+                            output.push_str(value.to_string().as_str());
                         },
                         _ => todo!(),
+
                     }
                 },
                 TemplateElement::Template(t) => {
-                    let ServValue::Text(inner) = t.render(ctx)? else { unreachable!() };
-                    output.push_str(inner.as_str())
+                    output.push_str(t.literal().to_string().as_str())
                 },
             }
         }
