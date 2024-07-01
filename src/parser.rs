@@ -105,6 +105,7 @@ fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
     	let (kind, pattern) = match cursor.get(0).unwrap().kind {
         	Route => ("route", token.contents.to_owned()),
         	At    => ("word",  {cursor.incr(1); cursor.expect(Identifier).unwrap().contents.to_owned()} ),
+        	Comment => continue,
         	_     =>  panic!("unexpected token {:?}", token),
     	};
 

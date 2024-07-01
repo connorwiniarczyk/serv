@@ -675,7 +675,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "serv-new"
+name = "serv"
 version = "0.1.0"
 dependencies = [
  "bytes",

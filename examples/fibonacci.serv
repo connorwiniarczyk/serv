@@ -1,0 +1,7 @@
+@fibonacci => let {
+    @calc => %{$(fibonacci decr) + $(fibonacci decr decr)} 
+} *(choose (in) [{0} {1} {calc}])
+
+@sequence => *(choose (in) [{} {{$(sequence decr), $(fibonacci)}}])
+
+@out => sequence 10

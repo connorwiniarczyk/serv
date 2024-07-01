@@ -1,8 +1,9 @@
 use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
-
 use crate::{ Scope, ServResult };
+
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum TemplateElement {
@@ -12,6 +13,22 @@ pub enum TemplateElement {
 	Expression(ast::Word),
 }
 
+impl Display for TemplateElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+    		TemplateElement::Text(t)     => f.write_str(t.contents.as_str()),
+            TemplateElement::Template(t) => t.fmt(f),
+            TemplateElement::Variable(t) => f.write_str(t.contents.as_str()),
+            TemplateElement::Expression(e) => {
+                f.write_str("$(")?;
+    			e.fmt(f)?;
+                f.write_str(")")?;
+                Ok(())
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Template {
     pub open: Token,
@@ -19,21 +36,20 @@ pub struct Template {
     pub elements: Vec<TemplateElement>,
 }
 
+impl Display for Template {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str(self.open.contents.as_str())?;
+        for element in self.elements.iter() {
+            element.fmt(f)?;
+        }
+        f.write_str(self.close.contents.as_str())?;
+        Ok(())
+    }
+}
+
 impl Template {
-
     pub fn literal(&self) -> ServValue {
-		let mut output = String::new();
-		output.push_str(self.open.contents.as_str());
-		for e in self.elements.iter() {
-    		match e {
-        		TemplateElement::Text(t)     => output.push_str(t.contents.to_string().as_str()),
-                TemplateElement::Template(t) => output.push_str(t.literal().to_string().as_str()),
-        		_ => todo!(),
-    		}
-		}
-		output.push_str(self.close.contents.as_str());
-
-		ServValue::Text(output)
+        ServValue::Text(self.to_string())
     }
 
     pub fn render(&self, ctx: &Scope) -> ServResult {

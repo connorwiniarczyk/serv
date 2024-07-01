@@ -5,6 +5,8 @@ use crate::Words;
 use crate::parser;
 use crate::compile;
 
+use evalexpr::eval;
+
 use std::collections::VecDeque;
 
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
@@ -23,14 +25,24 @@ pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? - 1))
 }
 
+pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
+    let expression = input.to_string();
+	let res = eval(expression.as_str()).unwrap();
+	Ok(match res {
+		evalexpr::Value::String(s) => ServValue::Text(s),
+		evalexpr::Value::Int(x) => ServValue::Int(x),
+		// evalexpr::Value::Boolean(x) => ServValue::Boolean(x),
+		// evalexpr::Value::Float(x) => ServValue::Float(x),
+		evalexpr::Value::Empty => ServValue::None,
+		_ => todo!(),
+	})
+}
 pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
     let test = match input {
         ServValue::List(l) => l.into_iter().map(|x| x.expect_int()),
         _ => todo!(),
     };
-    // println!("{:?}", test);
     todo!();
-    // Ok(ServValue::Int(input.expect_int()? - 1))
 }
 
 pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
@@ -80,12 +92,13 @@ pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enought arguments")?;
     let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
-     // println!("{:?}", arg);
     let rest = words.eval(input, scope)?;
 
 	let ServValue::List(list) = rest else { return Err("not a valid list") };
 
-	Ok(list[arg.expect_int()?.try_into().unwrap()].clone())
+	let index: usize = arg.expect_int()?.try_into().unwrap();
+
+	Ok(list[index.clamp(0, list.len() - 1)].clone())
 }
 
 pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
@@ -105,3 +118,5 @@ pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 
     words.eval(input, &new_scope)
 }
+
+

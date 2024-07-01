@@ -51,7 +51,7 @@ impl Words {
 
     pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
         let Some(next) = self.next() else { return Ok(input) };
-        let next_fn = scope.get(&next).unwrap();
+        let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
 
         if let ServFunction::Meta(m) = next_fn {
 			return (m)(self, input, scope);
@@ -138,6 +138,7 @@ async fn main() {
 	scope.insert(FnLabel("uppercase".to_owned()), ServFunction::Core(uppercase));
 	scope.insert(FnLabel("incr".to_owned()), ServFunction::Core(incr));
 	scope.insert(FnLabel("decr".to_owned()), ServFunction::Core(decr));
+	scope.insert(FnLabel("%".to_owned()), ServFunction::Core(math_expr));
 
 	scope.insert(FnLabel("!".to_owned()),         ServFunction::Meta(drop));
 	scope.insert(FnLabel("map".to_owned()),         ServFunction::Meta(map));
