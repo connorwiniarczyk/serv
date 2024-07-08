@@ -1,28 +1,57 @@
 use std::collections::HashMap;
+use matchit::Router;
 
 pub trait Key: Eq + PartialEq + std::hash::Hash {}
 impl<T: Eq + PartialEq + std::hash::Hash> Key for T {}
 
-pub struct StackDictionary<'parent, K, V> {
-    unique_id: u32,
-	words: HashMap<K, V>,
-	parent: Option<&'parent StackDictionary<'parent, K, V>>,
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub enum FnLabel {
+    Name(String),
+    Anonymous(u32),
 }
 
-impl<'parent, K: Key, V: Clone> StackDictionary<'parent, K, V> {
+impl FnLabel {
+    pub fn name(input: &str) -> Self       { Self::Name(input.to_string()) }
+    pub fn anonymous(input: u32) -> Self { Self::Anonymous(input) }
+}
+
+impl From<String> for FnLabel {
+    fn from(input: String) -> Self {
+        Self::Name(input)
+    }
+}
+
+pub struct StackDictionary<'parent, V> {
+    unique_id: u32,
+	words: HashMap<FnLabel, V>,
+	parent: Option<&'parent StackDictionary<'parent, V>>,
+	pub router: Option<Router<V>>,
+}
+
+impl<'parent, V: Clone> StackDictionary<'parent, V> {
     pub fn empty() -> Self {
-        Self { unique_id: 0, words: HashMap::new(), parent: None }
+        Self { unique_id: 0, words: HashMap::new(), parent: None, router: Some(Router::new()) }
     }
 
     pub fn make_child(&'parent self) -> Self {
-        Self { unique_id: self.unique_id, words: HashMap::new(), parent: Some(self) }
+        Self { unique_id: self.unique_id, words: HashMap::new(), parent: Some(self), router: None }
     }
 
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert(&mut self, key: FnLabel, value: V) {
         self.words.insert(key, value);
     }
 
-    pub fn get(&self, key: &K) -> Option<V> {
+    pub fn insert_name(&mut self, key: &str, value: V) {
+        self.words.insert(FnLabel::name(key), value);
+    }
+
+    pub fn insert_anonymous(&mut self, value: V) -> FnLabel {
+        let id = self.get_unique_id();
+        self.words.insert(FnLabel::Anonymous(id), value);
+        FnLabel::Anonymous(id)
+    }
+
+    pub fn get(&self, key: &FnLabel) -> Option<V> {
         self.words.get(key).map(|s| s.clone()).or_else(|| {
             self.parent.and_then(|p| p.get(key))
         })
@@ -34,8 +63,6 @@ impl<'parent, K: Key, V: Clone> StackDictionary<'parent, K, V> {
 		return output
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

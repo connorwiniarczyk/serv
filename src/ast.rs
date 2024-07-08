@@ -10,6 +10,7 @@ pub enum Word {
    	Template(Template),
    	Literal(ServValue),
    	Parantheses(Expression),
+   	List(Vec<Expression>),
 }
 
 impl Display for Word {
@@ -18,6 +19,7 @@ impl Display for Word {
             Self::Function(t) => f.write_str(t.contents.as_str())?,
             Self::Template(t) => t.fmt(f)?,
             Self::Literal(l)  => l.fmt(f)?,
+            Self::List(l) => todo!(),
             Self::Parantheses(e) => {
 				f.write_str("(")?;
 				for word in e.0.iter() {

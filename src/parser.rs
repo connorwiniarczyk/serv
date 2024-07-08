@@ -67,13 +67,30 @@ fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
 	Ok(ast::Template { open, close, elements })
 }
 
+fn parse_list(cursor: &mut Cursor) -> Result<Vec<ast::Expression>, &'static str> {
+    let mut output = Vec::new();
+    while cursor.get(0)?.kind != TokenKind::ListEnd {
+        // println!("{:?}", cursor.get(0)?);
+        output.push(parse_expression(cursor)?);
+        if cursor.get(0)?.kind == TokenKind::Comma {
+            cursor.incr(1);
+        }
+    }
+    // println!("{:?}", cursor.get(0)?);
+    // cursor.incr(1);
+    Ok(output)
+}
+
 fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, &'static str> {
     let token = cursor.get(0)?;
     let output = match token.kind {
         TokenKind::Identifier => ast::Word::Function(token.clone()),
         TokenKind::IntLiteral => ast::Word::Literal(token.contents.parse::<i64>().unwrap().into()),
-        // TokenKind::TemplateOpen => ast::Word::Literal(parse_template(cursor)?.into()),
         TokenKind::TemplateOpen => ast::Word::Template(parse_template(cursor)?.into()),
+        TokenKind::ListBegin => {
+            cursor.incr(1);
+            ast::Word::List(parse_list(cursor)?)
+        },
         TokenKind::LambdaBegin => {
             cursor.incr(1);
             ast::Word::Parantheses(parse_expression(cursor)?)
@@ -96,7 +113,6 @@ fn parse_expression(cursor: &mut Cursor) -> Result<ast::Expression, &'static str
     Ok(ast::Expression(output))
 }
 
-
 fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
 	let mut output: Vec<ast::Declaration> = Vec::new();
 	
@@ -114,7 +130,6 @@ fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
 
     	cursor.incr(1);
     	let value = parse_expression(cursor)?;
-    	// let value = parse_expression(cursor).map(Box::new)?;
     	output.push(ast::Declaration {kind: kind.to_owned(), key: pattern.to_owned(), value});
 	}
 

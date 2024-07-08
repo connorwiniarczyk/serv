@@ -50,19 +50,6 @@ pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     words.eval(input, scope)
 }
 
-pub fn list_open(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let mut output: VecDeque<ServValue> = VecDeque::new();
-    loop {
-        let next = words.next().ok_or("unclosed list expression")?;
-        if next.0 == "]" { break };
-
-        let res = scope.get(&next).unwrap().call(input.clone(), scope)?;
-        output.push_back(res);
-    }
-
-    Ok(ServValue::List(output))
-}
-
 pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enough arguments")?;
     let arg = scope.get(&next).ok_or("not found")?;

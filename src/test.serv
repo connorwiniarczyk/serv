@@ -1,19 +1,2 @@
+/{name} => {hello}
 
-@fibonacci_one_line =>
-let { @f => fibonacci }
-*(choose in [
-	{0}
-	{1}
-	{% {$(f decr) + $(f decr decr)} }
-]) 
-
-@fibonacci_with_let => let {
-	@fib     => fibonacci
-	@calc    => %{ $(fib decr) + $(fib decr decr) }
-	@options => [{0} {1} {calc}]
-} *(choose (in) options)
-
-@fibonacci => fibonacci_one_line
-@sequence  => *(choose (in) [{} {{$(sequence decr) $(fibonacci)}}])
-
-@out => let { @double => %{ $in * 2 }} map double *{[ $(sequence 5) ]} 

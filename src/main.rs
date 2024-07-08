@@ -13,6 +13,7 @@ use lexer::*;
 use value::ServValue;
 use template::Template;
 use functions::*;
+use dictionary::FnLabel;
 
 use std::collections::VecDeque;
 use std::iter::Peekable;
@@ -21,20 +22,11 @@ use tokio::net::TcpListener;
 use matchit::Router;
 
 type ServResult = Result<ServValue, &'static str>;
-pub type Scope<'a> = dictionary::StackDictionary<'a, FnLabel, ServFunction>;
+pub type Scope<'a> = dictionary::StackDictionary<'a, ServFunction>;
 
 impl<'a> Scope<'a> {
     pub fn get_str(&self, input: &str) -> Result<ServFunction, &'static str> {
-        self.get(&FnLabel(input.to_string())).ok_or("word not found")
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct FnLabel(String);
-
-impl From<String> for FnLabel {
-    fn from(input: String) -> Self {
-        Self(input)
+        self.get(&FnLabel::name(input)).ok_or("word not found")
     }
 }
 
@@ -69,6 +61,7 @@ pub enum ServFunction {
     Core(fn(ServValue, &Scope) -> ServResult),
     Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
     Template(Template),
+    List(Vec<FnLabel>),
     Composition(Vec<FnLabel>),
 }
 
@@ -79,16 +72,23 @@ impl ServFunction {
             Self::Literal(l)     => Ok(l.clone()),
             Self::Template(t)    => {
                 let mut child = scope.make_child();
-                child.insert(FnLabel("in".to_owned()), ServFunction::Literal(input));
+                child.insert_name("in", ServFunction::Literal(input));
                 t.render(&child)
             },
             Self::Composition(v) => {
                 let mut child_scope = scope.make_child();
-                child_scope.insert(FnLabel("in".to_owned()), ServFunction::Literal(input.clone()));
+                child_scope.insert_name("in", ServFunction::Literal(input.clone()));
 
                 let mut words: VecDeque<FnLabel> = v.clone().into();
                 Words(words).eval(input, &child_scope)
             },
+            Self::List(l) => {
+                let mut list: VecDeque<ServValue> = VecDeque::new();
+                for f in l {
+                    list.push_back(scope.get(f).unwrap().call(input.clone(), scope)?);
+                }
+                Ok(ServValue::List(list))
+            }
             Self::Meta(_) => Err("called a meta function when it was not appropriate"),
         }
     }
@@ -99,65 +99,173 @@ fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
     let mut iter = input.into_iter();
     while let Some(word) = iter.next() {
         match word {
-            ast::Word::Function(t) => output.push(FnLabel(t.contents.to_owned())),
+            ast::Word::Function(t) => output.push(FnLabel::Name(t.contents)),
+            ast::Word::List(l) => {
+                let mut inner: Vec<FnLabel> = Vec::new();
+                for expression in l {
+					let func = compile(expression.0, scope);
+                    inner.push(scope.insert_anonymous(func));
+                }
+                output.push(scope.insert_anonymous(ServFunction::List(inner)));
+            },
             ast::Word::Template(t) => {
-                let unique_id = scope.get_unique_id();
-                let label = format!("template.{}", unique_id);
-                scope.insert(FnLabel(label.clone()), ServFunction::Template(t));
-                output.push(FnLabel(label));
+                output.push(scope.insert_anonymous(ServFunction::Template(t)));
             },
             ast::Word::Parantheses(expression) => {
-                let unique_id = scope.get_unique_id();
-                let label = format!("lambda.{}", unique_id);
-                let inner_func = compile(expression.0, scope);
-                scope.insert(FnLabel(label.clone()), inner_func);
-                output.push(FnLabel(label));
+                let func = compile(expression.0, scope);
+                output.push(scope.insert_anonymous(func));
             },
             ast::Word::Literal(v) => {
-                let unique_id = scope.get_unique_id();
-                let label = format!("literal.{}", unique_id);
-                scope.insert(FnLabel(label.clone()), ServFunction::Literal(v));
-                output.push(FnLabel(label));
+                output.push(scope.insert_anonymous(ServFunction::Literal(v)));
             },
         };
     }
 
+
     ServFunction::Composition(output)
 }
+
+use hyper::service::Service;
+use hyper::body::{Body, Frame, Incoming as IncomingBody};
+use hyper::{ Request, Response };
+use std::sync::Arc;
+use std::pin::Pin;
+use std::future::Future;
+use std::task::{Poll, Context};
+
+pub struct ServBody(Option<VecDeque<u8>>);
+
+impl ServBody {
+	pub fn new() -> Self {
+		Self(Some("hello!".bytes().collect()))
+	}
+}
+
+impl From<ServValue> for ServBody {
+	fn from(input: ServValue) -> Self {
+		Self(Some(input.to_string().bytes().collect()))
+	}
+}
+
+impl Body for ServBody {
+	type Data = VecDeque<u8>;
+	type Error = &'static str;
+
+	fn poll_frame(self: Pin<&mut Self>, _: &mut Context) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+		if let Some(data) = self.get_mut().0.take() {
+			Poll::Ready(Some(Ok(Frame::data(data))))
+		} else {
+			Poll::Ready(None)
+		}
+	}
+}
+
+#[derive(Clone)]
+struct Serv<'a>(Arc<Scope<'a>>);
+
+impl Service<Request<IncomingBody>> for Serv<'_> {
+	type Response = Response<ServBody>;
+	type Error = hyper::Error;
+	type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+	fn call(&self, req: Request<IncomingBody>) -> Self::Future {
+    	let router = self.0.router.as_ref().unwrap();
+    	let Ok(matched) = router.at(req.uri().path()) else { panic!() };
+
+		let mut scope = self.0.make_child();
+    	for (k, v) in matched.params.iter() {
+        	println!("{:?}", v);
+			scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
+    	}
+
+    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
+		let res = Ok(Response::builder().body(result.into()).unwrap());
+		Box::pin(async { res })
+
+    	// todo!();
+		// let Ok(matched) = self.0.routes.at(req.uri().path()) else {
+		// 	let not_found_message = ServValue::Text("Error 404: Page Not Found".to_owned());
+		// 	let res = Ok(Response::builder().status(404).body(not_found_message.into()).unwrap());
+		// 	return Box::pin(async { res })
+		// };
+		// let mut inner_context = Context::from(&self.0);
+
+		// for (k, v) in matched.params.iter() {
+		// 	inner_context.push_str(k, v);
+		// }
+
+		// let result = matched.value.call(ServValue::None, &mut inner_context).unwrap();
+		// let res = Ok(Response::builder().body(result.into()).unwrap());
+		// Box::pin(async { res })
+	}
+}
+
+
+use hyper_util::rt::TokioIo;
+use hyper::server::conn::http1::Builder;
 
 #[tokio::main]
 async fn main() {
 	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
-	let input = std::fs::read_to_string(&input_path).unwrap();
-
-	let ast = parser::parse_root_from_text(&input).unwrap();
+	let input      = std::fs::read_to_string(&input_path).unwrap();
+	let ast        = parser::parse_root_from_text(&input).unwrap();
 
 	let mut scope: Scope = Scope::empty();
 
-	scope.insert(FnLabel("hello".to_owned()),     ServFunction::Core(hello_world));
-	scope.insert(FnLabel("uppercase".to_owned()), ServFunction::Core(uppercase));
-	scope.insert(FnLabel("incr".to_owned()), ServFunction::Core(incr));
-	scope.insert(FnLabel("decr".to_owned()), ServFunction::Core(decr));
-	scope.insert(FnLabel("%".to_owned()), ServFunction::Core(math_expr));
+	scope.insert(FnLabel::name("hello"),     ServFunction::Core(hello_world));
+	scope.insert(FnLabel::name("uppercase"), ServFunction::Core(uppercase));
+	scope.insert(FnLabel::name("incr"),      ServFunction::Core(incr));
+	scope.insert(FnLabel::name("decr"),      ServFunction::Core(decr));
+	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
 
-	scope.insert(FnLabel("!".to_owned()),         ServFunction::Meta(drop));
-	scope.insert(FnLabel("map".to_owned()),         ServFunction::Meta(map));
-	scope.insert(FnLabel("[".to_owned()),         ServFunction::Meta(list_open));
-	scope.insert(FnLabel("using".to_owned()),         ServFunction::Meta(using));
-	scope.insert(FnLabel("let".to_owned()),         ServFunction::Meta(using));
-	scope.insert(FnLabel("choose".to_owned()),         ServFunction::Meta(choose));
-	scope.insert(FnLabel("*".to_owned()),         ServFunction::Meta(apply));
-
+	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
+	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
+	scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
+	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
+	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
+	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
 
 	for declaration in ast.0 {
     	if declaration.kind == "word" {
         	let func = compile(declaration.value.0, &mut scope);
         	scope.insert(declaration.key.to_owned().into(), func);
     	}
+
+    	else if declaration.kind == "route" {
+        	let func = compile(declaration.value.0, &mut scope);
+        	scope.router.as_mut().unwrap().insert(declaration.key, func);
+    	}
 	}
 
-	if let Some(out) = scope.get(&FnLabel("out".to_owned())) {
-    	let res = out.call(ServValue::None, &scope);
-    	println!("{}", res.unwrap());
+	if let Ok(out) = scope.router.as_ref().unwrap().at("/") {
+    	let res = out.value.call(ServValue::None, &scope);
+    	println!("{:?}", res);
+	}
+
+	// if let Ok(out) = scope.get_str("out") {
+ //    	let res = out.call(ServValue::None, &scope);
+ //    	println!("{}", res.unwrap());
+	// }
+	//
+	//
+	//
+
+	let addr = SocketAddr::from(([0,0,0,0], 4000));
+	let listener = TcpListener::bind(addr).await.unwrap();
+
+	let scope_arc = Arc::new(scope);
+
+	loop {
+		let (stream, _) = listener.accept().await.unwrap();
+		let io = TokioIo::new(stream);
+
+		let scope_arc = scope_arc.clone();
+
+		tokio::task::spawn(async move {
+			Builder::new()
+				.serve_connection(io, Serv(scope_arc))
+				.await
+				.unwrap();
+		});
 	}
 }

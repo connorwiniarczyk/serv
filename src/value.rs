@@ -32,8 +32,10 @@ impl Display for ServValue {
             Self::Int(i) => write!(f, "{}", i)?,
             Self::List(l) => {
                 f.write_str("[")?;
-				for element in l.iter() {
-    				write!(f, " {}, ", element)?;
+				let mut iter = l.iter().peekable();
+				while let Some(element) = iter.next() {
+    				write!(f, "{}", element)?;
+    				if iter.peek().is_some() {f.write_str(", ")?}
 				}
                 f.write_str("]")?;
             }
