@@ -1,2 +1,25 @@
-/{name} => {hello}
+@html.body => {
+    <html>
+        <head>
+        	<title>$meta.title</title>
+        	<script>$meta.script</script>
+        </head>
+        <body>
+        	$in
+        </body>
+    </html>
+}
 
+@script => {
+    window.onload = function() {
+        console.log("hello");
+    }
+}
+
+@out => let {
+	@meta.title => uppercase {serv}
+	@meta.script => inline script
+	@body => {
+		hi, my name is
+	}
+} html.body body

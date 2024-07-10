@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use matchit::Router;
 
-pub trait Key: Eq + PartialEq + std::hash::Hash {}
-impl<T: Eq + PartialEq + std::hash::Hash> Key for T {}
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum FnLabel {
@@ -23,6 +21,7 @@ impl From<String> for FnLabel {
 
 pub struct StackDictionary<'parent, V> {
     unique_id: u32,
+    // input: V,
 	words: HashMap<FnLabel, V>,
 	parent: Option<&'parent StackDictionary<'parent, V>>,
 	pub router: Option<Router<V>>,
@@ -30,11 +29,22 @@ pub struct StackDictionary<'parent, V> {
 
 impl<'parent, V: Clone> StackDictionary<'parent, V> {
     pub fn empty() -> Self {
-        Self { unique_id: 0, words: HashMap::new(), parent: None, router: Some(Router::new()) }
+        Self {
+            unique_id: 0,
+            words: HashMap::new(),
+            parent: None,
+            // input: ServValue::None,
+            router: Some(Router::new()),
+        }
     }
 
     pub fn make_child(&'parent self) -> Self {
         Self { unique_id: self.unique_id, words: HashMap::new(), parent: Some(self), router: None }
+    }
+
+    pub fn with_input(mut self, input: V) -> Self {
+        self.insert_name("in", input);
+        self
     }
 
     pub fn insert(&mut self, key: FnLabel, value: V) {

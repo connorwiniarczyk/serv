@@ -66,6 +66,14 @@ pub enum ServFunction {
 }
 
 impl ServFunction {
+    // TODO:
+    // pub fn call_with_words(&self, input: ServValue, scope: &Scope, words: &mut Words) -> ServResult {
+    //     match self {
+    //         Self::Core(f) => f(words.eval(scope.get("in").unwrap_or(), scope)?, scope),
+    //         _ => todo!(),
+    //     }
+    // }
+
     pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
         match self {
             Self::Core(f)        => f(input, scope),
@@ -204,52 +212,7 @@ impl Service<Request<IncomingBody>> for Serv<'_> {
 use hyper_util::rt::TokioIo;
 use hyper::server::conn::http1::Builder;
 
-#[tokio::main]
-async fn main() {
-	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
-	let input      = std::fs::read_to_string(&input_path).unwrap();
-	let ast        = parser::parse_root_from_text(&input).unwrap();
-
-	let mut scope: Scope = Scope::empty();
-
-	scope.insert(FnLabel::name("hello"),     ServFunction::Core(hello_world));
-	scope.insert(FnLabel::name("uppercase"), ServFunction::Core(uppercase));
-	scope.insert(FnLabel::name("incr"),      ServFunction::Core(incr));
-	scope.insert(FnLabel::name("decr"),      ServFunction::Core(decr));
-	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
-
-	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
-	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
-	scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
-	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
-	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
-	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
-
-	for declaration in ast.0 {
-    	if declaration.kind == "word" {
-        	let func = compile(declaration.value.0, &mut scope);
-        	scope.insert(declaration.key.to_owned().into(), func);
-    	}
-
-    	else if declaration.kind == "route" {
-        	let func = compile(declaration.value.0, &mut scope);
-        	scope.router.as_mut().unwrap().insert(declaration.key, func);
-    	}
-	}
-
-	if let Ok(out) = scope.router.as_ref().unwrap().at("/") {
-    	let res = out.value.call(ServValue::None, &scope);
-    	println!("{:?}", res);
-	}
-
-	// if let Ok(out) = scope.get_str("out") {
- //    	let res = out.call(ServValue::None, &scope);
- //    	println!("{}", res.unwrap());
-	// }
-	//
-	//
-	//
-
+async fn run_webserver(scope: Scope<'static>) {
 	let addr = SocketAddr::from(([0,0,0,0], 4000));
 	let listener = TcpListener::bind(addr).await.unwrap();
 
@@ -268,4 +231,50 @@ async fn main() {
 				.unwrap();
 		});
 	}
+}
+
+#[tokio::main]
+async fn main() {
+	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
+	let input      = std::fs::read_to_string(&input_path).unwrap();
+	let ast        = parser::parse_root_from_text(&input).unwrap();
+
+	let mut scope: Scope = Scope::empty();
+
+	scope.insert(FnLabel::name("hello"),     ServFunction::Core(hello_world));
+	scope.insert(FnLabel::name("uppercase"), ServFunction::Core(uppercase));
+	scope.insert(FnLabel::name("incr"),      ServFunction::Core(incr));
+	scope.insert(FnLabel::name("decr"),      ServFunction::Core(decr));
+	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
+	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
+	scope.insert(FnLabel::name("read"),       ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file"),       ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("inline"),       ServFunction::Core(inline));
+
+	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
+	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
+	scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
+	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
+	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
+	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
+
+	for declaration in ast.0 {
+    	// println!("{:?}", declaration);
+    	if declaration.kind == "word" {
+        	let func = compile(declaration.value.0, &mut scope);
+        	scope.insert(declaration.key.to_owned().into(), func);
+    	}
+
+    	else if declaration.kind == "route" {
+        	let func = compile(declaration.value.0, &mut scope);
+        	scope.router.as_mut().unwrap().insert(declaration.key, func);
+    	}
+	}
+
+	if let Ok(out) = scope.get_str("out") {
+    	let res = out.call(ServValue::None, &scope);
+    	println!("{}", res.unwrap());
+	}
+
+	run_webserver(scope).await;
 }

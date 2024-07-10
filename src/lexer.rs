@@ -87,7 +87,8 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
     cursor.incr(1);
     output.push(cursor.emit_token(TokenKind::TemplateOpen));
 
-    let special_characters = ['{', '\\', '"', '$', '}'];
+    let special_characters = ['{', '\\', '$', '}'];
+    // let special_characters = ['{', '\\', '"', '$', '}'];
     
     while let Some(c) = cursor.get(0) {
         if special_characters.contains(&c) {
@@ -108,7 +109,7 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
                         output.push(cursor.emit_token(TokenKind::LambdaBegin));
                         tokenize_inner_expression(cursor, output);
                     } else {
-                        cursor.incr_while(|x| x.is_alphabetic());
+                        cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
                         output.push(cursor.emit_token(TokenKind::Identifier));
                     }
 
@@ -119,7 +120,7 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
                 },
 
                 '\\' => todo!(),
-                '"' => todo!(),
+                // '"' => todo!()
 
                 _ => unreachable!(),
             }
@@ -156,7 +157,7 @@ fn tokenize_inner_expression(cursor: &mut Cursor, output: &mut Vec<Token>) {
             '{' | '"' => tokenize_string_template(cursor, output),
             
             c @ _ if c.is_alphabetic() => {
-                cursor.incr_while(|x| x.is_alphabetic() || x == '_');
+                cursor.incr_while( |x| x.is_alphanumeric() || x == '_' || x == '.');
                 output.push(cursor.emit_token(TokenKind::Identifier))
             },
             
@@ -215,7 +216,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             '{' | '"' => tokenize_string_template(&mut cursor, &mut output),
             
             c @ _ if c.is_alphabetic() => {
-                cursor.incr_while(|x| x.is_alphabetic() || x == '_');
+                cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
                 output.push(cursor.emit_token(TokenKind::Identifier))
             },
             

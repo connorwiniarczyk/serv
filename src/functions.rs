@@ -17,12 +17,22 @@ pub fn uppercase(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text(input.to_string().to_uppercase()))
 }
 
+pub fn inline(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Text(input.to_string().lines().collect()))
+}
+
 pub fn incr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? + 1))
 }
 
 pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? - 1))
+}
+
+pub fn read_file(input: ServValue, scope: &Scope) -> ServResult {
+    let path = input.to_string();
+    let contents = std::fs::read_to_string(path).map_err(|e| "failed to open file")?;
+    Ok(ServValue::Text(contents))
 }
 
 pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
@@ -37,12 +47,17 @@ pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
 		_ => todo!(),
 	})
 }
+
 pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
-    let test = match input {
-        ServValue::List(l) => l.into_iter().map(|x| x.expect_int()),
-        _ => todo!(),
-    };
-    todo!();
+    if let ServValue::List(l) = input {
+        let mut sum = 0;
+        for x in l.into_iter() { sum += x.expect_int()? };
+        Ok(ServValue::Int(sum))
+    }
+
+    else {
+        Ok(ServValue::Int(input.expect_int()?))
+    }
 }
 
 pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
@@ -105,5 +120,3 @@ pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 
     words.eval(input, &new_scope)
 }
-
-
