@@ -250,6 +250,7 @@ async fn main() {
 	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
+	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
 
 	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
 	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));

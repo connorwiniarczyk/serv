@@ -1,3 +1,1 @@
-@cowsay => execpipe {cowsay} {I'm a cow, and I'm saying: $in}
-
-@out => cowsay {hi!}
+/ => hello

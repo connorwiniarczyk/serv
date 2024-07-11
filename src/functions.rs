@@ -58,6 +58,10 @@ pub fn incr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? + 1))
 }
 
+pub fn markdown(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Text(markdown::to_html(input.to_string().as_str())))
+}
+
 pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? - 1))
 }
