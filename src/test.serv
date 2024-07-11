@@ -1,1 +1,1 @@
-/ => hello
+@out => file {src/test.serv}
