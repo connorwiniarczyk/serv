@@ -54,7 +54,6 @@ impl Words {
     }
 }
 
-
 #[derive(Clone)]
 pub enum ServFunction {
     Literal(ServValue),
@@ -247,9 +246,10 @@ async fn main() {
 	scope.insert(FnLabel::name("decr"),      ServFunction::Core(decr));
 	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
 	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
-	scope.insert(FnLabel::name("read"),       ServFunction::Core(read_file));
-	scope.insert(FnLabel::name("file"),       ServFunction::Core(read_file));
-	scope.insert(FnLabel::name("inline"),       ServFunction::Core(inline));
+	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
+	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 
 	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
 	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
@@ -257,9 +257,9 @@ async fn main() {
 	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
 	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
 	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
+	scope.insert(FnLabel::name("execpipe"),         ServFunction::Meta(execpipe));
 
 	for declaration in ast.0 {
-    	// println!("{:?}", declaration);
     	if declaration.kind == "word" {
         	let func = compile(declaration.value.0, &mut scope);
         	scope.insert(declaration.key.to_owned().into(), func);

@@ -4,10 +4,43 @@ use crate::Scope;
 use crate::Words;
 use crate::parser;
 use crate::compile;
+use std::process::{Command, Stdio};
+use std::io::Write;
+use std::io::{BufWriter};
 
 use evalexpr::eval;
-
 use std::collections::VecDeque;
+
+pub fn exec(input: ServValue, scope: &Scope) -> ServResult {
+    let mut cmd = Command::new(input.to_string())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let output = cmd.wait_with_output().unwrap();
+    Ok(ServValue::Text(std::str::from_utf8(&output.stdout).unwrap().to_owned()))
+}
+
+pub fn execpipe(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let arg_name = words.0.pop_front().unwrap();
+    let arg_fn = scope.get(&arg_name).unwrap();
+    let arg = arg_fn.call(input.clone(), scope)?;
+    let rest = words.eval(input, scope)?;
+
+    let mut cmd = Command::new(arg.to_string())
+        .stderr(Stdio::null())
+        .stdout(Stdio::piped())
+        .stdin(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    cmd.stdin.as_mut().unwrap().write_all(rest.to_string().as_bytes());
+    let output = cmd.wait_with_output().unwrap();
+
+    Ok(ServValue::Text(std::str::from_utf8(&output.stdout).unwrap().to_owned()))
+}
+
+
+
 
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text("hello world".to_owned()))
@@ -59,6 +92,7 @@ pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
         Ok(ServValue::Int(input.expect_int()?))
     }
 }
+
 
 pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     _ = words.0.pop_front();

@@ -1,25 +1,3 @@
-@html.body => {
-    <html>
-        <head>
-        	<title>$meta.title</title>
-        	<script>$meta.script</script>
-        </head>
-        <body>
-        	$in
-        </body>
-    </html>
-}
+@cowsay => execpipe {cowsay} {I'm a cow, and I'm saying: $in}
 
-@script => {
-    window.onload = function() {
-        console.log("hello");
-    }
-}
-
-@out => let {
-	@meta.title => uppercase {serv}
-	@meta.script => inline script
-	@body => {
-		hi, my name is
-	}
-} html.body body
+@out => cowsay {hi!}

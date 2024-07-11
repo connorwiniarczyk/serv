@@ -101,22 +101,34 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
 
                 '{' => tokenize_string_template(cursor, output),
 
+                '$' if cursor.get(1) == Some('$') => {
+                    cursor.incr(1);
+                    _ = cursor.emit_token(TokenKind::Dollar);
+                    cursor.incr(1);
+                    output.push(cursor.emit_token(TokenKind::TemplateText))
+                },
+
                 '$' => {
                     cursor.incr(1);
                     output.push(cursor.emit_token(TokenKind::Dollar));
+
                     if cursor.get(0) == Some('(') {
                         cursor.incr(1);
                         output.push(cursor.emit_token(TokenKind::LambdaBegin));
                         tokenize_inner_expression(cursor, output);
-                    } else {
+                    }
+
+                    // else if cursor.get(0) == Some('$') {
+                    //     cursor.incr(1);
+                    //     // output.push(cursor.emit_token(TokenKind::Dollar));
+                    //     // cursor.incr(1);
+                    // }
+
+                    else {
                         cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
                         output.push(cursor.emit_token(TokenKind::Identifier));
                     }
 
-                    if cursor.get(0) == Some('$') {
-                        cursor.incr(1);
-                        output.push(cursor.emit_token(TokenKind::Dollar));
-                    }
                 },
 
                 '\\' => todo!(),

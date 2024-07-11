@@ -8,7 +8,6 @@ use std::fmt::Display;
 #[derive(Debug, Clone)]
 pub enum TemplateElement {
 	Text(Token),
-	// Variable(Token),
 	Template(Template),
 	Expression(ast::Word),
 }
@@ -57,6 +56,7 @@ impl Template {
             match elem {
                 TemplateElement::Text(t) => output.push_str(&t.contents),
                 TemplateElement::Template(t) => output.push_str(t.literal().to_string().as_str()),
+                // TemplateElement::Template(t) => output.push_str(t.render(ctx)?.to_string().as_str()),
                 TemplateElement::Expression(t) => {
                     match t {
                         ast::Word::Function(token) => {

@@ -22,7 +22,7 @@ impl From<String> for FnLabel {
 pub struct StackDictionary<'parent, V> {
     unique_id: u32,
     // input: V,
-	words: HashMap<FnLabel, V>,
+	pub words: HashMap<FnLabel, V>,
 	parent: Option<&'parent StackDictionary<'parent, V>>,
 	pub router: Option<Router<V>>,
 }

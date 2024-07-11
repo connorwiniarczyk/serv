@@ -144,7 +144,7 @@ pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, &'stat
 
 pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, &'static str> {
 	let tokens = lexer::tokenize(input);
-	// println!("{:#?}", tokens);
+	println!("{:#?}", tokens);
 	let mut cursor = Cursor::new(&tokens);
 	let ast = parse_root(&mut cursor)?;
 
