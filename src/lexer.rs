@@ -208,7 +208,9 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             '#'  => {
                 cursor.incr(1);
                 cursor.incr_while(|x| x != '\n' && x != '#');
-                output.push(cursor.emit_token(TokenKind::Comment))},
+                _ = cursor.emit_token(TokenKind::Comment);
+            },
+                // output.push(cursor.emit_token(TokenKind::Comment))},
             
             '\t' | ' ' => {
                 cursor.incr_while(|x| x == '\t' || x == ' ');

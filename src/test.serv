@@ -1,1 +1,1 @@
-@out => file {src/test.serv}
+/ => file {src/test.serv}

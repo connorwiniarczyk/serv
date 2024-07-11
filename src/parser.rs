@@ -3,6 +3,7 @@ use crate::lexer::*;
 use crate::lexer::TokenKind::*;
 use crate::ast;
 use crate::ast::{TemplateElement, Template};
+use crate::error::ServError;
 
 struct Cursor<'tokens> {
     input: &'tokens [Token],
@@ -18,25 +19,25 @@ impl<'tokens> Cursor<'tokens> {
         self.index += i;
     }
 
-    fn get(&mut self, offset: usize) -> Result<&'tokens Token, &'static str> {
+    fn get(&mut self, offset: usize) -> Result<&'tokens Token, ServError> {
         if self.index + offset < self.input.len() {
             Ok(&self.input[self.index + offset])
         } else {
-            Err("out of bounds")
+            Err("out of bounds".into())
         }
     }
 
-    fn expect(&mut self, kind: TokenKind) -> Result<&'tokens Token, &'static str> {
+    fn expect(&mut self, kind: TokenKind) -> Result<&'tokens Token, ServError> {
         let current = self.get(0)?;
         if current.kind == kind {
             Ok(current)
         } else {
-            Err("failed assertion")
+            Err("failed assertion".into())
         }
     }
 }
 
-fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
+fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, ServError>  {
     let open = cursor.expect(TokenKind::TemplateOpen)?.clone();
     cursor.incr(1);
     
@@ -51,7 +52,6 @@ fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
         	TokenKind::Dollar => elements.push({
             	cursor.incr(1);
             	ast::TemplateElement::Expression(parse_word(cursor)?)
-            	// ast::TemplateElement::Variable(token.clone())
         	}),
 
         	TokenKind::TemplateOpen => {
@@ -59,7 +59,7 @@ fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
             	cursor.incr(1);
         	},
         	TokenKind::TemplateClose => { unreachable!(); },
-        	_ => return Err("token not supported in template"),
+        	_ => return Err("token not supported in template".into()),
     	}
 	}
 
@@ -67,21 +67,18 @@ fn parse_template(cursor: &mut Cursor) -> Result<ast::Template, &'static str>  {
 	Ok(ast::Template { open, close, elements })
 }
 
-fn parse_list(cursor: &mut Cursor) -> Result<Vec<ast::Expression>, &'static str> {
+fn parse_list(cursor: &mut Cursor) -> Result<Vec<ast::Expression>, ServError> {
     let mut output = Vec::new();
     while cursor.get(0)?.kind != TokenKind::ListEnd {
-        // println!("{:?}", cursor.get(0)?);
         output.push(parse_expression(cursor)?);
         if cursor.get(0)?.kind == TokenKind::Comma {
             cursor.incr(1);
         }
     }
-    // println!("{:?}", cursor.get(0)?);
-    // cursor.incr(1);
     Ok(output)
 }
 
-fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, &'static str> {
+fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, ServError> {
     let token = cursor.get(0)?;
     let output = match token.kind {
         TokenKind::Identifier => ast::Word::Function(token.clone()),
@@ -96,7 +93,7 @@ fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, &'static str> {
             ast::Word::Parantheses(parse_expression(cursor)?)
         },
 
-        k @ _ => return Err("unhandled token"),
+        k @ _ => return Err("unhandled token".into()),
     };
 
     cursor.incr(1);
@@ -104,7 +101,7 @@ fn parse_word(cursor: &mut Cursor) -> Result<ast::Word, &'static str> {
 }
 
 
-fn parse_expression(cursor: &mut Cursor) -> Result<ast::Expression, &'static str> {
+fn parse_expression(cursor: &mut Cursor) -> Result<ast::Expression, ServError> {
     let mut output: Vec<ast::Word> = Vec::new();
     while let Ok(word) = parse_word(cursor) {
         output.push(word);
@@ -113,15 +110,32 @@ fn parse_expression(cursor: &mut Cursor) -> Result<ast::Expression, &'static str
     Ok(ast::Expression(output))
 }
 
-fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
+fn parse_declaration(cursor: &mut Cursor) -> Result<ast::Declaration, ServError> {
+    if matches!(cursor.get(0).unwrap().kind, Route) {
+		println!("test");
+    }
+
+    else if matches!(cursor.get(0).unwrap().kind, At) {
+		println!("test");
+    }
+    todo!();
+	// let (kind, pattern) = match cursor.get(0).unwrap().kind {
+ //    	Route => ("route", token.contents.to_owned()),
+ //    	At    => ("word",  {cursor.incr(1); cursor.expect(Identifier).unwrap().contents.to_owned()} ),
+ //    	_ => panic!(),
+ //    	// _     =>  return Err(format!("unexpected token {:?}", token).into()),
+	// };
+}
+
+fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, ServError> {
 	let mut output: Vec<ast::Declaration> = Vec::new();
 	
 	while cursor.get(0)?.kind != EndOfInput {
+    	parse_declaration(cursor)?;
     	let token = cursor.get(0).unwrap();
     	let (kind, pattern) = match cursor.get(0).unwrap().kind {
         	Route => ("route", token.contents.to_owned()),
         	At    => ("word",  {cursor.incr(1); cursor.expect(Identifier).unwrap().contents.to_owned()} ),
-        	Comment => continue,
         	_     =>  panic!("unexpected token {:?}", token),
     	};
 
@@ -136,19 +150,16 @@ fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, &'static str> {
 	Ok(ast::AstRoot(output))
 }
 
-pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, &'static str> {
+pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, ServError> {
 	let mut tokens = lexer::tokenize(input);
 	let mut cursor = Cursor::new(&tokens);
 	parse_expression(&mut cursor)
 }
 
-pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, &'static str> {
+pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, ServError> {
 	let tokens = lexer::tokenize(input);
-	// println!("{:#?}", tokens);
 	let mut cursor = Cursor::new(&tokens);
 	let ast = parse_root(&mut cursor)?;
-
-// println!("{:#?}", ast);
 
 	Ok(ast)
 }

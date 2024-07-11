@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+mod error;
 mod functions;
 mod lexer;
 mod parser;
