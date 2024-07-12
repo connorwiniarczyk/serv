@@ -1,215 +1,285 @@
-// #![deny(warnings)e
-// #![allow(unused_imports, unused_mut, unused_doc_comments, unused_macros, dead_code, unused_results, unused_must_use, unused_variables)]
-#![allow(warnings)]
+#![allow(unused)]
 
-mod config;
-mod route_table;
-mod pattern;
+mod error;
+mod functions;
+mod lexer;
 mod parser;
+mod template;
+mod ast;
+mod value;
+mod dictionary;
 
-mod command;
-mod request_state;
+use lexer::TokenKind;
+use lexer::*;
+use value::ServValue;
+use template::Template;
+use functions::*;
+use dictionary::FnLabel;
 
-use std::convert::Infallible;
-use route_table::Route;
+use std::collections::VecDeque;
+use std::iter::Peekable;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
+use matchit::Router;
 
-use clap::clap_app;
-use std::env::current_dir;
-use std::path::Path;
+type ServResult = Result<ServValue, &'static str>;
+pub type Scope<'a> = dictionary::StackDictionary<'a, ServFunction>;
 
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
-use hyper::server::conn::AddrIncoming;
-
-use std::path::PathBuf;
-
-use futures_util::stream::StreamExt;
-use futures_util::future::ready;
-use hyper::server::accept;
-
-use rustls_pemfile::{Item, read_all, read_one};
-
-use std::io::BufReader;
-use std::fs::File;
-
-use tls_listener::TlsListener;
-use std::sync::Arc;
-use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
-
-pub type Acceptor = tokio_rustls::TlsAcceptor;
-
-
-
-#[derive(Clone, Debug)]
-struct KeyPair {
-    key: PathBuf,
-    cert: PathBuf,
-}
-
-impl KeyPair {
-    pub fn into_tls_acceptor(&self) -> Acceptor {
-        let mut key_file = BufReader::new(File::open(&self.key).unwrap());
-        let key_der = match read_one(&mut key_file).unwrap().unwrap() {
-            Item::X509Certificate(_) => panic!("not a valid key"),
-            Item::RSAKey(key) => key,
-            Item::PKCS8Key(key) => key,
-            Item::ECKey(key) => key,
-            _ => panic!("item not covered"),
-        };
-
-        let mut cert_file = BufReader::new(File::open(&self.cert).unwrap());
-        let cert_der = match read_one(&mut cert_file).unwrap().unwrap() {
-            Item::X509Certificate(cert) => cert,
-            _ => panic!("not a valid certificate"),
-        };
-
-        let key = PrivateKey(key_der.into());
-        let cert = Certificate(cert_der.into());
-
-        let server_config = ServerConfig::builder()
-            .with_safe_defaults()
-            .with_no_client_auth()
-            .with_single_cert(vec![cert], key)
-            .unwrap();
-         
-        Arc::new(server_config).into()
+impl<'a> Scope<'a> {
+    pub fn get_str(&self, input: &str) -> Result<ServFunction, &'static str> {
+        self.get(&FnLabel::name(input)).ok_or("word not found")
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Config {
-    // route_table: RouteTable,
-    root: PathBuf,
-    port: u32,
-    host: String,
+struct Words(VecDeque<FnLabel>);
 
-    keypair: Option<KeyPair>,
+impl Words {
+    pub fn next(&mut self) -> Option<FnLabel> {
+        self.0.pop_front()
+    }
+
+    pub fn empty() -> Self {
+        Self(VecDeque::new())
+    }
+
+    pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
+        let Some(next) = self.next() else { return Ok(input) };
+        let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
+
+        if let ServFunction::Meta(m) = next_fn {
+			return (m)(self, input, scope);
+        } else {
+            let rest = self.eval(input, scope)?;
+            return next_fn.call(rest, scope)
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum ServFunction {
+    Literal(ServValue),
+    Core(fn(ServValue, &Scope) -> ServResult),
+    Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
+    Template(Template),
+    List(Vec<FnLabel>),
+    Composition(Vec<FnLabel>),
+}
+
+impl ServFunction {
+    // TODO:
+    // pub fn call_with_words(&self, input: ServValue, scope: &Scope, words: &mut Words) -> ServResult {
+    //     match self {
+    //         Self::Core(f) => f(words.eval(scope.get("in").unwrap_or(), scope)?, scope),
+    //         _ => todo!(),
+    //     }
+    // }
+
+    pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
+        match self {
+            Self::Core(f)        => f(input, scope),
+            Self::Literal(l)     => Ok(l.clone()),
+            Self::Template(t)    => {
+                let mut child = scope.make_child();
+                child.insert_name("in", ServFunction::Literal(input));
+                t.render(&child)
+            },
+            Self::Composition(v) => {
+                let mut child_scope = scope.make_child();
+                child_scope.insert_name("in", ServFunction::Literal(input.clone()));
+
+                let mut words: VecDeque<FnLabel> = v.clone().into();
+                Words(words).eval(input, &child_scope)
+            },
+            Self::List(l) => {
+                let mut list: VecDeque<ServValue> = VecDeque::new();
+                for f in l {
+                    list.push_back(scope.get(f).unwrap().call(input.clone(), scope)?);
+                }
+                Ok(ServValue::List(list))
+            }
+            Self::Meta(_) => Err("called a meta function when it was not appropriate"),
+        }
+    }
+}
+
+fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
+    let mut output: Vec<FnLabel> = Vec::new();
+    let mut iter = input.into_iter();
+    while let Some(word) = iter.next() {
+        match word {
+            ast::Word::Function(t) => output.push(FnLabel::Name(t.contents)),
+            ast::Word::List(l) => {
+                let mut inner: Vec<FnLabel> = Vec::new();
+                for expression in l {
+					let func = compile(expression.0, scope);
+                    inner.push(scope.insert_anonymous(func));
+                }
+                output.push(scope.insert_anonymous(ServFunction::List(inner)));
+            },
+            ast::Word::Template(t) => {
+                output.push(scope.insert_anonymous(ServFunction::Template(t)));
+            },
+            ast::Word::Parantheses(expression) => {
+                let func = compile(expression.0, scope);
+                output.push(scope.insert_anonymous(func));
+            },
+            ast::Word::Literal(v) => {
+                output.push(scope.insert_anonymous(ServFunction::Literal(v)));
+            },
+        };
+    }
+
+
+    ServFunction::Composition(output)
+}
+
+use hyper::service::Service;
+use hyper::body::{Body, Frame, Incoming as IncomingBody};
+use hyper::{ Request, Response };
+use std::sync::Arc;
+use std::pin::Pin;
+use std::future::Future;
+use std::task::{Poll, Context};
+
+pub struct ServBody(Option<VecDeque<u8>>);
+
+impl ServBody {
+	pub fn new() -> Self {
+		Self(Some("hello!".bytes().collect()))
+	}
+}
+
+impl From<ServValue> for ServBody {
+	fn from(input: ServValue) -> Self {
+		Self(Some(input.to_string().bytes().collect()))
+	}
+}
+
+impl Body for ServBody {
+	type Data = VecDeque<u8>;
+	type Error = &'static str;
+
+	fn poll_frame(self: Pin<&mut Self>, _: &mut Context) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+		if let Some(data) = self.get_mut().0.take() {
+			Poll::Ready(Some(Ok(Frame::data(data))))
+		} else {
+			Poll::Ready(None)
+		}
+	}
+}
+
+#[derive(Clone)]
+struct Serv<'a>(Arc<Scope<'a>>);
+
+impl Service<Request<IncomingBody>> for Serv<'_> {
+	type Response = Response<ServBody>;
+	type Error = hyper::Error;
+	type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+	fn call(&self, req: Request<IncomingBody>) -> Self::Future {
+    	let router = self.0.router.as_ref().unwrap();
+    	let Ok(matched) = router.at(req.uri().path()) else { panic!() };
+
+		let mut scope = self.0.make_child();
+    	for (k, v) in matched.params.iter() {
+        	println!("{:?}", v);
+			scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
+    	}
+
+    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
+		let res = Ok(Response::builder().body(result.into()).unwrap());
+		Box::pin(async { res })
+
+    	// todo!();
+		// let Ok(matched) = self.0.routes.at(req.uri().path()) else {
+		// 	let not_found_message = ServValue::Text("Error 404: Page Not Found".to_owned());
+		// 	let res = Ok(Response::builder().status(404).body(not_found_message.into()).unwrap());
+		// 	return Box::pin(async { res })
+		// };
+		// let mut inner_context = Context::from(&self.0);
+
+		// for (k, v) in matched.params.iter() {
+		// 	inner_context.push_str(k, v);
+		// }
+
+		// let result = matched.value.call(ServValue::None, &mut inner_context).unwrap();
+		// let res = Ok(Response::builder().body(result.into()).unwrap());
+		// Box::pin(async { res })
+	}
 }
 
 
+use hyper_util::rt::TokioIo;
+use hyper::server::conn::http1::Builder;
+
+async fn run_webserver(scope: Scope<'static>) {
+	let addr = SocketAddr::from(([0,0,0,0], 4000));
+	let listener = TcpListener::bind(addr).await.unwrap();
+
+	let scope_arc = Arc::new(scope);
+
+	loop {
+		let (stream, _) = listener.accept().await.unwrap();
+		let io = TokioIo::new(stream);
+
+		let scope_arc = scope_arc.clone();
+
+		tokio::task::spawn(async move {
+			Builder::new()
+				.serve_connection(io, Serv(scope_arc))
+				.await
+				.unwrap();
+		});
+	}
+}
+
 #[tokio::main]
-async fn main() -> hyper::Result<()> {
+async fn main() {
+	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
+	let input      = std::fs::read_to_string(&input_path).unwrap();
+	let ast        = parser::parse_root_from_text(&input).unwrap();
 
-    // Define this programs arguments
-    let matches = clap_app!(serv =>
-        (version: "0.3")
-        (author: "Connor Winiarczyk")
-        (about: "A Based Web Server")
-        (@arg port: -p --port +takes_value "which tcp port to listen on")
-        (@arg host: -h --host +takes_value "which ip addresses to accept connections from")
-        (@arg cert: -c --cert +takes_value "path to ssl certificate")
-        (@arg key:  -k --key  +takes_value "path to matching rsa key")
-        (@arg debug: -d ... "Sets the level of debugging information")
-        (@arg PATH: "the directory to serve files from")
-    ).get_matches();
+	let mut scope: Scope = Scope::empty();
 
-    let port = matches.value_of("port").unwrap_or("4000");
-    let host = matches.value_of("host").unwrap_or("0.0.0.0");
+	scope.insert(FnLabel::name("hello"),     ServFunction::Core(hello_world));
+	scope.insert(FnLabel::name("uppercase"), ServFunction::Core(uppercase));
+	scope.insert(FnLabel::name("incr"),      ServFunction::Core(incr));
+	scope.insert(FnLabel::name("decr"),      ServFunction::Core(decr));
+	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
+	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
+	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
+	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
+	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
+	scope.insert(FnLabel::name("sql"),    ServFunction::Core(sql));
+	scope.insert(FnLabel::name("sqlexec"),    ServFunction::Core(sql_exec));
 
-    let keypair = match (matches.value_of("cert"), matches.value_of("key")) {
-        (Some(cert), Some(key)) => Some(KeyPair {
-            cert: Path::new(&cert).to_path_buf(),
-            key: Path::new(&key).to_path_buf(),
-        }),
-        (None, None) => None,
+	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
+	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
+	scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
+	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
+	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
+	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
+	scope.insert(FnLabel::name("execpipe"),         ServFunction::Meta(execpipe));
 
-        // if one is set but not the other
-        _ => panic!("please specify both a key and a cert or neither"),
-    };
+	for declaration in ast.0 {
+    	if declaration.kind == "word" {
+        	let func = compile(declaration.value.0, &mut scope);
+        	scope.insert(declaration.key.to_owned().into(), func);
+    	}
 
+    	else if declaration.kind == "route" {
+        	let func = compile(declaration.value.0, &mut scope);
+        	scope.router.as_mut().unwrap().insert(declaration.key, func);
+    	}
+	}
 
-    // Determine the local path to serve files out of 
-    let path = Path::new(matches.value_of("PATH").unwrap_or("."));
+	if let Ok(out) = scope.get_str("out") {
+    	let res = out.call(ServValue::None, &scope);
+    	println!("{}", res.unwrap());
+	}
 
-    // if the path given has a root, ie. /home/www/public, use it as is,
-    // if not, ie. server/public join it to the end of the current directory
-    let path_abs = match path.has_root() {
-        true => path.to_path_buf(),
-        false => current_dir().unwrap().join(path),
-    }.canonicalize().unwrap();
-
-    println!("");
-    println!("Serving Directory: {:?}", path_abs);
-
-    // It is important to cd into the target directory so that shell scripts invoked in that
-    // directory will know what directory they are being run from
-    std::env::set_current_dir(&path_abs).expect("could not cd into that directory!");
-
-    let config = Config {
-        root: current_dir().unwrap(),
-        port: port.parse().unwrap(), // parse port value into an integer
-        host: host.to_string(),
-
-        keypair,
-
-        // keypair: Some(KeyPair {
-        //     key: Path::new("local.key").to_path_buf(),
-        //     cert: Path::new("local.cert").to_path_buf(),
-        // }),
-
-        // cert: Some(PathBuf::new()),
-        // key: Some(),
-    };
-
-    let routefile = config.root.join("routes.conf");
-
-    // Need to wrap the Route Table in an ARC so that we can move multiple references to it into
-    // the different request handling closures
-    let route_table = Arc::new(
-        route_table::RouteTable::from_file(&routefile)
-    );
-
-    println!("Generated the following Route Table:");
-    println!("{}", route_table);
-
-    let listen_addr = ([0,0,0,0], port.parse::<u16>().unwrap_or(4000)).into();
-
-    match config.keypair {
-        None => {
-            let service = make_service_fn(move |_| {
-                let route_table = route_table.clone();
-                async move {
-                    Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
-                        let route_table = route_table.clone();
-                        async move {
-                            route_table.resolve(req).await
-                        }
-                    }))
-                }
-            });
-
-            Server::bind(&listen_addr).serve(service).await;
-        },
-
-        Some(keypair) => {
-            let service = make_service_fn(move |_| {
-                let route_table = route_table.clone();
-                async move {
-                    Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
-                        let route_table = route_table.clone();
-                        async move {
-                            route_table.resolve(req).await
-                        }
-                    }))
-                }
-            });
-
-
-            let addr = AddrIncoming::bind(&listen_addr)?;
-            // let incoming = TlsListener::new(tls_acceptor(&keypair), addr).filter(|conn|{
-            let incoming = TlsListener::new(keypair.into_tls_acceptor(), addr).filter(|conn|{
-                if let Err(err) = conn {
-                    eprintln!("Error: {:?}", err);
-                    ready(false)
-                } else {
-                    ready(true)
-                }
-            });
-
-            Server::builder(accept::from_stream(incoming)).serve(service).await;
-
-        }
-    };
-
-    Ok(())
+	println!("starting web server");
+	run_webserver(scope).await;
 }
