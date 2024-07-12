@@ -1,14 +1,16 @@
 use crate::ast;
 use crate::template::Template;
 use std::collections::VecDeque;
+use std::collections::HashMap;
 use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum ServValue {
     None,
     Int(i64),
-    List(VecDeque<ServValue>),
     Text(String),
+    List(VecDeque<ServValue>),
+    Table(HashMap<String, ServValue>),
 }
 
 impl ServValue {
@@ -30,6 +32,9 @@ impl Display for ServValue {
             Self::None => f.write_str("none")?,
             Self::Text(ref t) => f.write_str(t)?,
             Self::Int(i) => write!(f, "{}", i)?,
+            Self::Table(table) => {
+				f.debug_map().entries(table.iter()).finish()?;
+            },
             Self::List(l) => {
                 f.write_str("[")?;
 				let mut iter = l.iter().peekable();

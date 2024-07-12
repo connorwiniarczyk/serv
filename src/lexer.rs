@@ -30,12 +30,38 @@ pub enum TokenKind {
     EndOfInput,
 }
 
+impl std::fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub contents: String,
     pub start: usize,
     pub end: usize,
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+		write!(f, "({} {:?})", self.kind, self.contents)?;
+		Ok(())
+    }
+}
+
+pub struct TokenList(pub Vec<Token>);
+
+impl std::fmt::Display for TokenList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut iter = self.0.iter().peekable();
+        while let Some(token) = iter.next() {
+			token.fmt(f)?;
+			f.write_str("\n");
+        }
+        Ok(())
+    }
 }
 
 struct Cursor<'input> {
@@ -183,7 +209,8 @@ fn tokenize_inner_expression(cursor: &mut Cursor, output: &mut Vec<Token>) {
 	}
 }
 
-pub fn tokenize(input: &str) -> Vec<Token> {
+
+pub fn tokenize(input: &str) -> TokenList {
     let chars: Vec<char> = input.chars().collect();
     let mut cursor = Cursor::new(&chars);
     let mut output: Vec<Token> = Vec::new();
@@ -244,5 +271,5 @@ pub fn tokenize(input: &str) -> Vec<Token> {
     }
 
     output.push(cursor.emit_token(TokenKind::EndOfInput));
-    return output
+    return TokenList(output)
 }

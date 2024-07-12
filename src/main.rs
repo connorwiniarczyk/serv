@@ -252,6 +252,8 @@ async fn main() {
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
+	scope.insert(FnLabel::name("sql"),    ServFunction::Core(sql));
+	scope.insert(FnLabel::name("sqlexec"),    ServFunction::Core(sql_exec));
 
 	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
 	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
@@ -278,5 +280,6 @@ async fn main() {
     	println!("{}", res.unwrap());
 	}
 
+	println!("starting web server");
 	run_webserver(scope).await;
 }

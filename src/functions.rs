@@ -4,12 +4,13 @@ use crate::Scope;
 use crate::Words;
 use crate::parser;
 use crate::compile;
+
 use std::process::{Command, Stdio};
 use std::io::Write;
 use std::io::{BufWriter};
-
 use evalexpr::eval;
 use std::collections::VecDeque;
+use sqlite;
 
 pub fn exec(input: ServValue, scope: &Scope) -> ServResult {
     let mut cmd = Command::new(input.to_string())
@@ -39,8 +40,35 @@ pub fn execpipe(words: &mut Words, input: ServValue, scope: &Scope) -> ServResul
     Ok(ServValue::Text(std::str::from_utf8(&output.stdout).unwrap().to_owned()))
 }
 
+use std::collections::HashMap;
 
+pub fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
+    let connection = sqlite::open("serv.sqlite").unwrap();
+    connection.execute(input.to_string()).unwrap();
+    Ok(ServValue::None)
+}
 
+pub fn sql(input: ServValue, scope: &Scope) -> ServResult {
+    let mut output: HashMap<String, ServValue> = HashMap::new();
+    let connection = sqlite::open("serv.sqlite").unwrap();
+    let mut statement = connection.prepare(input.to_string()).unwrap();
+
+    while let Ok(sqlite::State::Row) = statement.next() {
+        for (index, name) in statement.column_names().iter().enumerate() {
+            let value = match statement.column_type(index).unwrap() {
+                sqlite::Type::Binary  => {todo!()},
+                sqlite::Type::Float   => {todo!()},
+                sqlite::Type::Integer => ServValue::Int(statement.read(index).unwrap()),
+                sqlite::Type::String  => ServValue::Text(statement.read(index).unwrap()),
+                sqlite::Type::Null    => ServValue::None,
+
+            };
+			output.insert(name.clone(), value);
+        }
+    }
+
+    Ok(ServValue::Table(output))
+}
 
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text("hello world".to_owned()))

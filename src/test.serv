@@ -1,1 +1,2 @@
-/ => file {src/test.serv}
+/ => sql { select id from test }
+/count => sql {update test set id = id + 1}
