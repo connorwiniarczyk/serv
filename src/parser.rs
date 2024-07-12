@@ -163,7 +163,7 @@ pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, ServEr
 
 pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, ServError> {
 	let tokens = lexer::tokenize(input);
-	// println!("{}", tokens);
+	println!("{}", tokens);
 	let mut cursor = Cursor::new(&tokens.0);
 	let ast = parse_root(&mut cursor)?;
 

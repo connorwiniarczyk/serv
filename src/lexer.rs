@@ -174,6 +174,7 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
 fn tokenize_inner_expression(cursor: &mut Cursor, output: &mut Vec<Token>) {
     while let Some(c) = cursor.get(0) {
         match c {
+            ','  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Comma))},
             ';'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Semicolon))},
             '$'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Dollar))},
             '%'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
@@ -203,12 +204,11 @@ fn tokenize_inner_expression(cursor: &mut Cursor, output: &mut Vec<Token>) {
                 cursor.incr_while(|x| x.is_digit(10));
                 output.push(cursor.emit_token(TokenKind::IntLiteral))
             },
-                
-            c @ _ => panic!("{}", c),
+
+            _ => return,
         }
 	}
 }
-
 
 pub fn tokenize(input: &str) -> TokenList {
     let chars: Vec<char> = input.chars().collect();
@@ -218,55 +218,54 @@ pub fn tokenize(input: &str) -> TokenList {
     while let Some(c) = cursor.get(0) {
         match c {
             '@'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::At))},
-            ';'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Semicolon))},
-            '$'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Dollar))},
-            '%'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
-            '*'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
-            '!'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
-            '\n' => {cursor.incr(1); _ = cursor.emit_token(TokenKind::NewLine)},
-            
-            '[' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::ListBegin))},
-            ']' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::ListEnd))},
-            ',' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Comma))},
-            
-            '(' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::LambdaBegin))},
-            ')' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::LambdaEnd))},
-            
             '#'  => {
                 cursor.incr(1);
                 cursor.incr_while(|x| x != '\n' && x != '#');
                 _ = cursor.emit_token(TokenKind::Comment);
             },
-                // output.push(cursor.emit_token(TokenKind::Comment))},
-            
-            '\t' | ' ' => {
-                cursor.incr_while(|x| x == '\t' || x == ' ');
-                _ = cursor.emit_token(TokenKind::WhiteSpace)
-            },
-           
             '=' if cursor.get(1) == Some('>') => {
                 cursor.incr(2);
                 output.push(cursor.emit_token(TokenKind::WideArrow))
             },
-        
+            '=' => { cursor.incr(1); output.push(cursor.emit_token(TokenKind::WideArrow))},
             '/' => {
                 cursor.incr_while(|x| !x.is_whitespace());
                 output.push(cursor.emit_token(TokenKind::Route))
             }
+            _ => tokenize_inner_expression(&mut cursor, &mut output),
 
-            '{' | '"' => tokenize_string_template(&mut cursor, &mut output),
+            // '\t' | ' ' => {
+            //     cursor.incr_while(|x| x == '\t' || x == ' ');
+            //     _ = cursor.emit_token(TokenKind::WhiteSpace)
+            // },
+
+            // '{' | '"' => tokenize_string_template(&mut cursor, &mut output),
             
-            c @ _ if c.is_alphabetic() => {
-                cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
-                output.push(cursor.emit_token(TokenKind::Identifier))
-            },
+            // c @ _ if c.is_alphabetic() => {
+            //     cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
+            //     output.push(cursor.emit_token(TokenKind::Identifier))
+            // },
             
-            c @ _ if c.is_digit(10) => {
-                cursor.incr_while(|x| x.is_digit(10));
-                output.push(cursor.emit_token(TokenKind::IntLiteral))
-            },
-                
-            c @ _ => panic!("{}", c),
+            // c @ _ if c.is_digit(10) => {
+            //     cursor.incr_while(|x| x.is_digit(10));
+            //     output.push(cursor.emit_token(TokenKind::IntLiteral))
+            // },
+            //
+            // ';'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Semicolon))},
+            // '$'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Dollar))},
+            // '%'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
+            // '*'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
+            // '!'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
+            // '\n' => {cursor.incr(1); _ = cursor.emit_token(TokenKind::NewLine)},
+            
+            // '[' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::ListBegin))},
+            // ']' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::ListEnd))},
+            // ',' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Comma))},
+            
+            // '(' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::LambdaBegin))},
+            // ')' => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::LambdaEnd))},
+
+            // c @ _ => panic!("{}", c),
         }
     }
 

@@ -1,2 +1,7 @@
-/ => sql { select id from test }
-/count => sql {update test set id = id + 1}
+
+@fibonacci => let {
+    @calc => %{$(fibonacci decr) + $(fibonacci decr decr)} 
+} *(choose (in) [{0}, {1}, {calc}])
+
+
+@out => map fibonacci [1, 2, 3, 4, 5, 6]
