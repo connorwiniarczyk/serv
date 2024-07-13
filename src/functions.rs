@@ -13,15 +13,24 @@ use std::collections::VecDeque;
 use sqlite;
 
 pub fn exec(input: ServValue, scope: &Scope) -> ServResult {
-    let mut cmd = Command::new(input.to_string())
+    let text = input.to_string();
+    let mut args = text.split_whitespace();
+    let mut cmd = Command::new(args.next().ok_or("not enough arguments")?);
+    for arg in args {
+        cmd.arg(arg);
+    }
+
+    let result = cmd
+        .stdout(Stdio::piped())
+        .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()
-        .unwrap();
-    let output = cmd.wait_with_output().unwrap();
-    Ok(ServValue::Text(std::str::from_utf8(&output.stdout).unwrap().to_owned()))
+        .spawn().map_err(|_| "could not spawn")?.wait_with_output().unwrap();
+
+    Ok(ServValue::Raw(result.stdout))
+    // Ok(ServValue::Text(std::str::from_utf8(&result.stdout).unwrap().to_owned()))
 }
 
-pub fn execpipe(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+pub fn exec_pipe(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let arg_name = words.0.pop_front().unwrap();
     let arg_fn = scope.get(&arg_name).unwrap();
     let arg = arg_fn.call(input.clone(), scope)?;
@@ -98,6 +107,11 @@ pub fn read_file(input: ServValue, scope: &Scope) -> ServResult {
     let path = input.to_string();
     let contents = std::fs::read_to_string(path).map_err(|e| "failed to open file")?;
     Ok(ServValue::Text(contents))
+}
+pub fn read_file_raw(input: ServValue, scope: &Scope) -> ServResult {
+    let path = input.to_string();
+    let contents = std::fs::read(path).map_err(|e| "failed to open file")?;
+    Ok(ServValue::Raw(contents))
 }
 
 pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
@@ -185,4 +199,24 @@ pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 	}
 
     words.eval(input, &new_scope)
+}
+
+pub fn with_header(words: &mut Words, mut input: ServValue, scope: &Scope) -> ServResult {
+    let arg = words.take_next(scope)?;
+	let mut output = words.eval(input, scope)?;
+	let headers: &mut ServValue = output.metadata()
+    	.entry("headers".to_owned())
+    	.or_insert(ServValue::List(VecDeque::new()));
+
+	let ServValue::List(list) = headers else {panic!()};
+	list.push_back(arg);
+	Ok(output)
+}
+
+pub fn with_status(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let arg = words.take_next(scope)?;
+    let mut output = words.eval(input, scope)?;
+	output.metadata().insert("status".to_owned(), arg);
+
+	Ok(output)
 }

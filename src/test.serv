@@ -1,7 +1,5 @@
-
-@fibonacci => let {
-    @calc => %{$(fibonacci decr) + $(fibonacci decr decr)} 
-} *(choose (in) [{0}, {1}, {calc}])
-
-
-@out => map fibonacci [1, 2, 3, 4, 5, 6]
+/ => *{
+	with_header {Content-Type = application/json} {{
+       	"name": "connor"
+    }}
+}

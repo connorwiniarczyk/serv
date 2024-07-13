@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+mod tape;
 mod error;
 mod functions;
 mod lexer;
@@ -22,6 +23,8 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use matchit::Router;
 
+use tape::Words;
+
 type ServResult = Result<ServValue, &'static str>;
 pub type Scope<'a> = dictionary::StackDictionary<'a, ServFunction>;
 
@@ -31,29 +34,6 @@ impl<'a> Scope<'a> {
     }
 }
 
-struct Words(VecDeque<FnLabel>);
-
-impl Words {
-    pub fn next(&mut self) -> Option<FnLabel> {
-        self.0.pop_front()
-    }
-
-    pub fn empty() -> Self {
-        Self(VecDeque::new())
-    }
-
-    pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
-        let Some(next) = self.next() else { return Ok(input) };
-        let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
-
-        if let ServFunction::Meta(m) = next_fn {
-			return (m)(self, input, scope);
-        } else {
-            let rest = self.eval(input, scope)?;
-            return next_fn.call(rest, scope)
-        }
-    }
-}
 
 #[derive(Clone)]
 pub enum ServFunction {
@@ -151,7 +131,10 @@ impl ServBody {
 
 impl From<ServValue> for ServBody {
 	fn from(input: ServValue) -> Self {
-		Self(Some(input.to_string().bytes().collect()))
+    	match input {
+			ServValue::Raw(bytes) => Self(Some(bytes.into())),
+			_ => Self(Some(input.to_string().bytes().collect())),
+    	}
 	}
 }
 
@@ -178,17 +161,45 @@ impl Service<Request<IncomingBody>> for Serv<'_> {
 
 	fn call(&self, req: Request<IncomingBody>) -> Self::Future {
     	let router = self.0.router.as_ref().unwrap();
-    	let Ok(matched) = router.at(req.uri().path()) else { panic!() };
+    	let Ok(matched) = router.at(req.uri().path()) else {
+        	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
+        	let res = Response::builder()
+            	.status(404)
+            	.body(ServValue::Text(text).into())
+            	.unwrap();
+        	return Box::pin(async {Ok(res)})
+    	};
 
 		let mut scope = self.0.make_child();
     	for (k, v) in matched.params.iter() {
-        	println!("{:?}", v);
 			scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
     	}
 
     	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
-		let res = Ok(Response::builder().body(result.into()).unwrap());
-		Box::pin(async { res })
+		let mut response = Response::builder();
+
+		if let Some(data) = result.get_metadata() {
+    		if let Some(status) = data.get("status") {
+        		let code = status.expect_int().unwrap().clone();
+        		response = response.status(u16::try_from(code).unwrap());
+    		}
+
+    		if let Some(ServValue::List(headers)) = data.get("headers") {
+        		for header in headers {
+            		let text = header.to_string();
+                	let mut iter = text
+                    	.split("=")
+                    	.map(|x| x.trim());
+
+                	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+                	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+            		response = response.header(key, value);
+        		}
+    		}
+		}
+
+		let response_sender = response.body(result.into()).unwrap();
+		Box::pin(async { Ok(response_sender) })
 
     	// todo!();
 		// let Ok(matched) = self.0.routes.at(req.uri().path()) else {
@@ -248,7 +259,9 @@ async fn main() {
 	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
 	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
 	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("read.raw"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file.raw"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
@@ -261,7 +274,9 @@ async fn main() {
 	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
 	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
 	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
-	scope.insert(FnLabel::name("execpipe"),         ServFunction::Meta(execpipe));
+	scope.insert(FnLabel::name("exec.pipe"),         ServFunction::Meta(exec_pipe));
+	scope.insert(FnLabel::name("with_header"),         ServFunction::Meta(with_header));
+	scope.insert(FnLabel::name("with_status"),         ServFunction::Meta(with_status));
 
 	for declaration in ast.0 {
     	if declaration.kind == "word" {

@@ -9,14 +9,44 @@ pub enum ServValue {
     None,
     Int(i64),
     Text(String),
+    Raw(Vec<u8>),
     List(VecDeque<ServValue>),
     Table(HashMap<String, ServValue>),
+    Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
+}
+
+impl Default for ServValue {
+	fn default() -> Self {
+    	Self::None
+	}
 }
 
 impl ServValue {
-    pub fn expect_int(self) -> Result<i64, &'static str> {
+    pub fn expect_int(&self) -> Result<i64, &'static str> {
         let Self::Int(i) = self else { return Err("expected an int") };
-        Ok(i)
+        Ok(i.clone())
+    }
+
+    // pub fn insert_metadata(&mut self, key: &str, value: ServValue) {
+    pub fn metadata(&mut self) -> &mut HashMap<String, ServValue> {
+    	if let ServValue::Meta { ref inner, ref mut metadata } = self {
+        	metadata
+    	} else {
+        	let mut metadata = HashMap::new();
+        	let inner = Box::new(std::mem::take(self));
+        	*self = Self::Meta { inner, metadata };
+
+			let Self::Meta { inner, ref mut metadata } = self else { unreachable!() };
+			metadata
+    	}
+    }
+
+    pub fn get_metadata(&self) -> Option<&HashMap<String, ServValue>> {
+        if let Self::Meta { inner, metadata } = self {
+            Some(metadata)
+        } else {
+            None
+        }
     }
 }
 
@@ -31,7 +61,11 @@ impl Display for ServValue {
         match self {
             Self::None => f.write_str("none")?,
             Self::Text(ref t) => f.write_str(t)?,
+            Self::Raw(bytes) => f.debug_list().entries(bytes.iter()).finish()?,
             Self::Int(i) => write!(f, "{}", i)?,
+            Self::Meta { inner, metadata } => {
+                inner.fmt(f)?;
+            },
             Self::Table(table) => {
 				f.debug_map().entries(table.iter()).finish()?;
             },
