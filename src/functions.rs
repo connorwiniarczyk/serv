@@ -24,8 +24,8 @@ pub fn exec(input: ServValue, scope: &Scope) -> ServResult {
 pub fn execpipe(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let arg_name = words.0.pop_front().unwrap();
     let arg_fn = scope.get(&arg_name).unwrap();
-    let arg = arg_fn.call(input.clone(), scope)?;
-    let rest = words.eval(input, scope)?;
+    let arg = arg_fn.call(&mut Words::empty(), scope)?;
+    let rest = words.eval(scope)?;
 
     let mut cmd = Command::new(arg.to_string())
         .stderr(Stdio::null())
@@ -126,63 +126,63 @@ pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
 }
 
 
-pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+pub fn drop(words: &mut Words, scope: &Scope) -> ServResult {
     _ = words.0.pop_front();
-    words.eval(input, scope)
+    words.eval(scope)
 }
 
-pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+pub fn map(words: &mut Words, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enough arguments")?;
     let arg = scope.get(&next).ok_or("not found")?;
-    let rest = words.eval(input, scope)?;
+    let rest = words.eval(scope)?;
 
 	let mapped = match rest {
-    	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call(a, scope).unwrap()).collect()),
+    	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call_with_input(a, scope).unwrap()).collect()),
     	_ => todo!(),
 	};
 
 	Ok(mapped)
 }
 
-pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+pub fn apply(words: &mut Words, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enought arguments")?;
-    let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
+    let arg = scope.get(&next).ok_or("not found")?.call(&mut Words::empty(), scope)?;
 
 	let mut new_scope = scope.make_child();
 	let ast = parser::parse_expression_from_text(arg.to_string().as_str()).unwrap();
 	let func = compile(ast.0, &mut new_scope);
 
-    let rest = words.eval(input, scope)?;
+	println!("{:?}", words);
 
-    func.call(rest, &new_scope)
+    func.call(words, &new_scope)
 }
 
-pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let next = words.next().ok_or("not enought arguments")?;
-    let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
-    let rest = words.eval(input, scope)?;
+// pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+//     let next = words.next().ok_or("not enought arguments")?;
+//     let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
+//     let rest = words.eval(input, scope)?;
 
-	let ServValue::List(list) = rest else { return Err("not a valid list") };
+// 	let ServValue::List(list) = rest else { return Err("not a valid list") };
 
-	let index: usize = arg.expect_int()?.try_into().unwrap();
+// 	let index: usize = arg.expect_int()?.try_into().unwrap();
 
-	Ok(list[index.clamp(0, list.len() - 1)].clone())
-}
+// 	Ok(list[index.clamp(0, list.len() - 1)].clone())
+// }
 
-pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let arg_name = words.0.pop_front().unwrap();
-    let arg_fn = scope.get(&arg_name).unwrap();
-    let arg = arg_fn.call(ServValue::None, scope)?;
+// pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+//     let arg_name = words.0.pop_front().unwrap();
+//     let arg_fn = scope.get(&arg_name).unwrap();
+//     let arg = arg_fn.call(ServValue::None, scope)?;
 
-	let ast = parser::parse_root_from_text(arg.to_string().as_str()).unwrap();
-	let mut new_scope = scope.make_child();
+// 	let ast = parser::parse_root_from_text(arg.to_string().as_str()).unwrap();
+// 	let mut new_scope = scope.make_child();
 
-	for declaration in ast.0 {
-    	if declaration.kind == "word" {
-        	let func = compile(declaration.value.0, &mut new_scope);
-        	new_scope.insert(declaration.key.to_owned().into(), func);
-    	}
-	}
+// 	for declaration in ast.0 {
+//     	if declaration.kind == "word" {
+//         	let func = compile(declaration.value.0, &mut new_scope);
+//         	new_scope.insert(declaration.key.to_owned().into(), func);
+//     	}
+// 	}
 
-    words.eval(input, &new_scope)
-}
+//     words.eval(input, &new_scope)
+// }

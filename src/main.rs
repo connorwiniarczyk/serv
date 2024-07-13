@@ -31,6 +31,7 @@ impl<'a> Scope<'a> {
     }
 }
 
+#[derive(Debug)]
 struct Words(VecDeque<FnLabel>);
 
 impl Words {
@@ -42,16 +43,19 @@ impl Words {
         Self(VecDeque::new())
     }
 
-    pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
-        let Some(next) = self.next() else { return Ok(input) };
+    pub fn eval(&mut self, scope: &Scope) -> ServResult {
+    // pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
+        let Some(next) = self.next() else { return Ok(ServValue::None) };
         let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
 
-        if let ServFunction::Meta(m) = next_fn {
-			return (m)(self, input, scope);
-        } else {
-            let rest = self.eval(input, scope)?;
-            return next_fn.call(rest, scope)
-        }
+        next_fn.call(self, scope)
+
+   //      if let ServFunction::Meta(m) = next_fn {
+			// return (m)(self, input, scope);
+   //      } else {
+   //          let rest = self.eval(input, scope)?;
+   //          return next_fn.call(rest, scope)
+   //      }
     }
 }
 
@@ -59,45 +63,55 @@ impl Words {
 pub enum ServFunction {
     Literal(ServValue),
     Core(fn(ServValue, &Scope) -> ServResult),
-    Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
+    WithArg(fn(ServValue, ServValue, &Scope) -> ServResult),
+    Meta(fn(&mut Words, &Scope) -> ServResult),
     Template(Template),
     List(Vec<FnLabel>),
     Composition(Vec<FnLabel>),
 }
 
 impl ServFunction {
-    // TODO:
-    // pub fn call_with_words(&self, input: ServValue, scope: &Scope, words: &mut Words) -> ServResult {
-    //     match self {
-    //         Self::Core(f) => f(words.eval(scope.get("in").unwrap_or(), scope)?, scope),
-    //         _ => todo!(),
-    //     }
-    // }
-
-    pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
+    pub fn call_with_input(&self, input: ServValue, scope: &Scope) -> ServResult {
         match self {
-            Self::Core(f)        => f(input, scope),
+            Self::Core(f) => f(input, scope),
+            Self::Literal(l) => Ok(l.clone()),
+            _ => Err("function cannot be called in this way"),
+        }
+    }
+
+    pub fn call(&self, words: &mut Words, scope: &Scope) -> ServResult {
+        match self {
+            Self::Core(f)        => { let input = words.eval(scope)?; f(input, scope) },
+            Self::WithArg(f) => {
+                let next = words.next().ok_or("not enough arguments")?;
+                let arg = scope.get(&next).ok_or("not found")?
+                    .call(&mut Words::empty(), scope)?;
+                let rest = words.eval(scope)?;
+                f(arg, rest, scope)
+            },
             Self::Literal(l)     => Ok(l.clone()),
             Self::Template(t)    => {
                 let mut child = scope.make_child();
+                let input = words.eval(scope)?;
                 child.insert_name("in", ServFunction::Literal(input));
                 t.render(&child)
             },
             Self::Composition(v) => {
                 let mut child_scope = scope.make_child();
+                let input = words.eval(scope)?;
                 child_scope.insert_name("in", ServFunction::Literal(input.clone()));
 
                 let mut words: VecDeque<FnLabel> = v.clone().into();
-                Words(words).eval(input, &child_scope)
+                Words(words).eval(&child_scope)
             },
             Self::List(l) => {
                 let mut list: VecDeque<ServValue> = VecDeque::new();
                 for f in l {
-                    list.push_back(scope.get(f).unwrap().call(input.clone(), scope)?);
+                    list.push_back(scope.get(f).unwrap().call(&mut Words::empty(), scope)?);
                 }
                 Ok(ServValue::List(list))
             }
-            Self::Meta(_) => Err("called a meta function when it was not appropriate"),
+            Self::Meta(f) => f(words, scope),
         }
     }
 }
@@ -177,18 +191,20 @@ impl Service<Request<IncomingBody>> for Serv<'_> {
 	type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
 	fn call(&self, req: Request<IncomingBody>) -> Self::Future {
-    	let router = self.0.router.as_ref().unwrap();
-    	let Ok(matched) = router.at(req.uri().path()) else { panic!() };
+    	todo!();
+  //   	let router = self.0.router.as_ref().unwrap();
+  //   	let Ok(matched) = router.at(req.uri().path()) else { panic!() };
 
-		let mut scope = self.0.make_child();
-    	for (k, v) in matched.params.iter() {
-        	println!("{:?}", v);
-			scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
-    	}
+		// let mut scope = self.0.make_child();
+  //   	for (k, v) in matched.params.iter() {
+  //       	println!("{:?}", v);
+		// 	scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
+  //   	}
 
-    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
-		let res = Ok(Response::builder().body(result.into()).unwrap());
-		Box::pin(async { res })
+  //   	// let result = matched.value.call(ServValue::None, &mut scope).unwrap();
+  //   	let result = matched.value.call(Words::empty(), &mut scope).unwrap();
+		// let res = Ok(Response::builder().body(result.into()).unwrap());
+		// Box::pin(async { res })
 
     	// todo!();
 		// let Ok(matched) = self.0.routes.at(req.uri().path()) else {
@@ -257,11 +273,11 @@ async fn main() {
 
 	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
 	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
-	scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
-	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
-	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
+	// scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
+	// scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
+	// scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
 	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
-	scope.insert(FnLabel::name("execpipe"),         ServFunction::Meta(execpipe));
+	// scope.insert(FnLabel::name("execpipe"),         ServFunction::Meta(execpipe));
 
 	for declaration in ast.0 {
     	if declaration.kind == "word" {
@@ -276,7 +292,7 @@ async fn main() {
 	}
 
 	if let Ok(out) = scope.get_str("out") {
-    	let res = out.call(ServValue::None, &scope);
+    	let res = out.call(&mut Words::empty(), &scope);
     	println!("{}", res.unwrap());
 	}
 

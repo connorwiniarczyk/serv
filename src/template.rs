@@ -1,6 +1,7 @@
 use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
+use crate::Words;
 use crate::{ Scope, ServResult };
 
 use std::fmt::Display;
@@ -60,15 +61,17 @@ impl Template {
                 TemplateElement::Expression(t) => {
                     match t {
                         ast::Word::Function(token) => {
-                            let value = ctx.get(&token.contents.clone().into()).ok_or("does not exist")?.call(ServValue::None, ctx)?;
+                            let value = ctx.get(&token.contents.clone().into()).ok_or("does not exist")?.call(&mut Words::empty(), ctx)?;
                             output.push_str(value.to_string().as_str());
                         },
                         ast::Word::Parantheses(words) => {
                             // println!("expr {:?}", words);
                             let mut child = ctx.make_child();
                         	let func = crate::compile(words.0.clone(), &mut child);
-                        	let value = func.call(ctx.get_str("in")?.call(ServValue::None, &child)?, &child)?;
-                            output.push_str(value.to_string().as_str());
+                        	// let value = func.call(ctx.get_str("in")?.call(&mut Words::empty(), &child)?, &child)?;
+                        	// let value = func.call(ctx.get_str("in")?.call(&mut Words::empty(), &child)?, &child)?;
+                            // output.push_str(value.to_string().as_str());
+                            todo!();
                         },
                         _ => todo!(),
 
