@@ -46,4 +46,35 @@ mess.
 Serv strings are allowed to contain any number of `$` follwed by expressions. When
 the string is evaluated, the expression will be called and its output placed into
 the text. Strings are allowed to access any function or variable in this way.
-In addition, strings can be treated like other
+In addition, strings can be treated like other function by using the $in variable
+to refer to the computed value of the expression to it's right.
+
+
+### Recursion
+
+Like any good functional language, serv is capable of using recursive expressions
+to elegantly express certain computations. Although it is generally outside of the
+language's scope, it was important to me that serv be able to compute the
+fibonacci sequence in an aesthetically pleasing way.
+
+```
+# compute an element in the fibonacci sequence
+@fib => switch (in) [1, 1, %{ $(fib decr) + $(fib decr decr) }]
+
+# map the fibonacci function onto a list from 0 to 14
+@out => map fib count 15
+
+# prints to stdout:
+# [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610]
+```
+
+I think the result is an incredibly satisfying two lines of code,
+and is perhaps an instructive use of some of serv's more advanced
+features:
+
+- switch is a function that takes an index, a list of functions, and
+  an input, and applies the function at the given index to the input.
+  In this case, the index given is `in`, meaning the same value as
+  the input, and the functions are 1, 1, and the calculation
+  % { $(fib decr) + $(fib decr decr) }
+
