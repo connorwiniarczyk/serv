@@ -1,7 +1,2 @@
-
-@fibonacci => let {
-    @calc => %{$(fibonacci decr) + $(fibonacci decr decr)} 
-} *(choose (in) [{0}, {1}, {calc}])
-
-
-@out => map fibonacci [1, 2, 3, 4, 5, 6]
+@fib => switch (in) [1, 1, %{ $(fib decr) + $(fib decr decr) }]
+@out => map fib count 15
