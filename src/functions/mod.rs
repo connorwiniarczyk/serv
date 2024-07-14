@@ -5,49 +5,17 @@ use crate::Words;
 use crate::parser;
 use crate::compile;
 
+mod host;
+mod list_operations;
+pub use host::*;
+pub use list_operations::*;
+
 use std::process::{Command, Stdio};
 use std::io::Write;
 use std::io::{BufWriter};
 use evalexpr::eval;
 use std::collections::VecDeque;
 use sqlite;
-
-pub fn exec(input: ServValue, scope: &Scope) -> ServResult {
-    let text = input.to_string();
-    let mut args = text.split_whitespace();
-    let mut cmd = Command::new(args.next().ok_or("not enough arguments")?);
-    for arg in args {
-        cmd.arg(arg);
-    }
-
-    let result = cmd
-        .stdout(Stdio::piped())
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn().map_err(|_| "could not spawn")?.wait_with_output().unwrap();
-
-    Ok(ServValue::Raw(result.stdout))
-    // Ok(ServValue::Text(std::str::from_utf8(&result.stdout).unwrap().to_owned()))
-}
-
-pub fn exec_pipe(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let arg_name = words.0.pop_front().unwrap();
-    let arg_fn = scope.get(&arg_name).unwrap();
-    let arg = arg_fn.call(input.clone(), scope)?;
-    let rest = words.eval(input, scope)?;
-
-    let mut cmd = Command::new(arg.to_string())
-        .stderr(Stdio::null())
-        .stdout(Stdio::piped())
-        .stdin(Stdio::piped())
-        .spawn()
-        .unwrap();
-
-    cmd.stdin.as_mut().unwrap().write_all(rest.to_string().as_bytes());
-    let output = cmd.wait_with_output().unwrap();
-
-    Ok(ServValue::Text(std::str::from_utf8(&output.stdout).unwrap().to_owned()))
-}
 
 use std::collections::HashMap;
 
@@ -108,10 +76,20 @@ pub fn read_file(input: ServValue, scope: &Scope) -> ServResult {
     let contents = std::fs::read_to_string(path).map_err(|e| "failed to open file")?;
     Ok(ServValue::Text(contents))
 }
+
 pub fn read_file_raw(input: ServValue, scope: &Scope) -> ServResult {
     let path = input.to_string();
     let contents = std::fs::read(path).map_err(|e| "failed to open file")?;
     Ok(ServValue::Raw(contents))
+}
+
+pub fn read_dir(input: ServValue, scope: &Scope) -> ServResult {
+    let paths = std::fs::read_dir(input.to_string()).map_err(|_| "invalid path")?;
+    let mut output = VecDeque::new();
+    for path in paths {
+        if let Ok(p) = path { output.push_back(ServValue::Text(p.path().display().to_string())); }
+    }
+    Ok(ServValue::List(output))
 }
 
 pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
@@ -127,36 +105,11 @@ pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
 	})
 }
 
-pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
-    if let ServValue::List(l) = input {
-        let mut sum = 0;
-        for x in l.into_iter() { sum += x.expect_int()? };
-        Ok(ServValue::Int(sum))
-    }
-
-    else {
-        Ok(ServValue::Int(input.expect_int()?))
-    }
-}
-
-
 pub fn drop(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     _ = words.0.pop_front();
     words.eval(input, scope)
 }
 
-pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let next = words.next().ok_or("not enough arguments")?;
-    let arg = scope.get(&next).ok_or("not found")?;
-    let rest = words.eval(input, scope)?;
-
-	let mapped = match rest {
-    	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call(a, scope).unwrap()).collect()),
-    	_ => todo!(),
-	};
-
-	Ok(mapped)
-}
 
 pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enought arguments")?;
@@ -171,17 +124,6 @@ pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     func.call(rest, &new_scope)
 }
 
-pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let next = words.next().ok_or("not enought arguments")?;
-    let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
-    let rest = words.eval(input, scope)?;
-
-	let ServValue::List(list) = rest else { return Err("not a valid list") };
-
-	let index: usize = arg.expect_int()?.try_into().unwrap();
-
-	Ok(list[index.clamp(0, list.len() - 1)].clone())
-}
 
 pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let arg_name = words.0.pop_front().unwrap();
@@ -219,4 +161,55 @@ pub fn with_status(words: &mut Words, input: ServValue, scope: &Scope) -> ServRe
 	output.metadata().insert("status".to_owned(), arg);
 
 	Ok(output)
+}
+
+use crate::error::ServError;
+fn parse_key_value(input: &str) -> Result<(String, String), &'static str> {
+    let mut iter = input.split("=").map(str::trim).map(str::to_string);
+    Ok((iter.next().ok_or("invalid option")?, iter.next().ok_or("invalid_option")?))
+}
+
+pub fn with_option(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let arg = words.take_next(scope)?;
+    let (key, value) = parse_key_value(&arg.to_string())?;
+    let mut output = words.eval(input, scope)?;
+	output.metadata().insert(key, ServValue::Text(value));
+	Ok(output)
+}
+
+
+use crate::ServFunction;
+use crate::FnLabel;
+
+pub fn bind_standard_library(scope: &mut Scope) {
+	scope.insert(FnLabel::name("hello"),     ServFunction::Core(hello_world));
+	scope.insert(FnLabel::name("uppercase"), ServFunction::Core(uppercase));
+	scope.insert(FnLabel::name("incr"),      ServFunction::Core(incr));
+	scope.insert(FnLabel::name("decr"),      ServFunction::Core(decr));
+	scope.insert(FnLabel::name("%"),         ServFunction::Core(math_expr));
+	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
+	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("read.raw"),      ServFunction::Core(read_file_raw));
+	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file.raw"),      ServFunction::Core(read_file_raw));
+	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
+	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
+	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
+	scope.insert(FnLabel::name("sql"),    ServFunction::Core(sql));
+	scope.insert(FnLabel::name("sqlexec"),    ServFunction::Core(sql_exec));
+	scope.insert(FnLabel::name("ls"),    ServFunction::Core(read_dir));
+	scope.insert(FnLabel::name("count"),    ServFunction::Core(count));
+
+	scope.insert(FnLabel::name("!"),         ServFunction::Meta(drop));
+	scope.insert(FnLabel::name("map"),       ServFunction::Meta(map));
+	scope.insert(FnLabel::name("using"),     ServFunction::Meta(using));
+	scope.insert(FnLabel::name("let"),       ServFunction::Meta(using));
+	scope.insert(FnLabel::name("choose"),    ServFunction::Meta(choose));
+	scope.insert(FnLabel::name("*"),         ServFunction::Meta(apply));
+	scope.insert(FnLabel::name("exec.pipe"),         ServFunction::Meta(exec_pipe));
+	scope.insert(FnLabel::name("with_header"),         ServFunction::Meta(with_header));
+	scope.insert(FnLabel::name("with_status"),         ServFunction::Meta(with_status));
+	scope.insert(FnLabel::name("fold"),    ServFunction::Meta(fold));
+	scope.insert(FnLabel::name("get"),    ServFunction::Meta(get));
+	scope.insert(FnLabel::name("switch"),    ServFunction::Meta(switch));
 }

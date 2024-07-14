@@ -23,6 +23,7 @@ impl Default for ServValue {
 
 impl ServValue {
     pub fn expect_int(&self) -> Result<i64, &'static str> {
+        if let Self::Meta { inner, metadata } = self { return inner.expect_int() };
         let Self::Int(i) = self else { return Err("expected an int") };
         Ok(i.clone())
     }
@@ -48,6 +49,14 @@ impl ServValue {
             None
         }
     }
+
+    pub fn ignore_metadata(self) -> ServValue {
+        if let Self::Meta { inner, .. } = self {
+            *inner
+        } else {
+            self
+        }
+    }
 }
 
 impl From<i64> for ServValue {
@@ -59,13 +68,11 @@ impl From<i64> for ServValue {
 impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::None => f.write_str("none")?,
+            Self::None => f.write_str("")?,
             Self::Text(ref t) => f.write_str(t)?,
             Self::Raw(bytes) => f.debug_list().entries(bytes.iter()).finish()?,
             Self::Int(i) => write!(f, "{}", i)?,
-            Self::Meta { inner, metadata } => {
-                inner.fmt(f)?;
-            },
+            Self::Meta { inner, metadata } => inner.fmt(f)?,
             Self::Table(table) => {
 				f.debug_map().entries(table.iter()).finish()?;
             },

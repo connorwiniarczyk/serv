@@ -78,7 +78,7 @@ impl<'input> Cursor<'input> {
     fn incr(&mut self, offset: usize) {
         self.index += offset;
     }
-    
+
     fn incr_while<F>(&mut self, test: F) where F: Fn(char) -> bool {
         while (self.get(0).is_some() && (test)(self.get(0).unwrap())) {
             self.incr(1);
@@ -93,6 +93,17 @@ impl<'input> Cursor<'input> {
         }
     }
     
+    fn emit_special(&mut self, text: &str) -> Token {
+        let output = Token {
+            start: self.mark,
+            end: self.index,
+            contents: text.to_string(),
+            kind: TokenKind::TemplateText,
+        };
+        self.mark = self.index;
+        output
+    }
+
     fn emit_token(&mut self, kind: TokenKind) -> Token {
         let mut contents = String::new();
         for i in self.mark..self.index {
@@ -157,7 +168,10 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
 
                 },
 
-                '\\' => todo!(),
+                '\\' if cursor.get(1) == Some('n') => {
+                    cursor.incr(2);
+                    output.push(cursor.emit_special("\n"));
+                },
                 // '"' => todo!()
 
                 _ => unreachable!(),
