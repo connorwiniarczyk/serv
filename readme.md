@@ -78,7 +78,7 @@ perhaps an instructive use of some of serv's more advanced features:
 switch is a function that takes an index, a list of functions, and an input,
 and applies the function at the given index to the input.  In this case, the
 index given is `in`, meaning the same value as the input, and the functions
-are 1, 1, and the calculation % { $(fib decr) + $(fib decr decr) }. Switch
+are 1, 1, and the calculation `% { $(fib decr) + $(fib decr decr) }`. Switch
 implicitly clamps the index to the length of the list.
 
 % is a function that performs a mathematical calculation on the
