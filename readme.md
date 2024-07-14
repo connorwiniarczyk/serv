@@ -83,8 +83,8 @@ implicitly clamps the index to the length of the list.
 
 % is a function that performs a mathematical calculation on the
 string given. In this case, we are simply adding the result of two sub
-expressions. decr is the decrement operator, so $(fib decr) calls fib with
-the input subtracted by one, and $(fib decr decr) calls fib with the input
+expressions. decr is the decrement operator, so `$(fib decr)` calls fib with
+the input subtracted by one, and `$(fib decr decr)` calls fib with the input
 subtracted by two. Summing these produces the next element in the series.
 
 map is a function that takes another function and a list, and calls that
