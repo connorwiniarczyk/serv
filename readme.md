@@ -73,7 +73,7 @@ be able to compute the fibonacci sequence in an aesthetically pleasing way.
 ```
 
 I think the result is an incredibly satisfying two lines of code, and is
-perhaps an instructive use of some of serv's more advanced features:
+an instructive use of some of serv's more advanced features:
 
 switch is a function that takes an index, a list of functions, and an input,
 and applies the function at the given index to the input.  In this case, the

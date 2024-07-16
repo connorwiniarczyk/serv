@@ -2,7 +2,7 @@
 @fib => switch (in) [1, 1, %{ $(fib decr) + $(fib decr decr) }]
 
 # map the fibonacci function onto a list from 0 to 14
-@out => map fib count 15
+@out => map fib count 10
 
 # prints to stdout:
 # [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610]
