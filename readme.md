@@ -78,13 +78,13 @@ an instructive use of some of serv's more advanced features:
 switch is a function that takes an index, a list of functions, and an input,
 and applies the function at the given index to the input.  In this case, the
 index given is `in`, meaning the same value as the input, and the functions
-are 1, 1, and the calculation % { $(fib decr) + $(fib decr decr) }. Switch
+are 1, 1, and the calculation `% { $(fib decr) + $(fib decr decr) }`. Switch
 implicitly clamps the index to the length of the list.
 
 % is a function that performs a mathematical calculation on the
 string given. In this case, we are simply adding the result of two sub
-expressions. decr is the decrement operator, so $(fib decr) calls fib with
-the input subtracted by one, and $(fib decr decr) calls fib with the input
+expressions. decr is the decrement operator, so `$(fib decr)` calls fib with
+the input subtracted by one, and `$(fib decr decr)` calls fib with the input
 subtracted by two. Summing these produces the next element in the series.
 
 map is a function that takes another function and a list, and calls that
