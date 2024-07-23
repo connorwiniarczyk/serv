@@ -3,8 +3,13 @@
 Serv is a
 [concatinative](https://en.wikipedia.org/wiki/Concatenative_programming_language)
 functional language for writing web servers quickly and concisely.  It focuses
-on minimizing boilerplate and making the most common operations for a web
-server as easy to write as possible.
+on minimizing boilerplate and optimizing the most common operations for a web
+server to be as syntactically concise as possible. Serv does this by providing
+a standard library of functions commonly found in HTTP servers, such as
+reading from a file, rendering markdown to HTML, executing and SQL query,
+parsing JSON, etc. and allowing you to compose them together to create complex
+behavior. Functions are composed in Serv by concatinating them, meaning
+even relatively long chains of functions can be trivial to express.
 
 ## Syntax
 
