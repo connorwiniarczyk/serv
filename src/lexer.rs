@@ -172,6 +172,21 @@ fn tokenize_string_template(cursor: &mut Cursor, output: &mut Vec<Token>) {
                     cursor.incr(2);
                     output.push(cursor.emit_special("\n"));
                 },
+
+                '\\' if cursor.get(1) == Some('t') => {
+                    cursor.incr(2);
+                    output.push(cursor.emit_special("\t"));
+                },
+
+                '\\' if cursor.get(1) == Some('{') => {
+                    cursor.incr(2);
+                    output.push(cursor.emit_special("{"));
+                },
+
+                '\\' if cursor.get(1) == Some('}') => {
+                    cursor.incr(2);
+                    output.push(cursor.emit_special("}"));
+                },
                 // '"' => todo!()
 
                 _ => unreachable!(),

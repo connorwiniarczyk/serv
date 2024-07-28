@@ -3,13 +3,75 @@
 Serv is a
 [concatinative](https://en.wikipedia.org/wiki/Concatenative_programming_language)
 functional language for writing web servers quickly and concisely.  It focuses
-on minimizing boilerplate and optimizing the most common operations for a web
-server to be as syntactically concise as possible. Serv does this by providing
-a standard library of functions commonly found in HTTP servers, such as
-reading from a file, rendering markdown to HTML, executing and SQL query,
-parsing JSON, etc. and allowing you to compose them together to create complex
-behavior. Functions are composed in Serv by concatinating them, meaning
-even relatively long chains of functions can be trivial to express.
+on minimizing boilerplate and optimizing the most commonly used operations
+server to be as syntactically concise as possible.
+
+Serv was born out of a frustration with traditional web frameworks like
+[express]() and [flask](), which aim to map the functionality of a web
+server onto existing languages like javascript, python, and more recently
+rust. These are very good at what they do, but are limited in a lot of ways
+by the languages they are built on. I wanted to see what a web framework
+could look like if it's language was built from the ground up specifically
+for that purpose.
+
+Serv offers the following advantages over traditional web frameworks:
+
+- No boilerplate: The serv runtime already knows it is an HTTP server, so it will behave as one without needing to be told
+- Built in templates: All strings in serv are a robust templating language. They use curly braces *{}* rather than quotes,
+  can span multiple lines, and can call subexpressions with the *$* syntax.
+- All values are a valid HTTP response: Every single value can be automatically converted into a valid and sensible HTTP response,
+  lists and maps will be serialized to valid json automatically.
+
+### Comparison to Express
+
+Express offers the following example of a hello world program
+on their website.
+
+```javascript
+const express = require('express')
+const app = express()
+const port = 3000
+
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
+
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
+})
+```
+
+In my opinion, 9 lines of code is too many for such a simple
+task, and it is mostly boilerplate and noise. Serv can express
+the same program in 3 lines:
+
+```python
+@port => 3000
+@out  => {Example app listening on port $port}
+/     => {Hello World!}
+```
+
+## Installation and Usage
+
+Install serv using cargo:
+
+```bash
+cargo install --git https://github.com/connorwiniarczyk/serv.git
+```
+
+Test by starting a simple hello world program. Then
+navigate to localhost:4000
+
+```
+serv -c "/ => hello"
+```
+
+Or print the result of a single expression
+
+```bash
+serv -ec "uppercase {hello}"
+HELLO
+```
 
 ## Syntax
 
@@ -17,8 +79,8 @@ even relatively long chains of functions can be trivial to express.
 / => {hello world!}
 ```
 
-A serv program is list of *declarations*. Every declaration contains a *route*
-followed by an *expression* that that route points to. When the script receives
+A serv program is list of *definitions*. Every definition contains a *route*
+followed by an *expression*. When the script receives
 an http request, it looks for an expression at the requested route and runs
 it to produce an output. In the above script, the root node is mapped to an
 expression that produces the string "hello world!"
@@ -78,7 +140,7 @@ be able to compute the fibonacci sequence in an aesthetically pleasing way.
 ```
 
 I think the result is an incredibly satisfying two lines of code, and is
-perhaps an instructive use of some of serv's more advanced features:
+an instructive use of some of serv's more advanced features:
 
 switch is a function that takes an index, a list of functions, and an input,
 and applies the function at the given index to the input.  In this case, the

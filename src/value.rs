@@ -7,9 +7,12 @@ use std::fmt::Display;
 #[derive(Debug, Clone)]
 pub enum ServValue {
     None,
+    Bool(bool),
     Int(i64),
+    Float(f64),
     Text(String),
     Raw(Vec<u8>),
+
     List(VecDeque<ServValue>),
     Table(HashMap<String, ServValue>),
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
@@ -69,6 +72,8 @@ impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Self::None => f.write_str("")?,
+            Self::Bool(v) => v.fmt(f)?,
+            Self::Float(v) => v.fmt(f)?,
             Self::Text(ref t) => f.write_str(t)?,
             Self::Raw(bytes) => f.debug_list().entries(bytes.iter()).finish()?,
             Self::Int(i) => write!(f, "{}", i)?,

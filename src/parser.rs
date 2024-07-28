@@ -155,6 +155,13 @@ fn parse_root(cursor: &mut Cursor) -> Result<ast::AstRoot, ServError> {
 	Ok(ast::AstRoot(output))
 }
 
+pub fn parse_template_from_text(input: &str) -> Result<ast::Template, ServError> {
+	let mut tokens = lexer::tokenize(input);
+	let mut cursor = Cursor::new(&tokens.0);
+
+	parse_template(&mut cursor)
+}
+
 pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, ServError> {
 	let mut tokens = lexer::tokenize(input);
 	let mut cursor = Cursor::new(&tokens.0);
@@ -163,7 +170,6 @@ pub fn parse_expression_from_text(input: &str) -> Result<ast::Expression, ServEr
 
 pub fn parse_root_from_text(input: &str) -> Result<ast::AstRoot, ServError> {
 	let tokens = lexer::tokenize(input);
-	// println!("{}", tokens);
 	let mut cursor = Cursor::new(&tokens.0);
 	let ast = parse_root(&mut cursor)?;
 

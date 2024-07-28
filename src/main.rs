@@ -11,12 +11,16 @@ mod value;
 mod dictionary;
 mod webserver;
 
+use crate::error::ServError;
+
 use lexer::TokenKind;
 use lexer::*;
 use value::ServValue;
 use template::Template;
 use functions::*;
 use dictionary::FnLabel;
+
+use clap::Parser;
 
 use std::collections::VecDeque;
 use std::iter::Peekable;
@@ -102,37 +106,80 @@ fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
         };
     }
 
-
     ServFunction::Composition(output)
 }
 
+/// A parser for serv files
+#[derive(Parser, Debug)]
+#[command(version, about, long_about)]
+struct CliArgs {
+
+	/// The tcp port to listen on
+    #[arg(short, long, default_value_t = 4000)]
+    port: u16,
+
+	/// The tcp port to listen on
+    #[arg(long)]
+    host: Option<String>,
+
+	/// Parse the file as a single expression only and run it immediately
+	#[arg(short, long, default_value_t = false)]
+    execute: bool,
+
+	/// Pass serv code directly as an argument, rather than specifying a file
+	#[arg(short, long)]
+	code: Option<String>,
+
+	/// The file to parse
+    path: Option<String>,
+
+}
+
+fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
+    if let Some(output) = args.code.take() { return Ok(output) }
+
+    let path = args.path.take().unwrap_or("main.serv".into());
+    std::fs::read_to_string(&path).map_err(|e| "could not open file".into())
+}
 
 #[tokio::main]
 async fn main() {
-	let input_path = std::env::args().nth(1).unwrap_or("src/test.serv".to_string());
-	let input      = std::fs::read_to_string(&input_path).unwrap();
-	let ast        = parser::parse_root_from_text(&input).unwrap();
+    let mut args = CliArgs::parse();
+    let input = get_input(&mut args).unwrap();
 
-	let mut scope: Scope = Scope::empty();
-	crate::functions::bind_standard_library(&mut scope);
+	if args.execute {
+    	let ast = parser::parse_expression_from_text(&input).unwrap();
+    	let mut scope: Scope = Scope::empty();
+    	crate::functions::bind_standard_library(&mut scope);
 
-	for declaration in ast.0 {
-    	if declaration.kind == "word" {
-        	let func = compile(declaration.value.0, &mut scope);
-        	scope.insert(declaration.key.to_owned().into(), func);
+    	let func = compile(ast.0, &mut scope);
+
+    	let output = func.call(ServValue::None, &scope).expect("error");
+    	println!("{}", output);
+
+	} else {
+    	let ast = parser::parse_root_from_text(&input).unwrap();
+    	let mut scope: Scope = Scope::empty();
+    	crate::functions::bind_standard_library(&mut scope);
+
+    	for declaration in ast.0 {
+        	if declaration.kind == "word" {
+            	let func = compile(declaration.value.0, &mut scope);
+            	scope.insert(declaration.key.to_owned().into(), func);
+        	}
+
+        	else if declaration.kind == "route" {
+            	let func = compile(declaration.value.0, &mut scope);
+            	scope.router.as_mut().unwrap().insert(declaration.key, func);
+        	}
     	}
 
-    	else if declaration.kind == "route" {
-        	let func = compile(declaration.value.0, &mut scope);
-        	scope.router.as_mut().unwrap().insert(declaration.key, func);
+    	if let Ok(out) = scope.get_str("out") {
+        	let res = out.call(ServValue::None, &scope);
+        	println!("{}", res.unwrap());
     	}
-	}
 
-	if let Ok(out) = scope.get_str("out") {
-    	let res = out.call(ServValue::None, &scope);
-    	println!("{}", res.unwrap());
+    	println!("starting web server");
+    	webserver::run_webserver(scope).await;
 	}
-
-	println!("starting web server");
-	webserver::run_webserver(scope).await;
 }

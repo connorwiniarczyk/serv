@@ -22,3 +22,9 @@ impl From<&str> for ServError {
         Self::new(input)
     }
 }
+
+impl From<std::io::Error> for ServError {
+    fn from(input: std::io::Error) -> Self {
+        Self { message: format!("io error: {}", input) }
+    }
+}
