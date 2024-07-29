@@ -1,1 +1,1 @@
-@out => render {src/test.template} {hello}
+@out => split {} {1,2,3}

@@ -236,4 +236,6 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("get"),    ServFunction::Meta(get));
 	scope.insert(FnLabel::name("switch"),    ServFunction::Meta(switch));
 	scope.insert(FnLabel::name("render"),    ServFunction::Meta(render));
+	scope.insert(FnLabel::name("join"),       ServFunction::Meta(join));
+	scope.insert(FnLabel::name("split"),    ServFunction::Meta(split));
 }
