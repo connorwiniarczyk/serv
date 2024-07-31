@@ -68,7 +68,20 @@ pub fn incr(input: ServValue, scope: &Scope) -> ServResult {
 }
 
 pub fn markdown(input: ServValue, scope: &Scope) -> ServResult {
-    Ok(ServValue::Text(markdown::to_html(input.to_string().as_str())))
+    let compile_options = markdown::CompileOptions {
+        allow_dangerous_html: true,
+        allow_dangerous_protocol: true,
+        gfm_tagfilter: false,
+        ..markdown::CompileOptions::default()
+    };
+
+    let options = markdown::Options {
+        compile: compile_options,
+        ..markdown::Options::gfm()
+    };
+
+    let output = markdown::to_html_with_options(input.to_string().as_str(), &options).unwrap();
+    Ok(ServValue::Text(output))
 }
 
 pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
