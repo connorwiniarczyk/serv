@@ -179,7 +179,7 @@ async fn main() {
         	println!("{}", res.unwrap());
     	}
 
-    	println!("starting web server");
+    	// println!("starting web server");
     	webserver::run_webserver(scope).await;
 	}
 }
