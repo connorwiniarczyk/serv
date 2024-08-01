@@ -232,7 +232,7 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
 	scope.insert(FnLabel::name("sql"),    ServFunction::Core(sql));
-	scope.insert(FnLabel::name("sqlexec"),    ServFunction::Core(sql_exec));
+	scope.insert(FnLabel::name("sql.exec"),    ServFunction::Core(sql_exec));
 	scope.insert(FnLabel::name("ls"),    ServFunction::Core(read_dir));
 	scope.insert(FnLabel::name("count"),    ServFunction::Core(count));
 

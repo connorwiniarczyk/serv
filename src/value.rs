@@ -79,13 +79,43 @@ impl Display for ServValue {
             Self::Int(i) => write!(f, "{}", i)?,
             Self::Meta { inner, metadata } => inner.fmt(f)?,
             Self::Table(table) => {
-				f.debug_map().entries(table.iter()).finish()?;
+                f.write_str("{")?;
+
+				let mut iter = table.iter().peekable();
+				while let Some((k, v)) = iter.next() {
+    				f.write_str("\"")?;
+    				f.write_str(k)?;
+    				f.write_str("\"")?;
+    				f.write_str(": ")?;
+
+    				match v {
+        				ServValue::None => f.write_str("0")?,
+        				ServValue::Text(t) => {
+            				f.write_str("\"")?;
+            				t.fmt(f)?;
+            				f.write_str("\"")?;
+        				},
+        				a => a.fmt(f)?,
+    				}
+
+    				if iter.peek().is_some() {f.write_str(", ")?}
+				}
+
+                f.write_str("}")?;
             },
             Self::List(l) => {
                 f.write_str("[")?;
 				let mut iter = l.iter().peekable();
 				while let Some(element) = iter.next() {
-    				write!(f, "{}", element)?;
+    				match element {
+        				ServValue::None => f.write_str("0")?,
+        				ServValue::Text(t) => {
+            				f.write_str("\"")?;
+            				t.fmt(f)?;
+            				f.write_str("\"")?;
+        				},
+        				a => a.fmt(f)?,
+    				}
     				if iter.peek().is_some() {f.write_str(", ")?}
 				}
                 f.write_str("]")?;
