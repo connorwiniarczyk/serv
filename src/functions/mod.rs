@@ -27,11 +27,12 @@ pub fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
 }
 
 pub fn sql(input: ServValue, scope: &Scope) -> ServResult {
-    let mut output: HashMap<String, ServValue> = HashMap::new();
+    let mut output: Vec<ServValue> = Vec::new();
     let connection = sqlite::open("serv.sqlite").unwrap();
     let mut statement = connection.prepare(input.to_string()).unwrap();
 
     while let Ok(sqlite::State::Row) = statement.next() {
+        let mut row: HashMap<String, ServValue> = HashMap::new();
         for (index, name) in statement.column_names().iter().enumerate() {
             let value = match statement.column_type(index).unwrap() {
                 sqlite::Type::Binary  => {
@@ -44,11 +45,12 @@ pub fn sql(input: ServValue, scope: &Scope) -> ServResult {
                 sqlite::Type::Null    => ServValue::None,
 
             };
-			output.insert(name.clone(), value);
+			row.insert(name.clone(), value);
         }
+        output.push(ServValue::Table(row));
     }
 
-    Ok(ServValue::Table(output))
+    Ok(ServValue::List(output.into()))
 }
 
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
