@@ -4,7 +4,7 @@ Serv is a
 [concatinative](https://en.wikipedia.org/wiki/Concatenative_programming_language)
 functional language for writing web servers quickly and concisely.  It focuses
 on minimizing boilerplate and optimizing the most commonly used operations
-server to be as syntactically concise as possible.
+to be as syntactically concise as possible.
 
 Serv was born out of a frustration with traditional web frameworks like
 [express]() and [flask](), which aim to map the functionality of a web
@@ -72,7 +72,6 @@ Or print the result of a single expression
 serv -ec "uppercase {hello}"
 HELLO
 ```
-
 ## Syntax
 
 ```

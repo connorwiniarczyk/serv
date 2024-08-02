@@ -82,6 +82,14 @@ pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
 	Ok(output)
 }
 
+pub fn join(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let intersperse = words.take_next(scope)?.to_string();
+    let ServValue::List(list) = words.eval(input, scope)?.ignore_metadata() else { return Err("sum needs to operate on a list") };
+    let t: Vec<String> = list.into_iter().map(|x| x.to_string()).collect();
+
+    Ok(ServValue::Text(t.join(&intersperse)))
+}
+
 pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enough arguments")?;
     let arg = scope.get(&next).ok_or("not found")?;
@@ -112,4 +120,12 @@ pub fn fold(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     }
 
 	Ok(acc)
+}
+
+
+pub fn split(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let arg = words.take_next(scope)?.to_string();
+    let rest = words.eval(input, scope)?.to_string();
+
+    Ok(ServValue::List(rest.split(&arg).map(|x| ServValue::Text(x.to_owned())).collect()))
 }

@@ -27,11 +27,12 @@ pub fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
 }
 
 pub fn sql(input: ServValue, scope: &Scope) -> ServResult {
-    let mut output: HashMap<String, ServValue> = HashMap::new();
+    let mut output: Vec<ServValue> = Vec::new();
     let connection = sqlite::open("serv.sqlite").unwrap();
     let mut statement = connection.prepare(input.to_string()).unwrap();
 
     while let Ok(sqlite::State::Row) = statement.next() {
+        let mut row: HashMap<String, ServValue> = HashMap::new();
         for (index, name) in statement.column_names().iter().enumerate() {
             let value = match statement.column_type(index).unwrap() {
                 sqlite::Type::Binary  => {
@@ -44,11 +45,12 @@ pub fn sql(input: ServValue, scope: &Scope) -> ServResult {
                 sqlite::Type::Null    => ServValue::None,
 
             };
-			output.insert(name.clone(), value);
+			row.insert(name.clone(), value);
         }
+        output.push(ServValue::Table(row));
     }
 
-    Ok(ServValue::Table(output))
+    Ok(ServValue::List(output.into()))
 }
 
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
@@ -68,7 +70,20 @@ pub fn incr(input: ServValue, scope: &Scope) -> ServResult {
 }
 
 pub fn markdown(input: ServValue, scope: &Scope) -> ServResult {
-    Ok(ServValue::Text(markdown::to_html(input.to_string().as_str())))
+    let compile_options = markdown::CompileOptions {
+        allow_dangerous_html: true,
+        allow_dangerous_protocol: true,
+        gfm_tagfilter: false,
+        ..markdown::CompileOptions::default()
+    };
+
+    let options = markdown::Options {
+        compile: compile_options,
+        ..markdown::Options::gfm()
+    };
+
+    let output = markdown::to_html_with_options(input.to_string().as_str(), &options).unwrap();
+    Ok(ServValue::Text(output))
 }
 
 pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
@@ -151,7 +166,7 @@ pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let arg_name = words.0.pop_front().unwrap();
     let arg_fn = scope.get(&arg_name).unwrap();
-    let arg = arg_fn.call(ServValue::None, scope)?;
+    let arg = arg_fn.call(input.clone(), scope)?;
 
 	let ast = parser::parse_root_from_text(arg.to_string().as_str()).unwrap();
 	let mut new_scope = scope.make_child();
@@ -213,13 +228,13 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
 	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
 	scope.insert(FnLabel::name("read.raw"),      ServFunction::Core(read_file_raw));
-	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
-	scope.insert(FnLabel::name("file.raw"),      ServFunction::Core(read_file_raw));
+	scope.insert(FnLabel::name("file.utf8"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
 	scope.insert(FnLabel::name("sql"),    ServFunction::Core(sql));
-	scope.insert(FnLabel::name("sqlexec"),    ServFunction::Core(sql_exec));
+	scope.insert(FnLabel::name("sql.exec"),    ServFunction::Core(sql_exec));
 	scope.insert(FnLabel::name("ls"),    ServFunction::Core(read_dir));
 	scope.insert(FnLabel::name("count"),    ServFunction::Core(count));
 
@@ -236,4 +251,6 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("get"),    ServFunction::Meta(get));
 	scope.insert(FnLabel::name("switch"),    ServFunction::Meta(switch));
 	scope.insert(FnLabel::name("render"),    ServFunction::Meta(render));
+	scope.insert(FnLabel::name("join"),       ServFunction::Meta(join));
+	scope.insert(FnLabel::name("split"),    ServFunction::Meta(split));
 }

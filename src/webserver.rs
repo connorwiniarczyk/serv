@@ -98,11 +98,22 @@ impl Service<Request<IncomingBody>> for Serv<'_> {
 use hyper_util::rt::TokioIo;
 use hyper::server::conn::http1::Builder;
 
+fn get_port(scope: &Scope) -> Result<u16, &'static str> {
+    let port_func = scope.get(&FnLabel::Name("port".to_owned())).ok_or("")?;
+    let port = port_func.call(ServValue::None, scope)?.expect_int()?;
+
+    Ok(port.try_into().unwrap())
+}
+
 pub async fn run_webserver(scope: Scope<'static>) {
-	let addr = SocketAddr::from(([0,0,0,0], 4000));
+    let port: u16 = get_port(&scope).unwrap_or(4000);
+
+	let addr = SocketAddr::from(([0,0,0,0], port));
 	let listener = TcpListener::bind(addr).await.unwrap();
 
 	let scope_arc = Arc::new(scope);
+
+	println!("listening on port: {}", port);
 
 	loop {
 		let (stream, _) = listener.accept().await.unwrap();
