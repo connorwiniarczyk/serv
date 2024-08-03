@@ -5,7 +5,15 @@ use std::sync::Arc;
 use std::pin::Pin;
 use std::future::Future;
 use std::task::{Poll, Context};
+use tokio_rustls::rustls;
 
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server::conn::auto::Builder;
+
+use std::io::{BufReader, Read, Write};
+
+// const CERT: &[u8] = include_bytes!("/home/connor/scratch/ssl/certificate.crt");
+// const PKEY: &[u8] = include_bytes!("/home/connor/scratch/ssl/private.key");
 
 use crate::{Scope, ServValue, ServFunction, FnLabel};
 use crate::VecDeque;
@@ -105,8 +113,26 @@ fn get_port(scope: &Scope) -> Result<u16, &'static str> {
     Ok(port.try_into().unwrap())
 }
 
+const certfile: &str = "/home/connor/scratch/ssl/certificate.crt";
+const keyfile: &str = "/home/connor/scratch/ssl/private.key";
+
 pub async fn run_webserver(scope: Scope<'static>) {
     let port: u16 = get_port(&scope).unwrap_or(4000);
+
+    let certs = rustls_pemfile::certs(
+        &mut BufReader::new(&mut std::fs::File::open(certfile).unwrap()))
+        .map(|x| x.unwrap())
+        .collect();
+
+    let key = rustls_pemfile::private_key(
+        &mut BufReader::new(&mut std::fs::File::open(keyfile).unwrap())).unwrap().unwrap();
+
+    let config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(certs, key)
+        .unwrap();
+
+    let tls_acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(config));
 
 	let addr = SocketAddr::from(([0,0,0,0], port));
 	let listener = TcpListener::bind(addr).await.unwrap();
@@ -119,11 +145,16 @@ pub async fn run_webserver(scope: Scope<'static>) {
 		let (stream, _) = listener.accept().await.unwrap();
 		let io = TokioIo::new(stream);
 
+		// let mut conn = rustls::ServerConnection::new(config_arc.clone()).unwrap();
+		// conn.complet_io(&stream);
+
 		let scope_arc = scope_arc.clone();
+		let tls_acceptor = tls_acceptor.clone();
 
 		tokio::task::spawn(async move {
+    		let Ok(tls_stream) = tls_acceptor.accept(io) else { panic!() };
 			Builder::new()
-				.serve_connection(io, Serv(scope_arc))
+				.serve_connection(tls_stream, Serv(scope_arc))
 				.await
 				.unwrap();
 		});
