@@ -3,7 +3,7 @@
 function files { find -name "*.rs" -or -name "*.serv"; }
 
 if [ $1 = "run" ]; then
-	files | entr -r sh -c "clear && cargo run -- src/test.serv";
+	files | entr -r sh -c "clear && cargo run -- test.serv";
 elif [ $1 = "test" ]; then
 	files | entr -r sh -c "clear && cargo test";
 else

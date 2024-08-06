@@ -166,7 +166,7 @@ pub fn apply(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let arg_name = words.0.pop_front().unwrap();
     let arg_fn = scope.get(&arg_name).unwrap();
-    let arg = arg_fn.call(ServValue::None, scope)?;
+    let arg = arg_fn.call(input.clone(), scope)?;
 
 	let ast = parser::parse_root_from_text(arg.to_string().as_str()).unwrap();
 	let mut new_scope = scope.make_child();
@@ -228,8 +228,8 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("sum"),       ServFunction::Core(sum));
 	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
 	scope.insert(FnLabel::name("read.raw"),      ServFunction::Core(read_file_raw));
-	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file));
-	scope.insert(FnLabel::name("file.raw"),      ServFunction::Core(read_file_raw));
+	scope.insert(FnLabel::name("file.utf8"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));

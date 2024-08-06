@@ -5,7 +5,14 @@ use std::sync::Arc;
 use std::pin::Pin;
 use std::future::Future;
 use std::task::{Poll, Context};
+use tokio_rustls::rustls;
 
+use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::server::conn::auto::Builder;
+
+use hyper::server::conn::http1;
+
+use std::io::{BufReader, Read, Write};
 
 use crate::{Scope, ServValue, ServFunction, FnLabel};
 use crate::VecDeque;
@@ -13,12 +20,6 @@ use crate::SocketAddr;
 use crate::TcpListener;
 
 pub struct ServBody(Option<VecDeque<u8>>);
-
-impl ServBody {
-	pub fn new() -> Self {
-		Self(Some("hello!".bytes().collect()))
-	}
-}
 
 impl From<ServValue> for ServBody {
 	fn from(input: ServValue) -> Self {
@@ -94,38 +95,74 @@ impl Service<Request<IncomingBody>> for Serv<'_> {
 	}
 }
 
-
-use hyper_util::rt::TokioIo;
-use hyper::server::conn::http1::Builder;
-
 fn get_port(scope: &Scope) -> Result<u16, &'static str> {
-    let port_func = scope.get(&FnLabel::Name("port".to_owned())).ok_or("")?;
+    let port_func = scope.get(&FnLabel::Name("serv.port".to_owned())).ok_or("")?;
     let port = port_func.call(ServValue::None, scope)?.expect_int()?;
 
     Ok(port.try_into().unwrap())
 }
 
+fn get_tls_info(scope: &Scope<'static>) -> Option<Arc<rustls::ServerConfig>> {
+    let key_word = scope.get_str("serv.tlskey").ok()?;
+    let key_str = key_word.call(ServValue::None, scope).expect("Failed to execute serv.tlskey").to_string();
+    let mut reader = BufReader::new(key_str.as_bytes());
+    let key = rustls_pemfile::private_key(&mut reader)
+        .expect("failed to parse private key")
+        .expect("failed to find private key");
+
+    let cert_word = scope.get_str("serv.tlscert").ok()?;
+    let cert_str = cert_word.call(ServValue::None, scope).expect("Failed to execute serv.tlscert").to_string();
+    let mut reader_cert = BufReader::new(cert_str.as_bytes());
+    let certs = rustls_pemfile::certs(&mut reader_cert)
+        .map(|cert| cert.expect("failed to parse cert"))
+    	.collect();
+
+	let output = rustls::ServerConfig::builder()
+    	.with_no_client_auth()
+    	.with_single_cert(certs, key)
+    	.expect("failed to build config");
+
+	Some(Arc::new(output))
+}
+
 pub async fn run_webserver(scope: Scope<'static>) {
     let port: u16 = get_port(&scope).unwrap_or(4000);
-
 	let addr = SocketAddr::from(([0,0,0,0], port));
 	let listener = TcpListener::bind(addr).await.unwrap();
-
 	let scope_arc = Arc::new(scope);
 
-	println!("listening on port: {}", port);
+	if let Some(config) = get_tls_info(&scope_arc) {
+    	println!("starting encrypted server");
+    	println!("listening on port: {}", port);
+        let tls_acceptor = tokio_rustls::TlsAcceptor::from(config);
 
-	loop {
-		let (stream, _) = listener.accept().await.unwrap();
-		let io = TokioIo::new(stream);
+    	loop {
+    		let (tcp_stream, _) = listener.accept().await.unwrap();
+    		let scope_arc = scope_arc.clone();
+    		let tls_acceptor = tls_acceptor.clone();
 
-		let scope_arc = scope_arc.clone();
+    		tokio::task::spawn(async move {
+        		let Ok(tls_stream) = tls_acceptor.accept(tcp_stream).await else { panic!() };
+    			http1::Builder::new()
+    				.serve_connection(TokioIo::new(tls_stream), Serv(scope_arc))
+    				.await
+    				.unwrap();
+    		});
+    	}
 
-		tokio::task::spawn(async move {
-			Builder::new()
-				.serve_connection(io, Serv(scope_arc))
-				.await
-				.unwrap();
-		});
+	} else {
+    	println!("starting unencrypted server");
+    	println!("listening on port: {}", port);
+    	loop {
+    		let (tcp_stream, _) = listener.accept().await.unwrap();
+    		let scope_arc = scope_arc.clone();
+
+    		tokio::task::spawn(async move {
+    			http1::Builder::new()
+    				.serve_connection(TokioIo::new(tcp_stream), Serv(scope_arc))
+    				.await
+    				.unwrap();
+    		});
+    	}
 	}
 }

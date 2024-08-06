@@ -75,7 +75,14 @@ impl Display for ServValue {
             Self::Bool(v) => v.fmt(f)?,
             Self::Float(v) => v.fmt(f)?,
             Self::Text(ref t) => f.write_str(t)?,
-            Self::Raw(bytes) => f.debug_list().entries(bytes.iter()).finish()?,
+            // Self::Raw(bytes) => f.debug_list().entries(bytes.iter()).finish()?,
+            Self::Raw(bytes) => {
+                if let Ok(text) = std::str::from_utf8(bytes) {
+                    f.write_str(text)?;
+                } else {
+                    f.debug_list().entries(bytes.iter()).finish()?
+                }
+            },
             Self::Int(i) => write!(f, "{}", i)?,
             Self::Meta { inner, metadata } => inner.fmt(f)?,
             Self::Table(table) => {
