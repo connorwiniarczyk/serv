@@ -207,6 +207,7 @@ fn tokenize_inner_expression(cursor: &mut Cursor, output: &mut Vec<Token>) {
             ';'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Semicolon))},
             '$'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Dollar))},
             '%'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
+            '.'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
             '*'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
             '!'  => {cursor.incr(1); output.push(cursor.emit_token(TokenKind::Identifier))},
             '\n' => {cursor.incr(1); _ = cursor.emit_token(TokenKind::NewLine)},

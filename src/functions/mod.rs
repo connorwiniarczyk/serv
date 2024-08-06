@@ -215,6 +215,20 @@ pub fn with_option(words: &mut Words, input: ServValue, scope: &Scope) -> ServRe
 	Ok(output)
 }
 
+pub fn get(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+    let arg = words.take_next(scope)?;
+	let mut input = words.eval(input, scope)?;
+
+	let output = match ((arg, input)) {
+    	(ServValue::Int(i),  ServValue::List(mut l)) => l.remove(i.try_into().unwrap()).unwrap_or(ServValue::None),
+    	(ServValue::Text(ref t), ServValue::Table(mut m)) =>  m.remove(t).unwrap_or(ServValue::None),
+
+    	_ => return Err("not a valid use of get"),
+	};
+
+	Ok(output)
+}
+
 
 use crate::ServFunction;
 use crate::FnLabel;
@@ -253,4 +267,6 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("render"),    ServFunction::Meta(render));
 	scope.insert(FnLabel::name("join"),       ServFunction::Meta(join));
 	scope.insert(FnLabel::name("split"),    ServFunction::Meta(split));
+	scope.insert(FnLabel::name("get"),    ServFunction::Meta(get));
+	scope.insert(FnLabel::name("."),    ServFunction::Meta(get));
 }
