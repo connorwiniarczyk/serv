@@ -43,56 +43,112 @@ impl Body for ServBody {
 	}
 }
 
-#[derive(Clone)]
-struct Serv<'a>(Arc<Scope<'a>>);
+use http_body_util::BodyExt;
 
-impl Service<Request<IncomingBody>> for Serv<'_> {
+#[derive(Clone)]
+struct Serv(Arc<Scope<'static>>);
+
+impl Service<Request<IncomingBody>> for Serv {
 	type Response = Response<ServBody>;
 	type Error = hyper::Error;
 	type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-	fn call(&self, req: Request<IncomingBody>) -> Self::Future {
-    	let router = self.0.router.as_ref().unwrap();
-    	let Ok(matched) = router.at(req.uri().path()) else {
-        	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
-        	let res = Response::builder()
-            	.status(404)
-            	.body(ServValue::Text(text).into())
-            	.unwrap();
-        	return Box::pin(async {Ok(res)})
-    	};
+	fn call(&self, mut req: Request<IncomingBody>) -> Self::Future {
+    	let root = self.0.clone();
+    	let output = async move {
+        	let router = root.router.as_ref().unwrap();
+        	let (parts, body) = req.into_parts();
+        	let parts_a = parts.clone();
+        	let Ok(matched) = router.at(parts_a.uri.path()) else {
+            	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
+            	let res = Response::builder()
+                	.status(404)
+                	.body(ServValue::Text(text).into())
+                	.unwrap();
+            	return Ok(res)
+        	};
 
-		let mut scope = self.0.make_child();
-    	for (k, v) in matched.params.iter() {
-			scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
-    	}
+    		let mut scope = root.make_child();
+        	for (k, v) in matched.params.iter() {
+    			scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
+        	}
 
-    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
-		let mut response = Response::builder();
+        	let body: bytes::Bytes = body.collect().await.unwrap().to_bytes();
+        	scope.insert(FnLabel::name("req.body"), ServFunction::Literal(ServValue::Raw(body.into())));
+        	scope.request = Some(parts);
 
-		if let Some(data) = result.get_metadata() {
-    		if let Some(status) = data.get("status") {
-        		let code = status.expect_int().unwrap().clone();
-        		response = response.status(u16::try_from(code).unwrap());
-    		}
+        	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
+    		let mut response = Response::builder();
 
-    		if let Some(ServValue::List(headers)) = data.get("headers") {
-        		for header in headers {
-            		let text = header.to_string();
-                	let mut iter = text
-                    	.split("=")
-                    	.map(|x| x.trim());
+    		if let Some(data) = result.get_metadata() {
+        		if let Some(status) = data.get("status") {
+            		let code = status.expect_int().unwrap().clone();
+            		response = response.status(u16::try_from(code).unwrap());
+        		}
 
-                	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
-                	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
-            		response = response.header(key, value);
+        		if let Some(ServValue::List(headers)) = data.get("headers") {
+            		for header in headers {
+                		let text = header.to_string();
+                    	let mut iter = text
+                        	.split("=")
+                        	.map(|x| x.trim());
+
+                    	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+                    	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+                		response = response.header(key, value);
+            		}
         		}
     		}
-		}
 
-		let response_sender = response.body(result.into()).unwrap();
-		Box::pin(async { Ok(response_sender) })
+    		let response_sender = response.body(result.into()).unwrap();
+    		Ok(response_sender)
+    	};
+
+    	Box::pin(output)
 	}
+
+	// fn call(&self, req: Request<IncomingBody>) -> Self::Future {
+ //    	let router = self.0.router.as_ref().unwrap();
+ //    	let Ok(matched) = router.at(req.uri().path()) else {
+ //        	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
+ //        	let res = Response::builder()
+ //            	.status(404)
+ //            	.body(ServValue::Text(text).into())
+ //            	.unwrap();
+ //        	return Box::pin(async {Ok(res)})
+ //    	};
+
+	// 	let mut scope = self.0.make_child();
+ //    	for (k, v) in matched.params.iter() {
+	// 		scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
+ //    	}
+
+ //    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
+	// 	let mut response = Response::builder();
+
+	// 	if let Some(data) = result.get_metadata() {
+ //    		if let Some(status) = data.get("status") {
+ //        		let code = status.expect_int().unwrap().clone();
+ //        		response = response.status(u16::try_from(code).unwrap());
+ //    		}
+
+ //    		if let Some(ServValue::List(headers)) = data.get("headers") {
+ //        		for header in headers {
+ //            		let text = header.to_string();
+ //                	let mut iter = text
+ //                    	.split("=")
+ //                    	.map(|x| x.trim());
+
+ //                	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+ //                	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+ //            		response = response.header(key, value);
+ //        		}
+ //    		}
+	// 	}
+
+	// 	let response_sender = response.body(result.into()).unwrap();
+	// 	Box::pin(async { Ok(response_sender) })
+	// }
 }
 
 fn get_port(scope: &Scope) -> Result<u16, &'static str> {

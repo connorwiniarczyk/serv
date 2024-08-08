@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use matchit::Router;
 
+use hyper::body::{Body, Frame, Incoming as IncomingBody};
+use hyper::{ Request, Response };
+use hyper::http::request::Parts;
+
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum FnLabel {
@@ -21,9 +25,10 @@ impl From<String> for FnLabel {
 
 pub struct StackDictionary<'parent, V> {
     unique_id: u32,
-    // input: V,
+
+	pub request: Option<Parts>,
 	pub words: HashMap<FnLabel, V>,
-	parent: Option<&'parent StackDictionary<'parent, V>>,
+	pub parent: Option<&'parent StackDictionary<'parent, V>>,
 	pub router: Option<Router<V>>,
 }
 
@@ -33,13 +38,19 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
             unique_id: 0,
             words: HashMap::new(),
             parent: None,
-            // input: ServValue::None,
+            request: None,
             router: Some(Router::new()),
         }
     }
 
     pub fn make_child(&'parent self) -> Self {
-        Self { unique_id: self.unique_id, words: HashMap::new(), parent: Some(self), router: None }
+        Self {
+            unique_id: self.unique_id,
+            words: HashMap::new(),
+            parent: Some(self),
+            router: None,
+            request: None,
+        }
     }
 
     pub fn with_input(mut self, input: V) -> Self {
@@ -71,6 +82,10 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
 		let output = self.unique_id;
 		self.unique_id += 1;
 		return output
+    }
+
+    pub fn get_request(&self) -> Option<&Parts> {
+        self.request.as_ref().or_else(|| self.parent.and_then(|p| p.get_request()))
     }
 }
 

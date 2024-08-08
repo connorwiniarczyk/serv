@@ -8,6 +8,8 @@ use std::io::Read;
 
 mod host;
 mod list_operations;
+mod request;
+
 pub use host::*;
 pub use list_operations::*;
 
@@ -19,6 +21,7 @@ use std::collections::VecDeque;
 use sqlite;
 
 use std::collections::HashMap;
+
 
 pub fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
     let connection = sqlite::open("serv.sqlite").unwrap();
@@ -229,7 +232,6 @@ pub fn get(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 	Ok(output)
 }
 
-
 use crate::ServFunction;
 use crate::FnLabel;
 
@@ -243,6 +245,7 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("read"),      ServFunction::Core(read_file));
 	scope.insert(FnLabel::name("read.raw"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("file.utf8"),      ServFunction::Core(read_file));
+	scope.insert(FnLabel::name("file.raw"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("file"),      ServFunction::Core(read_file_raw));
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
@@ -269,4 +272,6 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("split"),    ServFunction::Meta(split));
 	scope.insert(FnLabel::name("get"),    ServFunction::Meta(get));
 	scope.insert(FnLabel::name("."),    ServFunction::Meta(get));
+
+	request::bind(scope);
 }
