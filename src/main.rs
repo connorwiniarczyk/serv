@@ -4,6 +4,7 @@ mod tape;
 mod error;
 mod functions;
 mod lexer;
+mod generic_tokenizer;
 mod parser;
 mod template;
 mod ast;

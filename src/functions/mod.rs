@@ -9,6 +9,7 @@ use std::io::Read;
 mod host;
 mod list_operations;
 mod request;
+mod sql;
 
 pub use host::*;
 pub use list_operations::*;
@@ -23,38 +24,6 @@ use sqlite;
 use std::collections::HashMap;
 
 
-pub fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
-    let connection = sqlite::open("serv.sqlite").unwrap();
-    connection.execute(input.to_string()).unwrap();
-    Ok(ServValue::None)
-}
-
-pub fn sql(input: ServValue, scope: &Scope) -> ServResult {
-    let mut output: Vec<ServValue> = Vec::new();
-    let connection = sqlite::open("serv.sqlite").unwrap();
-    let mut statement = connection.prepare(input.to_string()).unwrap();
-
-    while let Ok(sqlite::State::Row) = statement.next() {
-        let mut row: HashMap<String, ServValue> = HashMap::new();
-        for (index, name) in statement.column_names().iter().enumerate() {
-            let value = match statement.column_type(index).unwrap() {
-                sqlite::Type::Binary  => {
-                    let v: i64 = statement.read(index).unwrap();
-                    ServValue::Bool(if v == 0 {false} else {true})
-                },
-                sqlite::Type::Float   => ServValue::Float(statement.read(index).unwrap()),
-                sqlite::Type::Integer => ServValue::Int(statement.read(index).unwrap()),
-                sqlite::Type::String  => ServValue::Text(statement.read(index).unwrap()),
-                sqlite::Type::Null    => ServValue::None,
-
-            };
-			row.insert(name.clone(), value);
-        }
-        output.push(ServValue::Table(row));
-    }
-
-    Ok(ServValue::List(output.into()))
-}
 
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text("hello world".to_owned()))
@@ -93,26 +62,26 @@ pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? - 1))
 }
 
-pub fn read_file(input: ServValue, scope: &Scope) -> ServResult {
-    let path = input.to_string();
-    let contents = std::fs::read_to_string(path).map_err(|e| "failed to open file")?;
-    Ok(ServValue::Text(contents))
-}
+// pub fn read_file(input: ServValue, scope: &Scope) -> ServResult {
+//     let path = input.to_string();
+//     let contents = std::fs::read_to_string(path).map_err(|e| "failed to open file")?;
+//     Ok(ServValue::Text(contents))
+// }
 
-pub fn read_file_raw(input: ServValue, scope: &Scope) -> ServResult {
-    let path = input.to_string();
-    let contents = std::fs::read(path).map_err(|e| "failed to open file")?;
-    Ok(ServValue::Raw(contents))
-}
+// pub fn read_file_raw(input: ServValue, scope: &Scope) -> ServResult {
+//     let path = input.to_string();
+//     let contents = std::fs::read(path).map_err(|e| "failed to open file")?;
+//     Ok(ServValue::Raw(contents))
+// }
 
-pub fn read_dir(input: ServValue, scope: &Scope) -> ServResult {
-    let paths = std::fs::read_dir(input.to_string()).map_err(|_| "invalid path")?;
-    let mut output = VecDeque::new();
-    for path in paths {
-        if let Ok(p) = path { output.push_back(ServValue::Text(p.path().display().to_string())); }
-    }
-    Ok(ServValue::List(output))
-}
+// pub fn read_dir(input: ServValue, scope: &Scope) -> ServResult {
+//     let paths = std::fs::read_dir(input.to_string()).map_err(|_| "invalid path")?;
+//     let mut output = VecDeque::new();
+//     for path in paths {
+//         if let Ok(p) = path { output.push_back(ServValue::Text(p.path().display().to_string())); }
+//     }
+//     Ok(ServValue::List(output))
+// }
 
 pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
     let expression = input.to_string();
@@ -250,8 +219,6 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("inline"),    ServFunction::Core(inline));
 	scope.insert(FnLabel::name("exec"),    ServFunction::Core(exec));
 	scope.insert(FnLabel::name("markdown"),    ServFunction::Core(markdown));
-	scope.insert(FnLabel::name("sql"),    ServFunction::Core(sql));
-	scope.insert(FnLabel::name("sql.exec"),    ServFunction::Core(sql_exec));
 	scope.insert(FnLabel::name("ls"),    ServFunction::Core(read_dir));
 	scope.insert(FnLabel::name("count"),    ServFunction::Core(count));
 
@@ -274,4 +241,5 @@ pub fn bind_standard_library(scope: &mut Scope) {
 	scope.insert(FnLabel::name("."),    ServFunction::Meta(get));
 
 	request::bind(scope);
+	sql::bind(scope);
 }
