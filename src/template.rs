@@ -2,8 +2,32 @@ use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
 use crate::{ Scope, ServResult };
-
 use std::fmt::Display;
+
+#[derive (Clone)]
+struct FormatOptions {
+	include_brackets: bool,
+	resolve_functions: bool,
+	sql_mode: bool,
+}
+
+impl Default for FormatOptions {
+    fn default() -> Self {
+        Self {
+        	include_brackets: false,
+        	resolve_functions: true,
+        	sql_mode: false,
+        }
+    }
+}
+
+impl FormatOptions {
+    fn with_brackets(&self) -> Self {
+        let mut output = self.clone();
+        output.include_brackets = true;
+        output
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum TemplateElement {
@@ -51,34 +75,9 @@ impl Template {
     }
 
     pub fn render(&self, ctx: &Scope) -> ServResult {
-        let mut renderer = Renderer { output: String::new(), ctx };
-        let options = FormatOptions { include_brackets: false, resolve_functions: true };
+        let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None };
+        let options = FormatOptions::default();
         renderer.render(self, options);
-  //       for elem in self.elements.iter() {
-  //           match elem {
-  //               TemplateElement::Text(t) => output.push_str(&t.contents),
-  //               TemplateElement::Template(t) => output.push_str(t.literal().to_string().as_str()),
-  //               // TemplateElement::Template(t) => output.push_str(t.render(ctx)?.to_string().as_str()),
-  //               TemplateElement::Expression(t) => {
-  //                   match t {
-  //                       ast::Word::Function(token) => {
-  //                           let value = ctx.get(&token.contents.clone().into()).ok_or("does not exist")?.call(ServValue::None, ctx)?;
-  //                           output.push_str(value.to_string().as_str());
-  //                       },
-  //                       ast::Word::Parantheses(words) => {
-  //                           let mut child = ctx.make_child();
-  //                       	let func = crate::compile(words.0.clone(), &mut child);
-  //                       	let value = func.call(ctx.get_str("in")?.call(ServValue::None, &child)?, &child)?;
-  //                           output.push_str(value.to_string().as_str());
-  //                       },
-  //                       _ => todo!(),
-
-  //                   }
-  //               },
-  //           }
-  //       }
-
-		// let formatted = format_text(output.as_str());
 		Ok(ServValue::Text(std::mem::take(&mut renderer.output)))
     }
 }
@@ -86,6 +85,7 @@ impl Template {
 struct Renderer<'scope> {
     output: String,
     ctx: &'scope Scope<'scope>,
+    sql_bindings: Option<Vec<crate::FnLabel>>,
 }
 
 impl<'scope> Renderer<'scope> {
@@ -119,55 +119,29 @@ impl<'scope> Renderer<'scope> {
             match elem {
                 TemplateElement::Text(t)     => self.output.push_str(&t.contents),
                 TemplateElement::Template(t) => self.render(t, options.with_brackets()),
-                TemplateElement::Expression(t) => { self.resolve_function(t).unwrap(); },
+                TemplateElement::Expression(t) if options.resolve_functions => {
+                    self.resolve_function(t).unwrap();
+                },
+                TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
+                    self.output.push('$');
+                    self.output.push_str(&t.contents.clone());
+                    if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
+                        sql_bindings.push(crate::FnLabel::Name(t.contents.clone()));
+                    }
+
+                },
+                TemplateElement::Expression(t) => {
+                    self.output.push('$');
+                    self.output.push('(');
+					self.output.push_str(&t.to_string());
+                    self.output.push(')');
+                },
             }
         }
         if options.include_brackets { self.output.push_str(&input.close.contents); }
 	}
 }
 
-#[derive (Clone)]
-struct FormatOptions {
-	include_brackets: bool,
-	resolve_functions: bool,
-}
-
-impl FormatOptions {
-    fn with_brackets(&self) -> Self {
-        let mut output = self.clone();
-        output.include_brackets = true;
-        output
-    }
-
-    fn render(self, input: &Template, output: &mut String) {
-        if self.include_brackets { output.push_str(&input.open.contents); }
-
-        for elem in input.elements.iter() {
-            match elem {
-                TemplateElement::Text(t)     => output.push_str(&t.contents),
-                TemplateElement::Template(t) => self.clone().with_brackets().render(t, output),
-                TemplateElement::Expression(t) => todo!(),
-                //     match t {
-                //         ast::Word::Function(token) => {
-                //             let value = ctx.get(&token.contents.clone().into()).ok_or("does not exist")?.call(ServValue::None, ctx)?;
-                //             output.push_str(value.to_string().as_str());
-                //         },
-                //         ast::Word::Parantheses(words) => {
-                //             let mut child = ctx.make_child();
-                //         	let func = crate::compile(words.0.clone(), &mut child);
-                //         	let value = func.call(ctx.get_str("in")?.call(ServValue::None, &child)?, &child)?;
-                //             output.push_str(value.to_string().as_str());
-                //         },
-                //         _ => todo!(),
-                //     }
-                // },
-
-            }
-        }
-
-        if self.include_brackets { output.push_str(&input.close.contents); }
-    }
-}
 
 pub fn format_text(input: &str) -> String {
     let mut output = String::new();
