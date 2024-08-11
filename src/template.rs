@@ -80,6 +80,21 @@ impl Template {
         renderer.render(self, options);
 		Ok(ServValue::Text(std::mem::take(&mut renderer.output)))
     }
+
+    pub fn render_sql(&self, ctx: &Scope) -> (String, Vec<crate::FnLabel>) {
+        let mut renderer = Renderer::new(ctx);
+        renderer.sql_bindings = Some(Vec::new());
+
+        let mut options = FormatOptions::default();
+        options.sql_mode = true;
+
+        renderer.render(self, options);
+
+        let output = std::mem::take(&mut renderer.output);
+        let bindings = std::mem::take(&mut renderer.sql_bindings).unwrap();
+
+		(output, bindings)
+    }
 }
 
 struct Renderer<'scope> {
@@ -89,6 +104,13 @@ struct Renderer<'scope> {
 }
 
 impl<'scope> Renderer<'scope> {
+    fn new(ctx: &'scope Scope) -> Self {
+		Self {
+    		output: String::new(),
+    		ctx: ctx,
+    		sql_bindings: None,
+		}
+    }
     fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
         match expression {
             ast::Word::Function(token) => {
@@ -124,7 +146,7 @@ impl<'scope> Renderer<'scope> {
                 },
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
                     self.output.push('$');
-                    self.output.push_str(&t.contents.clone());
+                    // self.output.push_str(&t.contents.clone());
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
                         sql_bindings.push(crate::FnLabel::Name(t.contents.clone()));
                     }
