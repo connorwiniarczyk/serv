@@ -12,8 +12,6 @@ fn sql_get_query(words: &mut Words, input: ServValue, scope: &Scope) -> ServResu
 
     let (output, sql_bindings) = template.render_sql(scope);
 
-
-
     todo!();
 }
 
@@ -24,15 +22,31 @@ fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::None)
 }
 
-// pub fn get(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-
-fn sql(words: Words, input: ServValue, scope: &Scope) -> ServResult {
-    let mut output: Vec<ServValue> = Vec::new();
+fn sql(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let path = get_database_location(scope).unwrap_or("serv.sqlite".to_string());
     let connection = sqlite::open(&path).unwrap();
 
+	let mut arg = scope.get(&words.next().ok_or("")?).ok_or("")?;
+	let ServFunction::Template(t) = arg else {panic!()};
+	let (input, params) = t.render_sql(scope);
     let mut statement = connection.prepare(input.to_string()).unwrap();
 
+    for (i, p) in params.into_iter().enumerate() {
+        let value = scope.get(&p).ok_or("")?.call(ServValue::None, scope).unwrap();
+        match value {
+            ServValue::Int(v)    => statement.bind((i, v)),
+            ServValue::Text(t)   => statement.bind((i, t.as_str())),
+            ServValue::Float(v)  => statement.bind((i, v)),
+            ServValue::None      => statement.bind((i, ())),
+            ServValue::Bool(v)   => todo!(),
+            ServValue::Raw(v)    => todo!(),
+            ServValue::List(v)   => todo!(),
+            ServValue::Table(v)  => todo!(),
+            ServValue::Meta {..} => todo!(),
+        };
+    }
+
+    let mut output: Vec<ServValue> = Vec::new();
     while let Ok(sqlite::State::Row) = statement.next() {
         let mut row: HashMap<String, ServValue> = HashMap::new();
         for (index, name) in statement.column_names().iter().enumerate() {

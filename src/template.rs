@@ -145,12 +145,10 @@ impl<'scope> Renderer<'scope> {
                     self.resolve_function(t).unwrap();
                 },
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
-                    self.output.push('$');
-                    // self.output.push_str(&t.contents.clone());
+                    self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
                         sql_bindings.push(crate::FnLabel::Name(t.contents.clone()));
                     }
-
                 },
                 TemplateElement::Expression(t) => {
                     self.output.push('$');
