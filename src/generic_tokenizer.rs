@@ -41,6 +41,9 @@ impl<'input> Tokenizer<'input> {
             self.index += 1;
         }
     }
+    pub fn incr(&mut self, i: usize) {
+        self.index += i;
+    }
 
     pub fn is_done(&self) -> bool {
 		self.mark >= self.input.len()
