@@ -1,7 +1,8 @@
+#[derive(Debug, Clone, Copy)]
 pub struct Token<'input> {
-	value: &'input [char],
-	start: usize,
-	end: usize,
+	pub value: &'input [char],
+	pub start: usize,
+	pub end: usize,
 }
 
 impl<'input> Token<'input> {
@@ -34,6 +35,13 @@ impl<'input> Tokenizer<'input> {
 
         self.mark = self.index;
         output
+    }
+
+    pub fn get(&mut self, offset: usize) -> Option<char>{
+        let index = self.index + offset;
+        if index >= self.input.len() { return None };
+
+        Some(self.input[index])
     }
 
     pub fn incr_while<F>(&mut self, test: F) where F: Fn(char) -> bool {

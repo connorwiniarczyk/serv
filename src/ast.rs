@@ -1,4 +1,3 @@
-use crate::lexer::Token;
 use crate::value::ServValue;
 pub use crate::template::{TemplateElement, Template};
 
@@ -6,7 +5,8 @@ use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum Word {
-   	Function(Token),
+   	// Function(Token)),
+   	Function(String),
    	Template(Template),
    	Literal(ServValue),
    	Parantheses(Expression),
@@ -16,7 +16,7 @@ pub enum Word {
 impl Display for Word {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::Function(t) => f.write_str(t.contents.as_str())?,
+            Self::Function(t) => f.write_str(t)?,
             Self::Template(t) => t.fmt(f)?,
             Self::Literal(l)  => l.fmt(f)?,
             Self::List(l) => todo!(),

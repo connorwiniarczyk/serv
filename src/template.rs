@@ -1,4 +1,4 @@
-use crate::lexer::{Token, TokenKind};
+// use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
 use crate::{ Scope, ServResult };
@@ -31,7 +31,7 @@ impl FormatOptions {
 
 #[derive(Debug, Clone)]
 pub enum TemplateElement {
-	Text(Token),
+	Text(String),
 	Template(Template),
 	Expression(ast::Word),
 }
@@ -39,7 +39,7 @@ pub enum TemplateElement {
 impl Display for TemplateElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-    		TemplateElement::Text(t)       => f.write_str(t.contents.as_str()),
+    		TemplateElement::Text(t)       => f.write_str(t.as_str()),
             TemplateElement::Template(t)   => t.fmt(f),
             TemplateElement::Expression(e) => {
                 f.write_str("$(")?;
@@ -53,18 +53,18 @@ impl Display for TemplateElement {
 
 #[derive(Debug, Clone)]
 pub struct Template {
-    pub open: Token,
-    pub close: Token,
+    pub open: String,
+    pub close: String,
     pub elements: Vec<TemplateElement>,
 }
 
 impl Display for Template {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(self.open.contents.as_str())?;
+        f.write_str(self.open.as_str())?;
         for element in self.elements.iter() {
             element.fmt(f)?;
         }
-        f.write_str(self.close.contents.as_str())?;
+        f.write_str(self.close.as_str())?;
         Ok(())
     }
 }
@@ -113,9 +113,8 @@ impl<'scope> Renderer<'scope> {
     }
     fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
         match expression {
-            ast::Word::Function(token) => {
-                let value = self.ctx.get(&token.contents.clone().into())
-                    .ok_or("does not exist")?
+            ast::Word::Function(name) => {
+                let value = self.ctx.get_str(name)?
                     .call(ServValue::None, &self.ctx)?
                     .to_string();
 
@@ -136,10 +135,10 @@ impl<'scope> Renderer<'scope> {
     }
 
 	fn render(&mut self, input: &Template, options: FormatOptions) {
-        if options.include_brackets { self.output.push_str(&input.open.contents); }
+        if options.include_brackets { self.output.push_str(&input.open); }
         for elem in input.elements.iter() {
             match elem {
-                TemplateElement::Text(t)     => self.output.push_str(&t.contents),
+                TemplateElement::Text(t)     => self.output.push_str(t),
                 TemplateElement::Template(t) => self.render(t, options.with_brackets()),
                 TemplateElement::Expression(t) if options.resolve_functions => {
                     self.resolve_function(t).unwrap();
@@ -147,7 +146,7 @@ impl<'scope> Renderer<'scope> {
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        sql_bindings.push(crate::FnLabel::Name(t.contents.clone()));
+                        sql_bindings.push(crate::FnLabel::Name(t.clone()));
                     }
                 },
                 TemplateElement::Expression(t) => {
@@ -158,7 +157,7 @@ impl<'scope> Renderer<'scope> {
                 },
             }
         }
-        if options.include_brackets { self.output.push_str(&input.close.contents); }
+        if options.include_brackets { self.output.push_str(&input.close); }
 	}
 }
 

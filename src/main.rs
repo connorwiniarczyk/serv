@@ -1,9 +1,9 @@
 #![allow(unused)]
 
+mod serv_tokenizer;
 mod tape;
 mod error;
 mod functions;
-mod lexer;
 mod generic_tokenizer;
 mod parser;
 mod template;
@@ -14,8 +14,9 @@ mod webserver;
 
 use crate::error::ServError;
 
-use lexer::TokenKind;
-use lexer::*;
+// use lexer::TokenKind;
+// use lexer::*;
+use serv_tokenizer::TokenKind;
 use value::ServValue;
 use template::Template;
 use functions::*;
@@ -85,7 +86,7 @@ fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
     let mut iter = input.into_iter();
     while let Some(word) = iter.next() {
         match word {
-            ast::Word::Function(t) => output.push(FnLabel::Name(t.contents)),
+            ast::Word::Function(t) => output.push(FnLabel::Name(t)),
             ast::Word::List(l) => {
                 let mut inner: Vec<FnLabel> = Vec::new();
                 for expression in l {

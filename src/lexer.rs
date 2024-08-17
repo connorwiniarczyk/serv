@@ -21,7 +21,6 @@ pub enum TokenKind {
     At,
     WideArrow,
     Semicolon,
-    Plus,
     Dollar,
     Percent,
     NewLine,
