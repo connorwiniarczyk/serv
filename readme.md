@@ -3,9 +3,11 @@
 Serv is a swiss army knife for writing http servers quickly and with as
 little friction as possible. It is similar in function to web frameworks
 like Express and Flask, but instead of existing as a library on top of a
-general purpose language like Javascript or Python, Serv uses its own,
-entirely custom, language implemented from the ground up specifically
-for writing web backends.  By doing so, Serv frees itself from almost
+general purpose language like Javascript or Python, Serv uses its own
+custom language, implemented from the ground up specifically
+for writing web backends.
+
+By doing so, Serv frees itself from almost
 all of the boilerplate required to build a web server in the traditional
 way. It is a single executable with a fully featured web server built
 directly into the runtime, a standard library full of useful tools,
@@ -14,7 +16,8 @@ and a dedicated syntax for assigning routes.
 Here are some examples of Serv in action:
 
 ```python
-# Hello World: (curly brackets denote strings)
+# Hello World:
+# curly brackets denote strings
 / => {Hello World!}
 
 # Hello World with a more personal touch:
@@ -22,23 +25,22 @@ Here are some examples of Serv in action:
 /hello/{name} => {Hello $name!}
 
 # Statically serve all files in the directory
-# (the 'file' function reads the contents of a file)
+# the 'file' function reads the contents of a file
 /{*f} => file f
 
 # Serve a markdown file dynamically rendered to HTML
-# (functions can be chained together to create complex expressions)
+# functions can be chained together to create complex expressions
 /index => markdown file {www/index.md}
 
 # Define your own functions:
-# (in refers to the input of the function, % calculates a mathematical expression)
+# in refers to the input of the function, % calculates a mathematical expression
 @square => %{ $in * $in }
 /api/square/{x} => square x
 
-# Write APIs endpoints directly in SQL
-# Serv automatically sanitizes your input, and converts
-# the output to JSON
+# Write API endpoints directly in SQL
+# serv automatically sanitizes your input, and converts the output to JSON
 @sql.database  => {my_database.sqlite}
-/api/user/{id} => sql { SELECT * FROM users WHERE id = $id; }
+/api/{user}/posts => sql { SELECT (title, content) FROM posts WHERE user = $user; }
 
 # Compute the Fibonnaci sequence
 @fib => switch (in) [1, 1, %{ $(fib decr) + $(fib decr decr) }]
@@ -55,9 +57,9 @@ cargo install --git https://github.com/connorwiniarczyk/serv.git
 
 Run serv in any directory with a main.serv file, or specify
 a file manually. Serv will run on port 4000 by default,
-or you can specify a port by defining the @serv.port function.
+or you can specify a port by defining the `@serv.port` function.
 
-Serv will use TLS encryption if the @serv.tlskey and @serv.tlscert
+Serv will use TLS encryption if the `@serv.tlskey` and `@serv.tlscert`
 functions are defined.
 
 ```python
@@ -77,7 +79,7 @@ listening on port 443
 
 ## Functions
 
-This is a non-exhaustive list, I'm still adding more
+This is a non-exhaustive list, I'm adding more
 constantly
 
 | Word      | Effect                            |
