@@ -10,6 +10,7 @@ mod host;
 mod list_operations;
 mod request;
 mod sql;
+mod json;
 
 pub use host::*;
 pub use list_operations::*;
@@ -242,4 +243,5 @@ pub fn bind_standard_library(scope: &mut Scope) {
 
 	request::bind(scope);
 	sql::bind(scope);
+	json::bind(scope);
 }

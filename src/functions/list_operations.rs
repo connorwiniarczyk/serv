@@ -33,9 +33,11 @@ pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult 
 }
 
 pub fn get(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let arg = words.take_next(scope)?;
+    let arg = {
+        let next = words.next().ok_or("")?;
+        scope.get(&next).ok_or("")?.call(input.clone(), scope)?
+    };
     let mut input = words.eval(input, scope)?;
-
     let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
         (ServValue::Int(index),    ServValue::List(mut list)) => list.remove(index.try_into().map_err(|e| "invalid index")?).ok_or("index not found")?,

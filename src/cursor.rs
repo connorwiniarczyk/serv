@@ -1,17 +1,14 @@
-#[derive(Debug, Clone, Copy)]
-pub struct Token<'input> {
-	pub value: &'input [char],
+#[derive(Debug, Clone)]
+pub struct Token<K> {
+    pub kind: K,
+	pub value: String,
 	pub start: usize,
 	pub end: usize,
 }
 
-impl<'input> Token<'input> {
+impl<K: Clone> Token<K> {
 	pub fn to_string(&self) -> String {
-    	let mut output = String::new();
-    	for c in self.value {
-        	output.push(*c)
-    	}
-    	output
+    	self.value.clone()
 	}
 }
 
@@ -26,9 +23,11 @@ impl<'input> Tokenizer<'input> {
         Self { input, mark: 0, index: 0}
     }
 
-    pub fn emit(&mut self) -> Token<'input> {
+    pub fn emit<K>(&mut self, k: K) -> Token<K> {
+        let value: String = self.input[self.mark..self.index].iter().collect();
         let output = Token {
-            value: &self.input[self.mark..self.index],
+            kind: k,
+            value,
 			start: self.mark,
 			end: self.index,
         };

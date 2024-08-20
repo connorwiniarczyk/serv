@@ -140,14 +140,17 @@ impl<'scope> Renderer<'scope> {
             match elem {
                 TemplateElement::Text(t)     => self.output.push_str(t),
                 TemplateElement::Template(t) => self.render(t, options.with_brackets()),
-                TemplateElement::Expression(t) if options.resolve_functions => {
-                    self.resolve_function(t).unwrap();
-                },
+
+                // be careful, order is important here
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
+                    println!("func");
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
                         sql_bindings.push(crate::FnLabel::Name(t.clone()));
                     }
+                },
+                TemplateElement::Expression(t) if options.resolve_functions => {
+                    self.resolve_function(t).unwrap();
                 },
                 TemplateElement::Expression(t) => {
                     self.output.push('$');

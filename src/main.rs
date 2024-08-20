@@ -4,7 +4,7 @@ mod serv_tokenizer;
 mod tape;
 mod error;
 mod functions;
-mod generic_tokenizer;
+mod cursor;
 mod parser;
 mod template;
 mod ast;

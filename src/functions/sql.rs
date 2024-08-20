@@ -31,7 +31,8 @@ fn sql(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 	let (input, params) = t.render_sql(scope);
     let mut statement = connection.prepare(input.to_string()).unwrap();
 
-    for (i, p) in params.into_iter().enumerate() {
+    for (mut i, p) in params.into_iter().enumerate() {
+        i += 1;
         let value = scope.get(&p).ok_or("")?.call(ServValue::None, scope).unwrap();
         match value {
             ServValue::Int(v)    => statement.bind((i, v)),
@@ -43,7 +44,7 @@ fn sql(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
             ServValue::List(v)   => todo!(),
             ServValue::Table(v)  => todo!(),
             ServValue::Meta {..} => todo!(),
-        };
+        }.expect("failed to bind to sqlite statement");
     }
 
     let mut output: Vec<ServValue> = Vec::new();
