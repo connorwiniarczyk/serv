@@ -75,15 +75,17 @@ impl Template {
     }
 
     pub fn render(&self, ctx: &Scope) -> ServResult {
-        let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None };
+        // let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None, new_context: None };
+        let mut renderer = Renderer::new(ctx);
         let options = FormatOptions::default();
         renderer.render(self, options);
 		Ok(ServValue::Text(std::mem::take(&mut renderer.output)))
     }
 
-    pub fn render_sql(&self, ctx: &Scope) -> (String, Vec<crate::FnLabel>) {
+    pub fn render_sql<'scope>(&self, ctx: &'scope Scope) -> (Scope<'scope>, String, Vec<crate::FnLabel>) {
         let mut renderer = Renderer::new(ctx);
         renderer.sql_bindings = Some(Vec::new());
+        renderer.new_context = Some(renderer.ctx.make_child());
 
         let mut options = FormatOptions::default();
         options.sql_mode = true;
@@ -92,15 +94,17 @@ impl Template {
 
         let output = std::mem::take(&mut renderer.output);
         let bindings = std::mem::take(&mut renderer.sql_bindings).unwrap();
+        let new_context = std::mem::take(&mut renderer.new_context).unwrap();
 
-		(output, bindings)
+		(new_context, output, bindings)
     }
 }
 
 struct Renderer<'scope> {
     output: String,
-    ctx: &'scope Scope<'scope>,
     sql_bindings: Option<Vec<crate::FnLabel>>,
+    ctx: &'scope Scope<'scope>,
+    new_context: Option<Scope<'scope>>,
 }
 
 impl<'scope> Renderer<'scope> {
@@ -109,6 +113,7 @@ impl<'scope> Renderer<'scope> {
     		output: String::new(),
     		ctx: ctx,
     		sql_bindings: None,
+    		new_context: None,
 		}
     }
     fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
@@ -143,12 +148,21 @@ impl<'scope> Renderer<'scope> {
 
                 // be careful, order is important here
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
-                    println!("func");
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
                         sql_bindings.push(crate::FnLabel::Name(t.clone()));
                     }
                 },
+
+                TemplateElement::Expression(ast::Word::Parantheses(e)) if options.sql_mode => {
+                    let Some(mut ctx)  = self.new_context.as_mut() else { return };
+                    let func = crate::compile(e.0.clone(), &mut ctx);
+                    self.output.push('?');
+                    if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
+                        sql_bindings.push(ctx.insert_anonymous(func));
+                    }
+                },
+
                 TemplateElement::Expression(t) if options.resolve_functions => {
                     self.resolve_function(t).unwrap();
                 },

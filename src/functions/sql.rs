@@ -6,14 +6,14 @@ fn get_database_location(scope: &Scope) -> Option<String> {
 	Some(output)
 }
 
-fn sql_get_query(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let arg = words.next().ok_or("not enough arguments")?;
-    let ServFunction::Template(template) = scope.get(&arg).ok_or("not found")? else { return Err("not a template") };
+// fn sql_get_query(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+//     let arg = words.next().ok_or("not enough arguments")?;
+//     let ServFunction::Template(template) = scope.get(&arg).ok_or("not found")? else { return Err("not a template") };
 
-    let (output, sql_bindings) = template.render_sql(scope);
+//     let (output, sql_bindings) = template.render_sql(scope);
 
-    todo!();
-}
+//     todo!();
+// }
 
 fn sql_exec(input: ServValue, scope: &Scope) -> ServResult {
     let path = get_database_location(scope).unwrap_or("serv.sqlite".to_string());
@@ -28,12 +28,14 @@ fn sql(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 
 	let mut arg = scope.get(&words.next().ok_or("")?).ok_or("")?;
 	let ServFunction::Template(t) = arg else {panic!()};
-	let (input, params) = t.render_sql(scope);
-    let mut statement = connection.prepare(input.to_string()).unwrap();
+	let (ctx, query, params) = t.render_sql(scope);
+    let mut statement = connection.prepare(query.to_string()).unwrap();
+
+    let rest = words.eval(input, scope)?;
 
     for (mut i, p) in params.into_iter().enumerate() {
         i += 1;
-        let value = scope.get(&p).ok_or("")?.call(ServValue::None, scope).unwrap();
+        let value = ctx.get(&p).ok_or("function not found")?.call(rest.clone(), &ctx).unwrap();
         match value {
             ServValue::Int(v)    => statement.bind((i, v)),
             ServValue::Text(t)   => statement.bind((i, t.as_str())),

@@ -47,7 +47,8 @@ fn tokenize_json<'input>(cursor: &mut Cursor<'input>) -> Vec<JsonToken> {
         		output.push(cursor.emit(Identifier));
     		}
 
-    		c @ _ if c.is_numeric() => {
+    		c @ _ if c.is_numeric() || c == '-' => {
+        		if c == '-' { cursor.incr(1)};
         		cursor.incr_while(|x| x.is_numeric() || x == '.');
         		output.push(cursor.emit(Number));
     		}
@@ -80,7 +81,7 @@ impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
         let token = self.0.next_if(|t| valid.contains(&t.kind)).ok_or(())?;
         let output = match token.kind {
             Text       => ServValue::Text(token.value),
-            Number     => ServValue::Int(token.value.parse().unwrap()),
+            Number     => ServValue::Float(token.value.parse().unwrap()),
             OpenList   => self.parse_list()?,
             OpenObject => self.parse_object()?,
 
