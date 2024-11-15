@@ -24,6 +24,14 @@ impl Words {
 		Ok(output)
     }
 
+    pub fn take_next_with_input(&mut self, scope: &Scope, input: ServValue) -> ServResult {
+        let next_word = self.next().ok_or("not enough arguments")?;
+        let func = scope.get(&next_word).ok_or("word not found")?;
+        let output = func.call(input, scope)?;
+
+		Ok(output)
+    }
+
     pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
         let Some(next) = self.next() else { return Ok(input) };
         let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};

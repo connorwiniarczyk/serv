@@ -154,7 +154,7 @@ pub fn using(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 }
 
 pub fn with_header(words: &mut Words, mut input: ServValue, scope: &Scope) -> ServResult {
-    let arg = words.take_next(scope)?;
+    let arg = words.take_next_with_input(scope, input.clone())?;
 	let mut output = words.eval(input, scope)?;
 	let headers: &mut ServValue = output.metadata()
     	.entry("headers".to_owned())
