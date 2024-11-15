@@ -89,6 +89,19 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
     }
 }
 
+use std::fmt::Display;
+
+impl Display for FnLabel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match (self) {
+            Self::Name(s) => f.write_str(s)?,
+            Self::Anonymous(id) => write!(f, "anonymous function {}", id)?,
+        };
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

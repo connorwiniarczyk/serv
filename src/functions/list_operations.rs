@@ -92,18 +92,37 @@ pub fn join(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text(t.join(&intersperse)))
 }
 
-pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-    let next = words.next().ok_or("not enough arguments")?;
-    let arg = scope.get(&next).ok_or("not found")?;
-    let rest = words.eval(input, scope)?;
+pub fn map(input: ServValue, scope: &Scope) -> ServResult {
+    // println!("map input: {}", input);
 
-	let mapped = match rest {
-    	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call(a, scope).unwrap()).collect()),
-    	_ => todo!(),
-	};
+    let ServValue::List(mut expr) = input else { return Ok(ServValue::None) };
 
-	Ok(mapped)
+    let arg = expr.pop_front().ok_or("not enough args")?;
+    // println!("map arg: {}", arg);
+
+    let target = ServValue::Expr(expr).eval(ServValue::None, scope)?;
+
+    // println!("map target: {}", target);
+    let ServValue::List(list) = target else { return Err("tried to map onto a non list") };
+
+    let result = list.into_iter().map(|a| arg.eval(a, scope).unwrap()).collect();
+    Ok(ServValue::List(result))
 }
+
+
+
+// pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
+//     let next = words.next().ok_or("not enough arguments")?;
+//     let arg = scope.get(&next).ok_or("not found")?;
+//     let rest = words.eval(input, scope)?;
+
+// 	let mapped = match rest {
+//     	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call(a, scope).unwrap()).collect()),
+//     	_ => todo!(),
+// 	};
+
+// 	Ok(mapped)
+// }
 
 pub fn fold(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
     let next = words.next().ok_or("not enough arguments")?;

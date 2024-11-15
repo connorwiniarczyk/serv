@@ -46,16 +46,28 @@ impl<'a> Scope<'a> {
 pub enum ServFunction {
     Literal(ServValue),
     Core(fn(ServValue, &Scope) -> ServResult),
-    Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
+    Meta(fn(ServValue, &Scope) -> ServResult),
+    // Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
     Template(Template),
     List(Vec<FnLabel>),
     Composition(Vec<FnLabel>),
 }
 
 impl ServFunction {
+    pub fn is_meta(&self) -> bool {
+        match (self) {
+            Self::Literal(_)     => false,
+            Self::Core(_)        => false,
+            Self::Meta(_)        => true,
+            Self::Template(_)    => false,
+            Self::List(_)        => false,
+            Self::Composition(_) => false,
+        }
+    }
     pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
         match self {
             Self::Core(f)        => f(input, scope),
+            Self::Meta(f)        => f(input, scope),
             Self::Literal(l)     => Ok(l.clone()),
             Self::Template(t)    => {
                 let mut child = scope.make_child();
@@ -76,7 +88,6 @@ impl ServFunction {
                 }
                 Ok(ServValue::List(list))
             }
-            Self::Meta(_) => Err("called a meta function when it was not appropriate"),
         }
     }
 }
@@ -132,10 +143,15 @@ fn compile_value(input: Vec<ast::Word>, scope: &mut Scope) -> ServValue {
         };
     }
 
-    ServValue::List(output)
+    ServValue::Expr(output)
 }
 
-// fn eval_value(value: ServValue)
+// fn eval_value(value: ServValue, input: ServValue, scope: &Scope) -> ServValue {
+//     match (value, input) {
+//         ()
+//     }
+// 	todo!();
+// }
 
 /// A parser for serv files
 #[derive(Parser, Debug)]
@@ -175,15 +191,20 @@ async fn main() {
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
 
+    args.execute = true;
+
 	if args.execute {
     	let ast = parser::parse_expression_from_text(&input).unwrap();
     	let mut scope: Scope = Scope::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
-    	let func = compile(ast.0, &mut scope);
+    	// let func = compile(ast.0, &mut scope);
+    	// let output = func.call(ServValue::None, &scope).expect("error");
 
-    	let output = func.call(ServValue::None, &scope).expect("error");
-    	println!("{}", output);
+    	let func = compile_value(ast.0, &mut scope);
+    	let output = func.eval(ServValue::None, &scope).expect("error");
+
+    	println!("output: {}", output);
 
 	} else {
     	let ast = parser::parse_root_from_text(&input).unwrap();

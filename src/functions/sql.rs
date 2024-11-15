@@ -104,6 +104,6 @@ fn sql(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 // }
 
 pub fn bind(scope: &mut Scope) {
-	scope.insert(FnLabel::name("sql"),    ServFunction::Meta(sql));
+	// scope.insert(FnLabel::name("sql"),    ServFunction::Meta(sql));
 	scope.insert(FnLabel::name("sql.exec"),    ServFunction::Core(sql_exec));
 }

@@ -37,7 +37,8 @@ impl Words {
         let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
 
         if let ServFunction::Meta(m) = next_fn {
-			return (m)(self, input, scope);
+            todo!();
+			// return (m)(self, input, scope);
         } else {
             let rest = self.eval(input, scope)?;
             return next_fn.call(rest, scope)
