@@ -4,7 +4,10 @@ use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+use crate::ServFunction;
+use crate::FnLabel;
+
+#[derive(Clone)]
 pub enum ServValue {
     None,
     Bool(bool),
@@ -15,6 +18,9 @@ pub enum ServValue {
 
     List(VecDeque<ServValue>),
     Table(HashMap<String, ServValue>),
+
+	ServFn(FnLabel),
+
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
 }
 
@@ -110,6 +116,7 @@ impl Display for ServValue {
 
                 f.write_str("}")?;
             },
+            // Self::Expr(e) => f.write_str("")?,
             Self::List(l) => {
                 f.write_str("[")?;
 				let mut iter = l.iter().peekable();
@@ -127,7 +134,10 @@ impl Display for ServValue {
 				}
                 f.write_str("]")?;
             }
+
+            otherwise => f.write_str("")?,
         }
+
 		Ok(())
     }
 }

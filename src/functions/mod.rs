@@ -24,8 +24,6 @@ use sqlite;
 
 use std::collections::HashMap;
 
-
-
 pub fn hello_world(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text("hello world".to_owned()))
 }
@@ -40,6 +38,10 @@ pub fn inline(input: ServValue, scope: &Scope) -> ServResult {
 
 pub fn incr(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? + 1))
+}
+
+pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
+    Ok(ServValue::Int(input.expect_int()? - 1))
 }
 
 pub fn markdown(input: ServValue, scope: &Scope) -> ServResult {
@@ -59,9 +61,6 @@ pub fn markdown(input: ServValue, scope: &Scope) -> ServResult {
     Ok(ServValue::Text(output))
 }
 
-pub fn decr(input: ServValue, scope: &Scope) -> ServResult {
-    Ok(ServValue::Int(input.expect_int()? - 1))
-}
 
 // pub fn read_file(input: ServValue, scope: &Scope) -> ServResult {
 //     let path = input.to_string();
@@ -88,11 +87,11 @@ pub fn math_expr(input: ServValue, scope: &Scope) -> ServResult {
     let expression = input.to_string();
 	let res = eval(expression.as_str()).unwrap();
 	Ok(match res {
-		evalexpr::Value::String(s) => ServValue::Text(s),
-		evalexpr::Value::Int(x) => ServValue::Int(x),
+		evalexpr::Value::String(s)  => ServValue::Text(s),
+		evalexpr::Value::Int(x)     => ServValue::Int(x),
 		evalexpr::Value::Boolean(x) => ServValue::Bool(x),
-		evalexpr::Value::Float(x) => ServValue::Float(x),
-		evalexpr::Value::Empty => ServValue::None,
+		evalexpr::Value::Float(x)   => ServValue::Float(x),
+		evalexpr::Value::Empty      => ServValue::None,
 		_ => todo!(),
 	})
 }

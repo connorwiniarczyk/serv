@@ -3,7 +3,7 @@ pub use crate::template::{TemplateElement, Template};
 
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Word {
    	// Function(Token)),
    	Function(String),
@@ -34,15 +34,15 @@ impl Display for Word {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Expression(pub Vec<Word>);
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Declaration {
    	pub kind: String,
 	pub key: String,
 	pub value: Expression,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct AstRoot(pub Vec<Declaration>);

@@ -46,6 +46,8 @@ fn sql(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
             ServValue::List(v)   => todo!(),
             ServValue::Table(v)  => todo!(),
             ServValue::Meta {..} => todo!(),
+
+            otherwise => todo!(),
         }.expect("failed to bind to sqlite statement");
     }
 

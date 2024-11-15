@@ -29,7 +29,7 @@ impl FormatOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum TemplateElement {
 	Text(String),
 	Template(Template),
@@ -51,7 +51,7 @@ impl Display for TemplateElement {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Template {
     pub open: String,
     pub close: String,

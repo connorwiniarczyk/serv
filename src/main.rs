@@ -111,6 +111,32 @@ fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
     ServFunction::Composition(output)
 }
 
+fn compile_value(input: Vec<ast::Word>, scope: &mut Scope) -> ServValue {
+    let mut output: VecDeque<ServValue> = VecDeque::new();
+    let mut iter = input.into_iter();
+    while let Some(word) = iter.next() {
+        match word {
+            ast::Word::Function(t) => output.push_back(ServValue::ServFn(FnLabel::Name(t))),
+            ast::Word::Literal(v) => output.push_back(v),
+            ast::Word::Template(t) => {
+                let label = scope.insert_anonymous(ServFunction::Template(t));
+                output.push_back(ServValue::ServFn(label));
+            },
+            ast::Word::Parantheses(expression) => {
+                let inner = compile_value(expression.0, scope);
+                // let label = scope.insert_anonymous(inner);
+                output.push_back(inner);
+            },
+
+            otherwise => panic!(),
+        };
+    }
+
+    ServValue::List(output)
+}
+
+// fn eval_value(value: ServValue)
+
 /// A parser for serv files
 #[derive(Parser, Debug)]
 #[command(version, about, long_about)]
