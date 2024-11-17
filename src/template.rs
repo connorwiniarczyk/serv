@@ -1,7 +1,7 @@
 // use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
-use crate::{ Scope, ServResult };
+use crate::{ Stack, ServResult };
 use std::fmt::Display;
 
 #[derive (Clone)]
@@ -69,12 +69,13 @@ impl Display for Template {
     }
 }
 
+
 impl Template {
     pub fn literal(&self) -> ServValue {
         ServValue::Text(self.to_string())
     }
 
-    pub fn render(&self, ctx: &Scope) -> ServResult {
+    pub fn render(&self, ctx: &Stack) -> ServResult {
         // let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None, new_context: None };
         let mut renderer = Renderer::new(ctx);
         let options = FormatOptions::default();
@@ -82,7 +83,7 @@ impl Template {
 		Ok(ServValue::Text(std::mem::take(&mut renderer.output)))
     }
 
-    pub fn render_sql<'scope>(&self, ctx: &'scope Scope) -> (Scope<'scope>, String, Vec<crate::FnLabel>) {
+    pub fn render_sql<'scope>(&self, ctx: &'scope Stack) -> (Stack<'scope>, String, Vec<crate::FnLabel>) {
         let mut renderer = Renderer::new(ctx);
         renderer.sql_bindings = Some(Vec::new());
         renderer.new_context = Some(renderer.ctx.make_child());
@@ -103,12 +104,12 @@ impl Template {
 struct Renderer<'scope> {
     output: String,
     sql_bindings: Option<Vec<crate::FnLabel>>,
-    ctx: &'scope Scope<'scope>,
-    new_context: Option<Scope<'scope>>,
+    ctx: &'scope Stack<'scope>,
+    new_context: Option<Stack<'scope>>,
 }
 
 impl<'scope> Renderer<'scope> {
-    fn new(ctx: &'scope Scope) -> Self {
+    fn new(ctx: &'scope Stack) -> Self {
 		Self {
     		output: String::new(),
     		ctx: ctx,
@@ -119,8 +120,9 @@ impl<'scope> Renderer<'scope> {
     fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
         match expression {
             ast::Word::Function(name) => {
-                let value = self.ctx.get_str(name)?
-                    .call(ServValue::None, &self.ctx)?
+            	let input = self.ctx.get(&crate::FnLabel::Name("in".into()));
+                let value = self.ctx.get(&crate::FnLabel::Name(name.into())).unwrap()
+                    .eval(input, &self.ctx)?
                     .to_string();
 
                 self.output.push_str(&value);
@@ -129,7 +131,7 @@ impl<'scope> Renderer<'scope> {
             ast::Word::Parantheses(words) => {
                 let mut child = self.ctx.make_child();
             	let func = crate::compile(words.0.clone(), &mut child);
-            	let value = func.call(self.ctx.get_str("in")?.call(ServValue::None, &child)?, &child)?;
+            	let value = func.eval(self.ctx.get(&crate::FnLabel::Name("in".into())), &child)?;
                 self.output.push_str(value.to_string().as_str());
             },
 

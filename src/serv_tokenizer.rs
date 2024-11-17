@@ -111,7 +111,10 @@ impl<'i> Cursor<'i> {
                 '%'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '.'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '*'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '&'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '!'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '+'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '-'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 
                 '[' => {self.input.incr(1); self.push_token(TokenKind::ListBegin)},
                 ']' => {self.input.incr(1); self.push_token(TokenKind::ListEnd)},

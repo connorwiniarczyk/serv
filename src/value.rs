@@ -4,11 +4,57 @@ use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use crate::Scope;
+// use crate::ServFunction;
+// use crate::Scope;
+use crate::Stack;
 
-use crate::ServFunction;
 use crate::FnLabel;
 use crate::ServResult;
+
+#[derive(Clone)]
+pub enum ServFn {
+    Core     (fn(ServValue, &Stack) -> ServResult),
+    CoreMeta (fn(ServValue, &Stack) -> ServResult),
+    Expr     (VecDeque<ServValue>),
+    ExprMeta (VecDeque<ServValue>),
+
+    Template(Template),
+}
+
+impl ServFn {
+	pub fn call(&self, input: ServValue, stack: &Stack) -> ServResult {
+        match self {
+            Self::Core(f)        => f(input, stack),
+            Self::CoreMeta(f)    => f(input, stack),
+            Self::Expr(i)        => {
+                let mut inner = i.clone();
+                let Some(front) = inner.pop_front() else { return Ok(input) };
+                // let remainder = Self::Expr(inner).call(input, stack)?;
+
+                let remainder = if !front.is_meta(stack) {
+                    Self::Expr(inner).call(input, stack)?
+                } else {
+                    inner.push_back(input);
+                    ServValue::List(inner)
+                };
+
+                front.eval(Some(remainder), stack)
+            },
+            // Self::ExprMeta(i)    => {
+            //     let mut inner = i.clone();
+            //     let Some(front) = inner.pop_front() else { return Ok(ServValue::None) };
+            //     let remainder = Self::Expr(inner).call(input, stack)?;
+            //     front.eval(Some(remainder), stack)
+            // },
+            Self::Template(t)    => {
+                let mut child = stack.make_child();
+                child.insert_name("in", input);
+                t.render(&child)
+            },
+            otherwise => todo!(),
+        }
+	}
+}
 
 #[derive(Clone)]
 pub enum ServValue {
@@ -22,10 +68,13 @@ pub enum ServValue {
     List(VecDeque<ServValue>),
     Table(HashMap<String, ServValue>),
 
-	ServFn(FnLabel),
-    Expr(VecDeque<ServValue>),
+    Ref(FnLabel),
+    FnLiteral(ServFn),
 
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
+
+	ServFn(FnLabel), // deprecated
+    Expr(VecDeque<ServValue>), // deprecated
 }
 
 impl Default for ServValue {
@@ -35,31 +84,54 @@ impl Default for ServValue {
 }
 
 impl ServValue {
-    pub fn eval(&self, input: Self, scope: &Scope) -> ServResult {
-        // println!("eval called {} with input {}", self, input);
+    fn is_meta(&self, stack: &Stack) -> bool {
+        if let Self::Ref(label) = self { return stack.get(label).unwrap().is_meta(stack) };
+
+        let Self::FnLiteral(f) = self else { return false };
+        match f {
+            ServFn::Core(_)     => false,
+            ServFn::CoreMeta(_) => true,
+            ServFn::Expr(_)     => false,
+            ServFn::ExprMeta(_) => true,
+            ServFn::Template(_) => false,
+        }
+    }
+
+    pub fn eval(&self, input: Option<Self>, scope: &crate::Stack) -> ServResult {
         match (self, input) {
+            (Self::ServFn(_), _) => panic!(),
 
-            (Self::Expr(inner), i) => {
-                let mut new_inner = inner.clone();
-                let first = new_inner.pop_front().unwrap_or(Self::None);
-                new_inner.push_back(i);
-                first.eval(Self::Expr(new_inner), scope)
+            // (Self::Expr(inner), i) => {
+            //     let mut new_inner = inner.clone();
+            //     let first = new_inner.pop_front().unwrap_or(Self::None);
+                
+            //     if i.is_some() { new_inner.push_back(i.unwrap()) };
+
+            //     first.eval(Some(Self::Expr(new_inner)), scope)
+            // },
+
+            // (Self::FnLiteral(f), Some(Self::Expr(inner))) => {
+            //     if (!f.is_meta()) {
+            //         let result = Self::Expr(inner.clone()).eval(None, scope)?;
+            //         f.call(result, scope)
+            //     } else {
+            //         f.call(Self::List(inner.clone()), scope)
+            //     }
+            // },
+
+            (Self::FnLiteral(f), Some(i)) => f.call(i, scope),
+            (Self::FnLiteral(f), None)    => f.call(ServValue::None, scope),
+
+
+            (Self::Ref(label), i) => {
+                let deref = scope.get(label).ok_or("err")?;
+                deref.eval(i, scope)
             },
 
-            (Self::ServFn(label), Self::Expr(inner)) => {
-                let func = scope.get(label).ok_or("err")?;
-
-                if (!func.is_meta()) {
-                    let result = Self::Expr(inner.clone()).eval(ServValue::None, scope)?;
-                    func.call(result, scope)
-                } else {
-                    func.call(Self::List(inner.clone()), scope)
-                }
-            },
-
-            (Self::ServFn(label), i) => scope.get(label).ok_or("not found")?.call(i.clone(), scope),
+            // (Self::ServFn(label), Some(i)) => scope.get(label).ok_or("not found")?.call(i.clone(), scope),
 
             otherwise => Ok(self.clone()),
+            // otherwise => Err("not supported"),
         }
     }
     pub fn expect_int(&self) -> Result<i64, &'static str> {
@@ -108,7 +180,7 @@ impl From<i64> for ServValue {
 impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::None => f.write_str("")?,
+            Self::None => f.write_str("NONE")?,
             Self::Bool(v) => v.fmt(f)?,
             Self::Float(v) => v.fmt(f)?,
             Self::Text(ref t) => f.write_str(t)?,
@@ -160,7 +232,6 @@ impl Display for ServValue {
 				let mut iter = l.iter().peekable();
 				while let Some(element) = iter.next() {
     				match element {
-        				ServValue::None => f.write_str("0")?,
         				ServValue::Text(t) => {
             				f.write_str("\"")?;
             				t.fmt(f)?;

@@ -14,8 +14,6 @@ mod webserver;
 
 use crate::error::ServError;
 
-// use lexer::TokenKind;
-// use lexer::*;
 use serv_tokenizer::TokenKind;
 use value::ServValue;
 use template::Template;
@@ -30,112 +28,99 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use matchit::Router;
 
-use tape::Words;
+// use tape::Words;
 
 type ServResult = Result<ServValue, &'static str>;
-pub type Scope<'a> = dictionary::StackDictionary<'a, ServFunction>;
+// pub type Scope<'a> = dictionary::StackDictionary<'a, ServFunction>;
 
-impl<'a> Scope<'a> {
-    pub fn get_str(&self, input: &str) -> Result<ServFunction, &'static str> {
+// impl<'a> Scope<'a> {
+//     pub fn get_str(&self, input: &str) -> Result<ServFunction, &'static str> {
+//         self.get(&FnLabel::name(input)).ok_or("word not found")
+//     }
+// }
+
+
+// #[derive(Clone)]
+// pub enum ServFunction {
+//     Literal(ServValue),
+//     Core(fn(ServValue, &Scope) -> ServResult),
+//     Meta(fn(ServValue, &Scope) -> ServResult),
+//     // Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
+//     Template(Template),
+//     List(Vec<FnLabel>),
+//     Composition(Vec<FnLabel>),
+// }
+
+// impl ServFunction {
+//     pub fn is_meta(&self) -> bool {
+//         match (self) {
+//             Self::Literal(_)     => false,
+//             Self::Core(_)        => false,
+//             Self::Meta(_)        => true,
+//             Self::Template(_)    => false,
+//             Self::List(_)        => false,
+//             Self::Composition(_) => false,
+//         }
+//     }
+//     pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
+//         match self {
+//             Self::Core(f)        => f(input, scope),
+//             Self::Meta(f)        => f(input, scope),
+//             Self::Literal(l)     => Ok(l.clone()),
+//             Self::Template(t)    => {
+//                 todo!();
+//                 // let mut child = scope.make_child();
+//                 // child.insert_name("in", ServFunction::Literal(input));
+//                 // t.render(&child)
+//             },
+//             Self::Composition(v) => {
+//                 let mut child_scope = scope.make_child();
+//                 child_scope.insert_name("in", ServFunction::Literal(input.clone()));
+
+//                 let mut words: VecDeque<FnLabel> = v.clone().into();
+//                 Words(words).eval(input, &child_scope)
+//             },
+//             Self::List(l) => {
+//                 let mut list: VecDeque<ServValue> = VecDeque::new();
+//                 for f in l {
+//                     list.push_back(scope.get(f).unwrap().call(input.clone(), scope)?);
+//                 }
+//                 Ok(ServValue::List(list))
+//             }
+//         }
+//     }
+// }
+
+use dictionary::StackDictionary;
+
+type Stack<'a> = StackDictionary<'a, ServValue>;
+
+impl<'a> Stack<'a> {
+    pub fn get_str(&self, input: &str) -> Result<ServValue, &'static str> {
         self.get(&FnLabel::name(input)).ok_or("word not found")
     }
 }
 
-
-#[derive(Clone)]
-pub enum ServFunction {
-    Literal(ServValue),
-    Core(fn(ServValue, &Scope) -> ServResult),
-    Meta(fn(ServValue, &Scope) -> ServResult),
-    // Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
-    Template(Template),
-    List(Vec<FnLabel>),
-    Composition(Vec<FnLabel>),
+fn incr(value: ServValue, stack: &Stack) -> ServResult {
+    Ok(ServValue::Int(value.expect_int()? + 1))
 }
 
-impl ServFunction {
-    pub fn is_meta(&self) -> bool {
-        match (self) {
-            Self::Literal(_)     => false,
-            Self::Core(_)        => false,
-            Self::Meta(_)        => true,
-            Self::Template(_)    => false,
-            Self::List(_)        => false,
-            Self::Composition(_) => false,
-        }
-    }
-    pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
-        match self {
-            Self::Core(f)        => f(input, scope),
-            Self::Meta(f)        => f(input, scope),
-            Self::Literal(l)     => Ok(l.clone()),
-            Self::Template(t)    => {
-                let mut child = scope.make_child();
-                child.insert_name("in", ServFunction::Literal(input));
-                t.render(&child)
-            },
-            Self::Composition(v) => {
-                let mut child_scope = scope.make_child();
-                child_scope.insert_name("in", ServFunction::Literal(input.clone()));
+use crate::value::ServFn;
 
-                let mut words: VecDeque<FnLabel> = v.clone().into();
-                Words(words).eval(input, &child_scope)
-            },
-            Self::List(l) => {
-                let mut list: VecDeque<ServValue> = VecDeque::new();
-                for f in l {
-                    list.push_back(scope.get(f).unwrap().call(input.clone(), scope)?);
-                }
-                Ok(ServValue::List(list))
-            }
-        }
-    }
-}
-
-fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
-    let mut output: Vec<FnLabel> = Vec::new();
-    let mut iter = input.into_iter();
-    while let Some(word) = iter.next() {
-        match word {
-            ast::Word::Function(t) => output.push(FnLabel::Name(t)),
-            ast::Word::List(l) => {
-                let mut inner: Vec<FnLabel> = Vec::new();
-                for expression in l {
-					let func = compile(expression.0, scope);
-                    inner.push(scope.insert_anonymous(func));
-                }
-                output.push(scope.insert_anonymous(ServFunction::List(inner)));
-            },
-            ast::Word::Template(t) => {
-                output.push(scope.insert_anonymous(ServFunction::Template(t)));
-            },
-            ast::Word::Parantheses(expression) => {
-                let func = compile(expression.0, scope);
-                output.push(scope.insert_anonymous(func));
-            },
-            ast::Word::Literal(v) => {
-                output.push(scope.insert_anonymous(ServFunction::Literal(v)));
-            },
-        };
-    }
-
-    ServFunction::Composition(output)
-}
-
-fn compile_value(input: Vec<ast::Word>, scope: &mut Scope) -> ServValue {
+fn compile(input: Vec<ast::Word>, scope: &mut Stack) -> ServValue {
     let mut output: VecDeque<ServValue> = VecDeque::new();
     let mut iter = input.into_iter();
     while let Some(word) = iter.next() {
         match word {
-            ast::Word::Function(t) => output.push_back(ServValue::ServFn(FnLabel::Name(t))),
+            ast::Word::Function(t) => output.push_back(ServValue::Ref(FnLabel::Name(t))),
             ast::Word::Literal(v) => output.push_back(v),
             ast::Word::Template(t) => {
-                let label = scope.insert_anonymous(ServFunction::Template(t));
-                output.push_back(ServValue::ServFn(label));
+                let template = ServFn::Template(t);
+                let label = scope.insert_anonymous(ServValue::FnLiteral(template));
+                output.push_back(ServValue::Ref(label));
             },
             ast::Word::Parantheses(expression) => {
-                let inner = compile_value(expression.0, scope);
-                // let label = scope.insert_anonymous(inner);
+                let inner = compile(expression.0, scope);
                 output.push_back(inner);
             },
 
@@ -143,15 +128,9 @@ fn compile_value(input: Vec<ast::Word>, scope: &mut Scope) -> ServValue {
         };
     }
 
-    ServValue::Expr(output)
+    let func = ServFn::Expr(output);
+    ServValue::FnLiteral(func)
 }
-
-// fn eval_value(value: ServValue, input: ServValue, scope: &Scope) -> ServValue {
-//     match (value, input) {
-//         ()
-//     }
-// 	todo!();
-// }
 
 /// A parser for serv files
 #[derive(Parser, Debug)]
@@ -191,24 +170,19 @@ async fn main() {
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
 
-    args.execute = true;
-
 	if args.execute {
     	let ast = parser::parse_expression_from_text(&input).unwrap();
-    	let mut scope: Scope = Scope::empty();
+    	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
-    	// let func = compile(ast.0, &mut scope);
-    	// let output = func.call(ServValue::None, &scope).expect("error");
+    	let func = compile(ast.0, &mut scope);
+    	let output = func.eval(None, &scope).expect("error");
 
-    	let func = compile_value(ast.0, &mut scope);
-    	let output = func.eval(ServValue::None, &scope).expect("error");
-
-    	println!("output: {}", output);
+    	println!("{}", output);
 
 	} else {
     	let ast = parser::parse_root_from_text(&input).unwrap();
-    	let mut scope: Scope = Scope::empty();
+    	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
     	for declaration in ast.0 {
@@ -223,12 +197,12 @@ async fn main() {
         	}
     	}
 
-    	if let Ok(out) = scope.get_str("out") {
-        	let res = out.call(ServValue::None, &scope);
+    	if let Some(out) = scope.get(&FnLabel::Name("out".into())) {
+        	let res = out.eval(None, &scope);
         	println!("{}", res.unwrap());
     	}
 
     	// println!("starting web server");
-    	webserver::run_webserver(scope).await;
+    	// webserver::run_webserver(scope).await;
 	}
 }

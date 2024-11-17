@@ -51,9 +51,9 @@ impl<I> Parser<I> where I: Iterator<Item = ServToken> {
         }
     }
 
-//     // -------------
-//     // PARSING LOGIC
-//     // -------------
+    // -------------
+    // PARSING LOGIC
+    // -------------
     fn parse_template(&mut self) -> Result<ast::Template, ServError>  {
         let open = self.expect(TokenKind::TemplateOpen)?.to_string();
         self.advance();
