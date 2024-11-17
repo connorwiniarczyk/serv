@@ -1,4 +1,3 @@
-// use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
 use crate::{ Stack, ServResult };
@@ -83,7 +82,7 @@ impl Template {
 		Ok(ServValue::Text(std::mem::take(&mut renderer.output)))
     }
 
-    pub fn render_sql<'scope>(&self, ctx: &'scope Stack) -> (Stack<'scope>, String, Vec<crate::FnLabel>) {
+    pub fn render_sql<'scope>(&self, ctx: &'scope Stack) -> (Stack<'scope>, String, Vec<crate::Label>) {
         let mut renderer = Renderer::new(ctx);
         renderer.sql_bindings = Some(Vec::new());
         renderer.new_context = Some(renderer.ctx.make_child());
@@ -103,7 +102,7 @@ impl Template {
 
 struct Renderer<'scope> {
     output: String,
-    sql_bindings: Option<Vec<crate::FnLabel>>,
+    sql_bindings: Option<Vec<crate::Label>>,
     ctx: &'scope Stack<'scope>,
     new_context: Option<Stack<'scope>>,
 }
@@ -120,8 +119,10 @@ impl<'scope> Renderer<'scope> {
     fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
         match expression {
             ast::Word::Function(name) => {
-            	let input = self.ctx.get(&crate::FnLabel::Name("in".into()));
-                let value = self.ctx.get(&crate::FnLabel::Name(name.into())).unwrap()
+            	// let input = self.ctx.get(&crate::Label::Name("in".into()));
+
+            	let input = self.ctx.get("in");
+                let value = self.ctx.get(name).unwrap()
                     .eval(input, &self.ctx)?
                     .to_string();
 
@@ -131,7 +132,8 @@ impl<'scope> Renderer<'scope> {
             ast::Word::Parantheses(words) => {
                 let mut child = self.ctx.make_child();
             	let func = crate::compile(words.0.clone(), &mut child);
-            	let value = func.eval(self.ctx.get(&crate::FnLabel::Name("in".into())), &child)?;
+            	// let value = func.eval(self.ctx.get(&crate::Label::Name("in".into())), &child)?;
+            	let value = func.eval(self.ctx.get("in"), &child)?;
                 self.output.push_str(value.to_string().as_str());
             },
 
@@ -152,7 +154,7 @@ impl<'scope> Renderer<'scope> {
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        sql_bindings.push(crate::FnLabel::Name(t.clone()));
+                        sql_bindings.push(crate::Label::Name(t.clone()));
                     }
                 },
 

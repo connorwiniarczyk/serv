@@ -2,7 +2,6 @@ use crate::ServValue;
 use crate::ServResult;
 use crate::Stack;
 use crate::parser;
-// use crate::compile;
 use crate::VecDeque;
 
 pub fn count(input: ServValue, scope: &Stack) -> ServResult {

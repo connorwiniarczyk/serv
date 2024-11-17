@@ -1,6 +1,9 @@
 use crate::ServValue;
 use crate::ServResult;
 
+use crate::Label;
+use crate::value::ServFn;
+
 // use crate::Stack;
 use crate::Stack;
 
@@ -205,46 +208,44 @@ pub fn math_expr(input: ServValue, scope: &Stack) -> ServResult {
 // 	Ok(output)
 // }
 
-use crate::FnLabel;
-use crate::value::ServFn;
 
 // pub fn bind_standard_library(scope: &mut Scope) {
-	// scope.insert(FnLabel::name("hello"),           ServFunction::Core(hello_world));
-	// scope.insert(FnLabel::name("uppercase"),       ServFunction::Core(uppercase));
-	// scope.insert(FnLabel::name("incr"),            ServFunction::Core(incr));
-	// scope.insert(FnLabel::name("decr"),            ServFunction::Core(decr));
-	// scope.insert(FnLabel::name("%"),               ServFunction::Core(math_expr));
-	// scope.insert(FnLabel::name("sum"),             ServFunction::Core(sum));
-	// scope.insert(FnLabel::name("read"),            ServFunction::Core(read_file));
-	// scope.insert(FnLabel::name("read.raw"),        ServFunction::Core(read_file_raw));
-	// scope.insert(FnLabel::name("file.utf8"),       ServFunction::Core(read_file));
-	// scope.insert(FnLabel::name("file.raw"),        ServFunction::Core(read_file_raw));
-	// scope.insert(FnLabel::name("file"),            ServFunction::Core(read_file_raw));
-	// scope.insert(FnLabel::name("inline"),          ServFunction::Core(inline));
-	// scope.insert(FnLabel::name("exec"),            ServFunction::Core(exec));
-	// scope.insert(FnLabel::name("markdown"),        ServFunction::Core(markdown));
-	// scope.insert(FnLabel::name("ls"),              ServFunction::Core(read_dir));
-	// scope.insert(FnLabel::name("count"),           ServFunction::Core(count));
+	// scope.insert(Label::name("hello"),           ServFunction::Core(hello_world));
+	// scope.insert(Label::name("uppercase"),       ServFunction::Core(uppercase));
+	// scope.insert(Label::name("incr"),            ServFunction::Core(incr));
+	// scope.insert(Label::name("decr"),            ServFunction::Core(decr));
+	// scope.insert(Label::name("%"),               ServFunction::Core(math_expr));
+	// scope.insert(Label::name("sum"),             ServFunction::Core(sum));
+	// scope.insert(Label::name("read"),            ServFunction::Core(read_file));
+	// scope.insert(Label::name("read.raw"),        ServFunction::Core(read_file_raw));
+	// scope.insert(Label::name("file.utf8"),       ServFunction::Core(read_file));
+	// scope.insert(Label::name("file.raw"),        ServFunction::Core(read_file_raw));
+	// scope.insert(Label::name("file"),            ServFunction::Core(read_file_raw));
+	// scope.insert(Label::name("inline"),          ServFunction::Core(inline));
+	// scope.insert(Label::name("exec"),            ServFunction::Core(exec));
+	// scope.insert(Label::name("markdown"),        ServFunction::Core(markdown));
+	// scope.insert(Label::name("ls"),              ServFunction::Core(read_dir));
+	// scope.insert(Label::name("count"),           ServFunction::Core(count));
 
-	// scope.insert(FnLabel::name("!"),            ServFunction::Meta(drop));
-	// scope.insert(FnLabel::name("map"),             ServFunction::Meta(map));
-	// scope.insert(FnLabel::name("&"),               ServFunction::Meta(quote));
-	// scope.insert(FnLabel::name("*"),               ServFunction::Meta(deref));
-	// scope.insert(FnLabel::name("using"),        ServFunction::Meta(using));
-	// scope.insert(FnLabel::name("let"),          ServFunction::Meta(using));
-	// scope.insert(FnLabel::name("choose"),       ServFunction::Meta(choose));
-	// scope.insert(FnLabel::name("*"),            ServFunction::Meta(apply));
-	// scope.insert(FnLabel::name("exec.pipe"),    ServFunction::Meta(exec_pipe));
-	// scope.insert(FnLabel::name("with_header"),  ServFunction::Meta(with_header));
-	// scope.insert(FnLabel::name("with_status"),  ServFunction::Meta(with_status));
-	// scope.insert(FnLabel::name("fold"),         ServFunction::Meta(fold));
-	// scope.insert(FnLabel::name("get"),          ServFunction::Meta(get));
-	// scope.insert(FnLabel::name("switch"),       ServFunction::Meta(switch));
-	// scope.insert(FnLabel::name("render"),       ServFunction::Meta(render));
-	// scope.insert(FnLabel::name("join"),         ServFunction::Meta(join));
-	// scope.insert(FnLabel::name("split"),        ServFunction::Meta(split));
-	// scope.insert(FnLabel::name("get"),          ServFunction::Meta(get));
-	// scope.insert(FnLabel::name("."),            ServFunction::Meta(get));
+	// scope.insert(Label::name("!"),            ServFunction::Meta(drop));
+	// scope.insert(Label::name("map"),             ServFunction::Meta(map));
+	// scope.insert(Label::name("&"),               ServFunction::Meta(quote));
+	// scope.insert(Label::name("*"),               ServFunction::Meta(deref));
+	// scope.insert(Label::name("using"),        ServFunction::Meta(using));
+	// scope.insert(Label::name("let"),          ServFunction::Meta(using));
+	// scope.insert(Label::name("choose"),       ServFunction::Meta(choose));
+	// scope.insert(Label::name("*"),            ServFunction::Meta(apply));
+	// scope.insert(Label::name("exec.pipe"),    ServFunction::Meta(exec_pipe));
+	// scope.insert(Label::name("with_header"),  ServFunction::Meta(with_header));
+	// scope.insert(Label::name("with_status"),  ServFunction::Meta(with_status));
+	// scope.insert(Label::name("fold"),         ServFunction::Meta(fold));
+	// scope.insert(Label::name("get"),          ServFunction::Meta(get));
+	// scope.insert(Label::name("switch"),       ServFunction::Meta(switch));
+	// scope.insert(Label::name("render"),       ServFunction::Meta(render));
+	// scope.insert(Label::name("join"),         ServFunction::Meta(join));
+	// scope.insert(Label::name("split"),        ServFunction::Meta(split));
+	// scope.insert(Label::name("get"),          ServFunction::Meta(get));
+	// scope.insert(Label::name("."),            ServFunction::Meta(get));
 // 	request::bind(scope);
 // 	sql::bind(scope);
 // 	json::bind(scope);
@@ -252,46 +253,46 @@ use crate::value::ServFn;
 
 
 pub fn bind_standard_library(scope: &mut crate::Stack) {
-	scope.insert(FnLabel::name("hello"),           ServValue::FnLiteral(ServFn::Core(hello_world)));
-	scope.insert(FnLabel::name("uppercase"),       ServValue::FnLiteral(ServFn::Core(uppercase)));
-	scope.insert(FnLabel::name("incr"),            ServValue::FnLiteral(ServFn::Core(incr)));
-	scope.insert(FnLabel::name("decr"),            ServValue::FnLiteral(ServFn::Core(decr)));
+	scope.insert(Label::name("hello"),           ServValue::FnLiteral(ServFn::Core(hello_world)));
+	scope.insert(Label::name("uppercase"),       ServValue::FnLiteral(ServFn::Core(uppercase)));
+	scope.insert(Label::name("incr"),            ServValue::FnLiteral(ServFn::Core(incr)));
+	scope.insert(Label::name("decr"),            ServValue::FnLiteral(ServFn::Core(decr)));
 
-	scope.insert(FnLabel::name("+"),            ServValue::FnLiteral(ServFn::Core(incr)));
-	scope.insert(FnLabel::name("-"),            ServValue::FnLiteral(ServFn::Core(decr)));
+	scope.insert(Label::name("+"),            ServValue::FnLiteral(ServFn::Core(incr)));
+	scope.insert(Label::name("-"),            ServValue::FnLiteral(ServFn::Core(decr)));
 
-	scope.insert(FnLabel::name("%"),               ServValue::FnLiteral(ServFn::Core(math_expr)));
-	// scope.insert(FnLabel::name("sum"),             ServValue::FnLiteral(ServFn::Core(sum)));
-	scope.insert(FnLabel::name("read"),            ServValue::FnLiteral(ServFn::Core(read_file)));
-	scope.insert(FnLabel::name("read.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
-	scope.insert(FnLabel::name("file.utf8"),       ServValue::FnLiteral(ServFn::Core(read_file)));
-	scope.insert(FnLabel::name("file.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
-	scope.insert(FnLabel::name("file"),            ServValue::FnLiteral(ServFn::Core(read_file_raw)));
-	scope.insert(FnLabel::name("inline"),          ServValue::FnLiteral(ServFn::Core(inline)));
-	// scope.insert(FnLabel::name("exec"),            ServValue::FnLiteral(ServFn::Core(exec)));
-	scope.insert(FnLabel::name("markdown"),        ServValue::FnLiteral(ServFn::Core(markdown)));
-	scope.insert(FnLabel::name("ls"),              ServValue::FnLiteral(ServFn::Core(read_dir)));
-	scope.insert(FnLabel::name("count"),           ServValue::FnLiteral(ServFn::Core(count)));
+	scope.insert(Label::name("%"),               ServValue::FnLiteral(ServFn::Core(math_expr)));
+	// scope.insert(Label::name("sum"),             ServValue::FnLiteral(ServFn::Core(sum)));
+	scope.insert(Label::name("read"),            ServValue::FnLiteral(ServFn::Core(read_file)));
+	scope.insert(Label::name("read.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
+	scope.insert(Label::name("file.utf8"),       ServValue::FnLiteral(ServFn::Core(read_file)));
+	scope.insert(Label::name("file.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
+	scope.insert(Label::name("file"),            ServValue::FnLiteral(ServFn::Core(read_file_raw)));
+	scope.insert(Label::name("inline"),          ServValue::FnLiteral(ServFn::Core(inline)));
+	// scope.insert(Label::name("exec"),            ServValue::FnLiteral(ServFn::Core(exec)));
+	scope.insert(Label::name("markdown"),        ServValue::FnLiteral(ServFn::Core(markdown)));
+	scope.insert(Label::name("ls"),              ServValue::FnLiteral(ServFn::Core(read_dir)));
+	scope.insert(Label::name("count"),           ServValue::FnLiteral(ServFn::Core(count)));
 
-	// scope.insert(FnLabel::name("!"),            ServFunction::Meta(drop));
-	scope.insert(FnLabel::name("map"),             ServValue::FnLiteral(ServFn::CoreMeta(map)));  // ::Meta(map));
-	// scope.insert(FnLabel::name("&"),               ServFunction::Meta(quote));
-	// scope.insert(FnLabel::name("*"),               ServFunction::Meta(deref));
-	// scope.insert(FnLabel::name("using"),        ServFunction::Meta(using));
-	// scope.insert(FnLabel::name("let"),          ServFunction::Meta(using));
-	// scope.insert(FnLabel::name("choose"),       ServFunction::Meta(choose));
-	// scope.insert(FnLabel::name("*"),            ServFunction::Meta(apply));
-	// scope.insert(FnLabel::name("exec.pipe"),    ServFunction::Meta(exec_pipe));
-	// scope.insert(FnLabel::name("with_header"),  ServFunction::Meta(with_header));
-	// scope.insert(FnLabel::name("with_status"),  ServFunction::Meta(with_status));
-	// scope.insert(FnLabel::name("fold"),         ServFunction::Meta(fold));
-	// scope.insert(FnLabel::name("get"),          ServFunction::Meta(get));
-	// scope.insert(FnLabel::name("switch"),       ServFunction::Meta(switch));
-	// scope.insert(FnLabel::name("render"),       ServFunction::Meta(render));
-	// scope.insert(FnLabel::name("join"),         ServFunction::Meta(join));
-	// scope.insert(FnLabel::name("split"),        ServFunction::Meta(split));
-	// scope.insert(FnLabel::name("get"),          ServFunction::Meta(get));
-	// scope.insert(FnLabel::name("."),            ServFunction::Meta(get));
+	// scope.insert(Label::name("!"),            ServFunction::Meta(drop));
+	scope.insert(Label::name("map"),             ServValue::FnLiteral(ServFn::CoreMeta(map)));  // ::Meta(map));
+	// scope.insert(Label::name("&"),               ServFunction::Meta(quote));
+	// scope.insert(Label::name("*"),               ServFunction::Meta(deref));
+	// scope.insert(Label::name("using"),        ServFunction::Meta(using));
+	// scope.insert(Label::name("let"),          ServFunction::Meta(using));
+	// scope.insert(Label::name("choose"),       ServFunction::Meta(choose));
+	// scope.insert(Label::name("*"),            ServFunction::Meta(apply));
+	// scope.insert(Label::name("exec.pipe"),    ServFunction::Meta(exec_pipe));
+	// scope.insert(Label::name("with_header"),  ServFunction::Meta(with_header));
+	// scope.insert(Label::name("with_status"),  ServFunction::Meta(with_status));
+	// scope.insert(Label::name("fold"),         ServFunction::Meta(fold));
+	// scope.insert(Label::name("get"),          ServFunction::Meta(get));
+	// scope.insert(Label::name("switch"),       ServFunction::Meta(switch));
+	// scope.insert(Label::name("render"),       ServFunction::Meta(render));
+	// scope.insert(Label::name("join"),         ServFunction::Meta(join));
+	// scope.insert(Label::name("split"),        ServFunction::Meta(split));
+	// scope.insert(Label::name("get"),          ServFunction::Meta(get));
+	// scope.insert(Label::name("."),            ServFunction::Meta(get));
 
 	// request::bind(scope);
 	// sql::bind(scope);
