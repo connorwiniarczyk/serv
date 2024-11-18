@@ -36,20 +36,26 @@ type Stack<'a> = StackDictionary<'a, ServValue, ()>;
 
 use crate::value::ServFn;
 
-fn compile(input: Vec<ast::Word>, scope: &mut Stack) -> ServValue {
+// fn compile_meta(input: Vec<ast::Word>, scope: &mut Stack) -> ServValue {
+//     let ServValue::FnLiteral(ServFn::Expr(e)) = compile(input, scope) else { panic!() };
+//     ServValue::FnLiteral(ServFn::ExprMeta(e))
+// }
+
+fn compile(input: ast::Expression, scope: &mut Stack) -> ServValue {
     let mut output: VecDeque<ServValue> = VecDeque::new();
-    let mut iter = input.into_iter();
+    let mut iter = input.0.into_iter();
     while let Some(word) = iter.next() {
         match word {
             ast::Word::Function(t) => output.push_back(ServValue::Ref(Label::Name(t))),
             ast::Word::Literal(v) => output.push_back(v),
             ast::Word::Template(t) => {
                 let template = ServFn::Template(t);
-                let label = scope.insert_anonymous(ServValue::FnLiteral(template));
+                let label = scope.insert_anonymous(ServValue::Func(template));
                 output.push_back(ServValue::Ref(label));
             },
-            ast::Word::Parantheses(expression) => {
-                let inner = compile(expression.0, scope);
+            ast::Word::Parantheses(e) => {
+                // let inner = if meta { compile_meta(words, scope) } else { compile(words, scope) };
+                let inner = compile(e, scope);
                 output.push_back(inner);
             },
 
@@ -57,8 +63,8 @@ fn compile(input: Vec<ast::Word>, scope: &mut Stack) -> ServValue {
         };
     }
 
-    let func = ServFn::Expr(output);
-    ServValue::FnLiteral(func)
+    let func = ServFn::Expr(output, input.1);
+    ServValue::Func(func)
 }
 
 /// A parser for serv files
@@ -104,10 +110,10 @@ async fn main() {
     	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
-    	let func = compile(ast.0, &mut scope);
-    	let output = func.eval(None, &scope).expect("error");
+    	let func = compile(ast, &mut scope);
+    	let output = func.call(None, &scope).expect("error");
 
-    	println!("{}", output);
+    	// println!("{}", output);
 
 	} else {
     	let ast = parser::parse_root_from_text(&input).unwrap();
@@ -116,19 +122,19 @@ async fn main() {
 
     	for declaration in ast.0 {
         	if declaration.kind == "word" {
-            	let func = compile(declaration.value.0, &mut scope);
+            	let func = compile(declaration.value, &mut scope);
             	scope.insert(declaration.key.to_owned().into(), func);
         	}
 
         	else if declaration.kind == "route" {
-            	let func = compile(declaration.value.0, &mut scope);
+            	let func = compile(declaration.value, &mut scope);
             	scope.router.as_mut().unwrap().insert(declaration.key, func);
         	}
     	}
 
     	// if let Some(out) = scope.get(&Label::Name("out".into())) {
     	if let Some(out) = scope.get("out") {
-        	let res = out.eval(None, &scope);
+        	let res = out.call(None, &scope);
         	println!("{}", res.unwrap());
     	}
 

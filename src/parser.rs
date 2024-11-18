@@ -87,14 +87,23 @@ impl<I> Parser<I> where I: Iterator<Item = ServToken> {
     fn parse_word(&mut self) -> Result<ast::Word, ServError> {
         let token = self.0.peek().ok_or("End of input while parsing")?;
         let output = match token.kind {
-            TokenKind::Identifier => ast::Word::Function(token.to_string()),
-            TokenKind::IntLiteral => ast::Word::Literal(token.to_string().parse::<i64>().unwrap().into()),
+            TokenKind::Identifier   => ast::Word::Function(token.to_string()),
+            TokenKind::ListEnd      => ast::Word::Function(token.to_string()),
+            TokenKind::IntLiteral   => ast::Word::Literal(token.to_string().parse::<i64>().unwrap().into()),
             TokenKind::TemplateOpen => ast::Word::Template(self.parse_template()?.into()),
-            TokenKind::ListBegin => {
-                self.advance();
-                ast::Word::List(self.parse_list()?)
-            },
-            TokenKind::OpenParenthesis=> {
+            // TokenKind::ListBegin => {
+            //     self.advance();
+            //     let mut inner = self.parse_expression()?;
+            //     let mut t = vec![ast::Word::Function("[".into())];
+            //     for w in inner.0 {
+            //         t.push(w);
+            //     }
+            //     inner.0 = t;
+            //     inner.1 = true;
+
+            //     ast::Word::Parantheses(inner)
+            // },
+            TokenKind::OpenParenthesis => {
                 self.advance();
                 ast::Word::Parantheses(self.parse_expression()?)
             },
@@ -111,8 +120,17 @@ impl<I> Parser<I> where I: Iterator<Item = ServToken> {
         while let Ok(word) = self.parse_word() {
             output.push(word);
         }
-       
-        Ok(ast::Expression(output))
+
+        fn is_meta(words: &Vec<ast::Word>) -> bool {
+            match words.last() {
+                Some(ast::Word::Function(t)) if t == "]" => true,
+                Some(ast::Word::Parantheses(ast::Expression(e, is_meta))) => *is_meta,
+                otherwise => false,
+            }
+        }
+
+        let meta = is_meta(&output);
+        Ok(ast::Expression(output, meta))
     }
 
     fn parse_list(&mut self) -> Result<Vec<ast::Expression>, ServError> {

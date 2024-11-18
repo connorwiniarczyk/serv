@@ -17,6 +17,7 @@ pub fn count(input: ServValue, scope: &Stack) -> ServResult {
 	Ok(ServValue::List(output))
 }
 
+
 // pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 //     let next = words.next().ok_or("not enought arguments")?;
 //     let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
@@ -90,20 +91,21 @@ pub fn count(input: ServValue, scope: &Stack) -> ServResult {
 // }
 
 pub fn map(input: ServValue, scope: &Stack) -> ServResult {
-    println!("map input: {}", input);
+    todo!();
+    // println!("map input: {}", input);
 
-    let ServValue::List(mut expr) = input else { return Ok(ServValue::None) };
+    // let ServValue::List(mut expr) = input else { return Ok(ServValue::None) };
 
-    let arg = expr.pop_front().ok_or("not enough args")?;
-    println!("map arg: {}", arg);
+    // let arg = expr.pop_front().ok_or("not enough args")?;
+    // println!("map arg: {}", arg);
 
-    let target = ServValue::FnLiteral(crate::ServFn::Expr(expr)).eval(None, scope)?;
+    // let target = ServValue::FnLiteral(crate::ServFn::Expr(expr)).eval(None, scope)?;
 
-    println!("map target: {}", target);
-    let ServValue::List(list) = target else { return Err("tried to map onto a non list") };
+    // println!("map target: {}", target);
+    // let ServValue::List(list) = target else { return Err("tried to map onto a non list") };
 
-    let result = list.into_iter().map(|a| arg.eval(Some(a), scope).unwrap()).collect();
-    Ok(ServValue::List(result))
+    // let result = list.into_iter().map(|a| arg.eval(Some(a), scope).unwrap()).collect();
+    // Ok(ServValue::List(result))
 }
 
 // pub fn quote(mut input: ServValue, scope: &Scope) -> ServResult {

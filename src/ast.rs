@@ -10,6 +10,7 @@ pub enum Word {
    	Template(Template),
    	Literal(ServValue),
    	Parantheses(Expression),
+   	// MetaExpr(Expression),
    	List(Vec<Expression>),
 }
 
@@ -28,6 +29,14 @@ impl Display for Word {
 				}
 				f.write_str(")")?;
             },
+    //         Self::MetaExpr(e) => {
+				// f.write_str("[")?;
+				// for word in e.0.iter() {
+    // 				word.fmt(f)?;
+    // 				f.write_str(" ")?;
+				// }
+				// f.write_str("]")?;
+    //         },
         }
 
 		Ok(())
@@ -35,7 +44,7 @@ impl Display for Word {
 }
 
 #[derive(Clone)]
-pub struct Expression(pub Vec<Word>);
+pub struct Expression(pub Vec<Word>, pub bool);
 
 // #[derive(Debug)]
 pub struct Declaration {

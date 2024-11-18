@@ -123,7 +123,7 @@ impl<'scope> Renderer<'scope> {
 
             	let input = self.ctx.get("in");
                 let value = self.ctx.get(name).unwrap()
-                    .eval(input, &self.ctx)?
+                    .call(input, &self.ctx)?
                     .to_string();
 
                 self.output.push_str(&value);
@@ -131,9 +131,9 @@ impl<'scope> Renderer<'scope> {
 
             ast::Word::Parantheses(words) => {
                 let mut child = self.ctx.make_child();
-            	let func = crate::compile(words.0.clone(), &mut child);
-            	// let value = func.eval(self.ctx.get(&crate::Label::Name("in".into())), &child)?;
-            	let value = func.eval(self.ctx.get("in"), &child)?;
+            	let func = crate::compile(words.clone(), &mut child);
+            	// let value = func.call(self.ctx.get(&crate::Label::Name("in".into())), &child)?;
+            	let value = func.call(self.ctx.get("in"), &child)?;
                 self.output.push_str(value.to_string().as_str());
             },
 
@@ -160,7 +160,7 @@ impl<'scope> Renderer<'scope> {
 
                 TemplateElement::Expression(ast::Word::Parantheses(e)) if options.sql_mode => {
                     let Some(mut ctx)  = self.new_context.as_mut() else { return };
-                    let func = crate::compile(e.0.clone(), &mut ctx);
+                    let func = crate::compile(e.clone(), &mut ctx);
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
                         sql_bindings.push(ctx.insert_anonymous(func));

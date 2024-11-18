@@ -251,31 +251,77 @@ pub fn math_expr(input: ServValue, scope: &Stack) -> ServResult {
 // 	json::bind(scope);
 // }
 
+pub fn pop(input: ServValue, scope: &Stack) -> ServResult {
+    let ServValue::List(mut inner) = input else { return Ok(ServValue::None) };
+    _ = inner.pop_front();
+
+
+    // let arg = expr.pop_front().ok_or("not enough args")?;
+    // let target = ServValue::FnLiteral(crate::ServFn::Expr(expr)).eval(None, scope)?;
+    // let ServValue::List(list) = target else { return Err("tried to map onto a non list") };
+
+    Ok(ServValue::List(inner))
+}
+
+pub fn dequote(input: ServValue, scope: &Stack) -> ServResult {
+    match input {
+		ServValue::List(words) => crate::value::eval(words, scope),
+		i => Ok(i),
+    }
+}
+
+pub fn quote(input: VecDeque::<ServValue>, scope: &Stack) -> ServResult {
+    Ok(ServValue::List(input))
+}
+
+fn generate_list(input: VecDeque::<ServValue>, scope: &Stack) -> ServResult {
+    let mut output = VecDeque::new();
+    for item in input.into_iter() {
+        output.push_back(item.call(None, scope)?);
+    }
+    Ok(ServValue::List(output))
+}
+
+fn map(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let mut output = VecDeque::new();
+    let ServValue::List(list) = input else { return arg.call(Some(input), scope) };
+    for item in list.into_iter() {
+        output.push_back(arg.call(Some(item), scope)?);
+    }
+    Ok(ServValue::List(output))
+}
 
 pub fn bind_standard_library(scope: &mut crate::Stack) {
-	scope.insert(Label::name("hello"),           ServValue::FnLiteral(ServFn::Core(hello_world)));
-	scope.insert(Label::name("uppercase"),       ServValue::FnLiteral(ServFn::Core(uppercase)));
-	scope.insert(Label::name("incr"),            ServValue::FnLiteral(ServFn::Core(incr)));
-	scope.insert(Label::name("decr"),            ServValue::FnLiteral(ServFn::Core(decr)));
+	// scope.insert(Label::name("hello"),           ServValue::FnLiteral(ServFn::Core(hello_world)));
+	// scope.insert(Label::name("uppercase"),       ServValue::FnLiteral(ServFn::Core(uppercase)));
+	// scope.insert(Label::name("incr"),            ServValue::FnLiteral(ServFn::Core(incr)));
+	// scope.insert(Label::name("decr"),            ServValue::FnLiteral(ServFn::Core(decr)));
 
-	scope.insert(Label::name("+"),            ServValue::FnLiteral(ServFn::Core(incr)));
-	scope.insert(Label::name("-"),            ServValue::FnLiteral(ServFn::Core(decr)));
+	scope.insert(Label::name("+"),            ServValue::Func(ServFn::Core(incr)));
+	scope.insert(Label::name("-"),            ServValue::Func(ServFn::Core(decr)));
+	scope.insert(Label::name("map"),          ServValue::Func(ServFn::ArgFn(map)));
 
-	scope.insert(Label::name("%"),               ServValue::FnLiteral(ServFn::Core(math_expr)));
+	// scope.insert(Label::name("%"),               ServValue::FnLiteral(ServFn::Core(math_expr)));
 	// scope.insert(Label::name("sum"),             ServValue::FnLiteral(ServFn::Core(sum)));
-	scope.insert(Label::name("read"),            ServValue::FnLiteral(ServFn::Core(read_file)));
-	scope.insert(Label::name("read.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
-	scope.insert(Label::name("file.utf8"),       ServValue::FnLiteral(ServFn::Core(read_file)));
-	scope.insert(Label::name("file.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
-	scope.insert(Label::name("file"),            ServValue::FnLiteral(ServFn::Core(read_file_raw)));
-	scope.insert(Label::name("inline"),          ServValue::FnLiteral(ServFn::Core(inline)));
+	// scope.insert(Label::name("read"),            ServValue::FnLiteral(ServFn::Core(read_file)));
+	// scope.insert(Label::name("read.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
+	// scope.insert(Label::name("file.utf8"),       ServValue::FnLiteral(ServFn::Core(read_file)));
+	// scope.insert(Label::name("file.raw"),        ServValue::FnLiteral(ServFn::Core(read_file_raw)));
+	// scope.insert(Label::name("file"),            ServValue::FnLiteral(ServFn::Core(read_file_raw)));
+	// scope.insert(Label::name("inline"),          ServValue::FnLiteral(ServFn::Core(inline)));
 	// scope.insert(Label::name("exec"),            ServValue::FnLiteral(ServFn::Core(exec)));
-	scope.insert(Label::name("markdown"),        ServValue::FnLiteral(ServFn::Core(markdown)));
-	scope.insert(Label::name("ls"),              ServValue::FnLiteral(ServFn::Core(read_dir)));
-	scope.insert(Label::name("count"),           ServValue::FnLiteral(ServFn::Core(count)));
+	// scope.insert(Label::name("markdown"),        ServValue::FnLiteral(ServFn::Core(markdown)));
+	// scope.insert(Label::name("ls"),              ServValue::FnLiteral(ServFn::Core(read_dir)));
+	scope.insert(Label::name("count"),           ServValue::Func(ServFn::Core(count)));
+	scope.insert(Label::name("pop"),             ServValue::Func(ServFn::Core(pop)));
 
 	// scope.insert(Label::name("!"),            ServFunction::Meta(drop));
-	scope.insert(Label::name("map"),             ServValue::FnLiteral(ServFn::CoreMeta(map)));  // ::Meta(map));
+	// scope.insert(Label::name("map"),             ServValue::FnLiteral(ServFn::CoreMeta(map)));  // ::Meta(map));
+
+	// scope.insert(Label::name("pop"),             ServValue::FnLiteral(ServFn::Core(pop))); 
+	scope.insert(Label::name("["),               ServValue::Func(ServFn::Core(dequote)));
+	scope.insert(Label::name("]"),               ServValue::Func(ServFn::Meta(quote)));
+	scope.insert(Label::name("|"),               ServValue::Func(ServFn::Meta(generate_list)));
 	// scope.insert(Label::name("&"),               ServFunction::Meta(quote));
 	// scope.insert(Label::name("*"),               ServFunction::Meta(deref));
 	// scope.insert(Label::name("using"),        ServFunction::Meta(using));
