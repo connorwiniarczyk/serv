@@ -5,15 +5,22 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::Stack;
-
 use crate::Label;
 use crate::ServResult;
 
-pub fn eval(mut expr: VecDeque<ServValue>, scope: &Stack) -> ServResult {
+pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
     match expr.pop_front() {
         Some(ServValue::Ref(label)) => {
-			expr.push_front(scope.get(label.clone()).ok_or("")?);
-			eval(expr, scope)
+            if let Some(func) = scope.get(label.clone()) {
+    			expr.push_front(func);
+    			eval(expr, scope)
+            }
+            else {
+                let rest = eval(expr, scope)?;
+                scope.get(label.clone()).ok_or("not found")?.call(Some(rest), scope)
+            }
+
+			// expr.push_front(scope.get(label.clone()).ok_or("not found")?);
         },
 
         Some(ServValue::Func(ServFn::Meta(f))) => {
@@ -34,10 +41,20 @@ pub fn eval(mut expr: VecDeque<ServValue>, scope: &Stack) -> ServResult {
 
         Some(ref f @ ServValue::Func(ref a)) => {
             let rest = eval(expr, scope)?;
-            f.call(Some(rest), scope)
+            if let ServValue::Transform(r, t) = rest {
+                let mut child = scope.clone();
+                t.0(&mut child);
+                f.call(Some(*r), &child)
+
+            } else {
+                f.call(Some(rest), scope)
+            }
         },
 
-        Some(constant) => Ok(constant),
+        Some(constant) => {
+            _ = eval(expr, scope)?;
+            Ok(constant)
+        },
         None => Ok(ServValue::Func(ServFn::Ident)),
     }
 }
@@ -46,7 +63,7 @@ pub fn eval(mut expr: VecDeque<ServValue>, scope: &Stack) -> ServResult {
 pub enum ServFn {
     Ident,
     Core     (fn(ServValue, &Stack) -> ServResult),
-    Meta     (fn(VecDeque<ServValue>, &Stack) -> ServResult),
+    Meta     (fn(VecDeque<ServValue>, &mut Stack) -> ServResult),
     ArgFn    (fn(ServValue, ServValue, &Stack) -> ServResult),
     Expr     (VecDeque<ServValue>, bool),
     Template (Template),
@@ -81,8 +98,23 @@ pub enum ServValue {
     Table(HashMap<String, ServValue>),
 
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
+
+    // Transform (Box<ServValue>, fn(&mut Stack)) ,
+    Transform (Box<ServValue>, Transform) ,
 }
 
+use std::rc::Rc;
+
+#[derive(Clone)]
+pub struct Transform (pub Rc<dyn Fn(&mut Stack)>);
+
+impl std::fmt::Debug for Transform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str("f")
+    }
+}
+
+struct ValueMetadata {}
 
 impl ServValue {
     pub fn call(&self, input: Option<ServValue>, scope: &Stack) -> ServResult {
@@ -93,7 +125,7 @@ impl ServValue {
            	Self::Func(ServFn::Expr(e, _)) => {
                	let mut child = e.clone();
                	if let Some(v) = input { child.push_back(v); }
-               	eval(child, scope)
+               	eval(child, &mut scope.make_child())
            	},
            	Self::Func(ServFn::Ident) => Ok(input.unwrap_or_default()),
            	Self::Func(ServFn::Template(t)) => {
@@ -164,6 +196,7 @@ impl Display for ServValue {
             Self::Ref(Label::Anonymous(id)) => f.write_str("()")?,
             Self::Func(v)                   => f.write_str("()")?,
 
+
             Self::None                      => f.write_str("NONE")?,
             Self::Bool(v)                   => v.fmt(f)?,
             Self::Float(v)                  => v.fmt(f)?,
@@ -199,6 +232,7 @@ impl Display for ServValue {
             }
 
             Self::Meta { inner, metadata } => inner.fmt(f)?,
+            _ => todo!(),
         }
 
 		Ok(())

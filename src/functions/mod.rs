@@ -25,7 +25,7 @@ pub use list_operations::*;
 use std::process::{Command, Stdio};
 use std::io::Write;
 use std::io::{BufWriter};
-use evalexpr::eval;
+// use evalexpr::eval;
 use std::collections::VecDeque;
 use sqlite;
 
@@ -92,7 +92,7 @@ pub fn read_dir(input: ServValue, scope: &Stack) -> ServResult {
 
 pub fn math_expr(input: ServValue, scope: &Stack) -> ServResult {
     let expression = input.to_string();
-	let res = eval(expression.as_str()).unwrap();
+	let res = evalexpr::eval(expression.as_str()).unwrap();
 	Ok(match res {
 		evalexpr::Value::String(s)  => ServValue::Text(s),
 		evalexpr::Value::Int(x)     => ServValue::Int(x),
@@ -251,6 +251,35 @@ pub fn math_expr(input: ServValue, scope: &Stack) -> ServResult {
 // 	json::bind(scope);
 // }
 
+use std::rc::Rc;
+use crate::value::Transform;
+use crate::value::eval;
+
+pub fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
+   	let arg  = input.pop_front().ok_or("word expected")?;
+   	let ServValue::Ref(name @ Label::Name(_)) = arg else { panic!() };
+
+   	let rest = eval(input, scope)?;
+
+   	let out = match rest {
+       	ServValue::List(mut l) => { scope.insert(name, l.pop_front().ok_or("")?); ServValue::List(l) },
+       	element => { scope.insert(name, element); ServValue::None },
+   	};
+   	// scope.insert(name, ServValue::Int(10));
+   	
+   	Ok(out)
+
+   	// f(arg, rest, scope)
+
+    // if let ServValue::Ref(Label::Name(ref name)) = arg {
+    //     scope.insert("");
+    //     let transform = Transform(Rc::new(|s: &mut Stack| { s.insert_name(name, ServValue::None) }));
+    //     let out = ServValue::Transform(Box::new(input), transform);
+    //     Ok(out)
+    // }
+    // else { return Ok(input) }
+}
+
 pub fn pop(input: ServValue, scope: &Stack) -> ServResult {
     let ServValue::List(mut inner) = input else { return Ok(ServValue::None) };
     _ = inner.pop_front();
@@ -265,16 +294,16 @@ pub fn pop(input: ServValue, scope: &Stack) -> ServResult {
 
 pub fn dequote(input: ServValue, scope: &Stack) -> ServResult {
     match input {
-		ServValue::List(words) => crate::value::eval(words, scope),
+		ServValue::List(words) => crate::value::eval(words, &mut scope.make_child()),
 		i => Ok(i),
     }
 }
 
-pub fn quote(input: VecDeque::<ServValue>, scope: &Stack) -> ServResult {
+pub fn quote(input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
     Ok(ServValue::List(input))
 }
 
-fn generate_list(input: VecDeque::<ServValue>, scope: &Stack) -> ServResult {
+fn generate_list(input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
     let mut output = VecDeque::new();
     for item in input.into_iter() {
         output.push_back(item.call(None, scope)?);
@@ -300,6 +329,7 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("+"),            ServValue::Func(ServFn::Core(incr)));
 	scope.insert(Label::name("-"),            ServValue::Func(ServFn::Core(decr)));
 	scope.insert(Label::name("map"),          ServValue::Func(ServFn::ArgFn(map)));
+	// scope.insert(Label::name("take"),         ServValue::Func(ServFn::Meta(take)));
 
 	// scope.insert(Label::name("%"),               ServValue::FnLiteral(ServFn::Core(math_expr)));
 	// scope.insert(Label::name("sum"),             ServValue::FnLiteral(ServFn::Core(sum)));
@@ -322,6 +352,7 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("["),               ServValue::Func(ServFn::Core(dequote)));
 	scope.insert(Label::name("]"),               ServValue::Func(ServFn::Meta(quote)));
 	scope.insert(Label::name("|"),               ServValue::Func(ServFn::Meta(generate_list)));
+	scope.insert(Label::name("take"),               ServValue::Func(ServFn::Meta(take)));
 	// scope.insert(Label::name("&"),               ServFunction::Meta(quote));
 	// scope.insert(Label::name("*"),               ServFunction::Meta(deref));
 	// scope.insert(Label::name("using"),        ServFunction::Meta(using));

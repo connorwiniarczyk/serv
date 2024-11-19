@@ -35,6 +35,7 @@ impl From<&str> for Label {
     }
 }
 
+#[derive(Clone)]
 pub struct StackDictionary<'parent, V, M> {
     unique_id: u32,
 	pub parent: Option<&'parent Self>,
