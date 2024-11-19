@@ -19,8 +19,6 @@ pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
                 let rest = eval(expr, scope)?;
                 scope.get(label.clone()).ok_or("not found")?.call(Some(rest), scope)
             }
-
-			// expr.push_front(scope.get(label.clone()).ok_or("not found")?);
         },
 
         Some(ServValue::Func(ServFn::Meta(f))) => {
@@ -41,14 +39,7 @@ pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
 
         Some(ref f @ ServValue::Func(ref a)) => {
             let rest = eval(expr, scope)?;
-            if let ServValue::Transform(r, t) = rest {
-                let mut child = scope.clone();
-                t.0(&mut child);
-                f.call(Some(*r), &child)
-
-            } else {
-                f.call(Some(rest), scope)
-            }
+            f.call(Some(rest), scope)
         },
 
         Some(constant) => {
@@ -100,7 +91,6 @@ pub enum ServValue {
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
 
     // Transform (Box<ServValue>, fn(&mut Stack)) ,
-    Transform (Box<ServValue>, Transform) ,
 }
 
 use std::rc::Rc;
@@ -131,9 +121,13 @@ impl ServValue {
            	Self::Func(ServFn::Template(t)) => {
                	if let Some(v) = input {
                    	let mut child = scope.make_child();
-                   	child.insert("in".into(), v);
+                   	child.insert("in".into(), v.clone());
+                   	child.insert(":".into(), v);
+                   	t.render(&child)
                	}
-               	t.render(scope)
+               	else {
+                   	t.render(scope)
+               	}
            	},
 
 

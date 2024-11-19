@@ -10,7 +10,7 @@ mod template;
 mod ast;
 mod value;
 mod dictionary;
-// mod webserver;
+mod webserver;
 
 use crate::error::ServError;
 
@@ -138,7 +138,7 @@ async fn main() {
         	println!("{}", res.unwrap());
     	}
 
-    	// println!("starting web server");
-    	// webserver::run_webserver(scope).await;
+    	println!("starting web server");
+    	webserver::run_webserver(scope).await;
 	}
 }

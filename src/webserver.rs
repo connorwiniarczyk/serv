@@ -14,7 +14,7 @@ use hyper::server::conn::http1;
 
 use std::io::{BufReader, Read, Write};
 
-use crate::{ServValue, FnLabel};
+use crate::{ServValue, Label};
 use crate::Stack;
 use crate::VecDeque;
 use crate::SocketAddr;
@@ -71,15 +71,15 @@ impl Service<Request<IncomingBody>> for Serv {
 
     		let mut scope = root.make_child();
         	for (k, v) in matched.params.iter() {
-    			scope.insert(FnLabel::name(k), ServValue::Text(v.to_string()));
+    			scope.insert(Label::name(k), ServValue::Text(v.to_string()));
         	}
 
         	let body: bytes::Bytes = body.collect().await.unwrap().to_bytes();
-        	scope.insert(FnLabel::name("req.body"), ServValue::Raw(body.into()));
+        	scope.insert(Label::name("req.body"), ServValue::Raw(body.into()));
         	scope.request = Some(parts);
 
         	// let result = matched.value.call(ServValue::None, &mut scope).unwrap();
-        	let result = matched.value.eval(None, &mut scope).unwrap();
+        	let result = matched.value.call(None, &mut scope).unwrap();
     		let mut response = Response::builder();
 
     		if let Some(data) = result.get_metadata() {
@@ -122,7 +122,7 @@ impl Service<Request<IncomingBody>> for Serv {
 
 	// 	let mut scope = self.0.make_child();
  //    	for (k, v) in matched.params.iter() {
-	// 		scope.insert(FnLabel::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
+	// 		scope.insert(Label::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
  //    	}
 
  //    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
@@ -154,26 +154,19 @@ impl Service<Request<IncomingBody>> for Serv {
 }
 
 fn get_port(scope: &Stack) -> Result<u16, &'static str> {
-    // let port_func = scope.get(&FnLabel::Name("serv.port".to_owned())).ok_or("")?;
-    let port = scope.get_str("serv.port")?.eval(None, scope)?.expect_int()?;
-    // let port = port_func.call(ServValue::None, scope)?.expect_int()?;
-
+    let port = scope.get("serv.port").ok_or("serv.port not defined")?.call(None, scope)?.expect_int()?;
     Ok(port.try_into().unwrap())
 }
 
 fn get_tls_info(scope: &Stack<'static>) -> Option<Arc<rustls::ServerConfig>> {
-    let key_word = scope.get_str("serv.tlskey").ok()?;
-    // let key_str = key_word.call(ServValue::None, scope).expect("Failed to execute serv.tlskey").to_string();
-    let key_str = key_word.eval(None, scope).expect("Failed to execute serv.tlskey").to_string();
-    let mut reader = BufReader::new(key_str.as_bytes());
+    let key = scope.get("serv.tlskey")?.call(None, scope).expect("Failed running serv.tlskey").to_string();
+    let mut reader = BufReader::new(key.as_bytes());
     let key = rustls_pemfile::private_key(&mut reader)
         .expect("failed to parse private key")
         .expect("failed to find private key");
 
-    let cert_word = scope.get_str("serv.tlscert").ok()?;
-    // let cert_str = cert_word.call(ServValue::None, scope).expect("Failed to execute serv.tlscert").to_string();
-    let cert_str = cert_word.eval(None, scope).expect("Failed to execute serv.tlscert").to_string();
-    let mut reader_cert = BufReader::new(cert_str.as_bytes());
+    let cert = scope.get("serv.tlscert")?.call(None, scope).expect("Failed running serv.tlscert").to_string();
+    let mut reader_cert = BufReader::new(cert.as_bytes());
     let certs = rustls_pemfile::certs(&mut reader_cert)
         .map(|cert| cert.expect("failed to parse cert"))
     	.collect();

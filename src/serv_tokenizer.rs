@@ -117,6 +117,10 @@ impl<'i> Cursor<'i> {
                 '-'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '|'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
 
+                ':'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '<'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '>'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+
 
                 '[' => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 ']' => {self.input.incr(1); self.push_token(TokenKind::ListEnd)},
@@ -203,7 +207,7 @@ impl<'i> Cursor<'i> {
             self.push_token(TokenKind::OpenParenthesis);
             self.tokenize_expression();
         } else {
-			self.input.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
+			self.input.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.' || x == ':');
 			self.push_token(TokenKind::Identifier);
         }
     }

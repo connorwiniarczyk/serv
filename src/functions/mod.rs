@@ -353,6 +353,7 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("]"),               ServValue::Func(ServFn::Meta(quote)));
 	scope.insert(Label::name("|"),               ServValue::Func(ServFn::Meta(generate_list)));
 	scope.insert(Label::name("take"),               ServValue::Func(ServFn::Meta(take)));
+	scope.insert(Label::name("<"),               ServValue::Func(ServFn::Meta(take)));
 	// scope.insert(Label::name("&"),               ServFunction::Meta(quote));
 	// scope.insert(Label::name("*"),               ServFunction::Meta(deref));
 	// scope.insert(Label::name("using"),        ServFunction::Meta(using));
