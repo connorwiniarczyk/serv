@@ -44,7 +44,7 @@ impl<'input> Tokenizer<'input> {
     }
 
     pub fn incr_while<F>(&mut self, test: F) where F: Fn(char) -> bool {
-        while (self.index < self.input.len() && (test)(self.input[self.index])) {
+        while self.index < self.input.len() && (test)(self.input[self.index]) {
             self.index += 1;
         }
     }

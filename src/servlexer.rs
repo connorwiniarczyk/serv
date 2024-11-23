@@ -1,4 +1,4 @@
-use crate::cursor::{Tokenizer, Token};
+use parsetool::cursor::{Tokenizer, Token};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum TokenKind {
@@ -12,44 +12,17 @@ pub enum TokenKind {
 
     Comment,
 
-    ListBegin,
-    ListEnd,
-    Comma,
-
 	OpenParenthesis,
 	CloseParenthesis,
+	ListEnd,
 
     WhiteSpace,
     At,
     WideArrow,
-    Semicolon,
     Dollar,
-    Percent,
     NewLine,
     Equals,
 }
-
-// #[derive(Debug, Clone, Copy)]
-// pub struct ServToken<'input> {
-//     pub kind: TokenKind,
-//     token: Token<'input>
-// }
-
-// impl ServToken<'_> {
-//     pub fn to_string(&self) -> String {
-//         let mut output = String::new();
-//         for c in self.token.value {
-//             output.push(*c);
-//         }
-//         output
-//     }
-// }
-
-// impl std::fmt::Display for ServToken<'_> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-//         write!(f, "({}-{}) {:?} {:?}", self.token.start, self.token.end, self.kind, self.token.value)
-//     }
-// }
 
 struct Cursor<'input> {
     input: Tokenizer<'input>,
@@ -105,8 +78,7 @@ impl<'i> Cursor<'i> {
     fn tokenize_expression(&mut self) {
         while let Some(c) = self.input.get(0) {
             match c {
-                ','  => {self.input.incr(1); self.push_token(TokenKind::Comma)},
-                ';'  => {self.input.incr(1); self.push_token(TokenKind::Semicolon)},
+                // ';'  => {self.input.incr(1); self.push_token(TokenKind::Semicolon)},
                 '$'  => {self.input.incr(1); self.push_token(TokenKind::Dollar)},
                 '%'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '.'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},

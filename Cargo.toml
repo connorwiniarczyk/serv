@@ -3,6 +3,11 @@ name = "serv"
 version = "0.5.0"
 edition = "2021"
 
+[lib]
+name = "parsetool"
+path = "src/parsetool/lib.rs"
+
+
 [dependencies]
 clap = { version="4.5.9", features = ["derive"] }
 url = "2.2.2"

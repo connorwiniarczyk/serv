@@ -1,11 +1,11 @@
 #![allow(unused)]
 
-mod serv_tokenizer;
+mod servlexer;
+mod servparser;
+
 mod tape;
 mod error;
 mod functions;
-mod cursor;
-mod parser;
 mod template;
 mod ast;
 mod value;
@@ -14,7 +14,8 @@ mod webserver;
 
 use crate::error::ServError;
 
-use serv_tokenizer::TokenKind;
+use servlexer::TokenKind;
+
 use value::ServValue;
 use template::Template;
 use functions::*;
@@ -102,21 +103,22 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
 
 #[tokio::main]
 async fn main() {
+	parsetool::test();
+
+
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
 
 	if args.execute {
-    	let ast = parser::parse_expression_from_text(&input).unwrap();
+    	let ast = servparser::parse_expression_from_text(&input).unwrap();
     	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
     	let func = compile(ast, &mut scope);
     	let output = func.call(None, &scope).expect("error");
 
-    	// println!("{}", output);
-
 	} else {
-    	let ast = parser::parse_root_from_text(&input).unwrap();
+    	let ast = servparser::parse_root_from_text(&input).unwrap();
     	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
