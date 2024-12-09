@@ -44,7 +44,7 @@ impl<'input, K> Parser<'input, K> where K: Clone + PartialEq {
     }
 
     pub fn next_if_kind(&mut self, kind: K) -> Result<Token<K>, ServError> {
-        if self.get(1)?.kind == kind { self.incr()?; self.get(0).cloned() }
+        if self.get(0)?.kind == kind { self.incr()?; self.get(-1).cloned() }
         else {
             Err("incorrect kind".into())
         }

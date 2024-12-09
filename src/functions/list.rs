@@ -3,8 +3,9 @@ use crate::ServResult;
 use crate::Stack;
 use crate::servparser;
 use crate::VecDeque;
+use crate::{Label, ServFn};
 
-pub fn count(input: ServValue, scope: &Stack) -> ServResult {
+fn count(input: ServValue, scope: &Stack) -> ServResult {
     let max = input.expect_int()?;
     let mut output = VecDeque::new();
     let mut i: i64 = 0;
@@ -18,32 +19,52 @@ pub fn count(input: ServValue, scope: &Stack) -> ServResult {
 }
 
 
-// pub fn choose(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-//     let next = words.next().ok_or("not enought arguments")?;
-//     let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
-//     let rest = words.eval(input, scope)?;
+fn pop(input: ServValue, scope: &Stack) -> ServResult {
+    let ServValue::List(mut inner) = input else { return Ok(ServValue::None) };
+    _ = inner.pop_front();
 
-// 	let ServValue::List(list) = rest else { return Err("not a valid list") };
+    Ok(ServValue::List(inner))
+}
 
-// 	let index: usize = arg.expect_int()?.try_into().unwrap();
 
-// 	Ok(list[index.clamp(0, list.len() - 1)].clone())
-// }
+fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
+        (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
+        (ServValue::Int(index),    ServValue::List(mut list)) => list.remove(index.try_into().map_err(|e| "invalid index")?).ok_or("index not found")?,
+        (_, _) => return Err("invalid key"),
+    };
 
-// pub fn get(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-//     let arg = {
-//         let next = words.next().ok_or("")?;
-//         scope.get(&next).ok_or("")?.call(input.clone(), scope)?
-//     };
-//     let mut input = words.eval(input, scope)?;
-//     let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
-//         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
-//         (ServValue::Int(index),    ServValue::List(mut list)) => list.remove(index.try_into().map_err(|e| "invalid index")?).ok_or("index not found")?,
-//         (_, _) => return Err("invalid key"),
-//     };
+	Ok(output)
+}
 
-// 	Ok(output)
-// }
+fn map(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let mut output = VecDeque::new();
+    let ServValue::List(list) = input else { return arg.call(Some(input), scope) };
+    for item in list.into_iter() {
+        output.push_back(arg.call(Some(item), scope)?);
+    }
+    Ok(ServValue::List(output))
+}
+
+fn generate_list(input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
+    let mut output = VecDeque::new();
+    for item in input.into_iter() {
+        output.push_back(item.call(None, scope)?);
+    }
+    Ok(ServValue::List(output))
+}
+
+
+pub fn bind(scope: &mut Stack) {
+	scope.insert(Label::name("map"), ServValue::Func(ServFn::ArgFn(map)));
+
+	scope.insert(Label::name("count"), ServValue::Func(ServFn::Core(count)));
+	scope.insert(Label::name("|"),     ServValue::Func(ServFn::Meta(generate_list)));
+	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Core(pop)));
+	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Core(pop)));
+	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
+
+}
 
 // pub fn switch(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 
@@ -90,23 +111,6 @@ pub fn count(input: ServValue, scope: &Stack) -> ServResult {
 //     Ok(ServValue::Text(t.join(&intersperse)))
 // }
 
-pub fn map(input: ServValue, scope: &Stack) -> ServResult {
-    todo!();
-    // println!("map input: {}", input);
-
-    // let ServValue::List(mut expr) = input else { return Ok(ServValue::None) };
-
-    // let arg = expr.pop_front().ok_or("not enough args")?;
-    // println!("map arg: {}", arg);
-
-    // let target = ServValue::FnLiteral(crate::ServFn::Expr(expr)).eval(None, scope)?;
-
-    // println!("map target: {}", target);
-    // let ServValue::List(list) = target else { return Err("tried to map onto a non list") };
-
-    // let result = list.into_iter().map(|a| arg.eval(Some(a), scope).unwrap()).collect();
-    // Ok(ServValue::List(result))
-}
 
 // pub fn quote(mut input: ServValue, scope: &Scope) -> ServResult {
 //     Ok(input)

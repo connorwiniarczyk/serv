@@ -5,13 +5,10 @@ use std::fmt::Display;
 
 #[derive(Clone)]
 pub enum Word {
-   	// Function(Token)),
    	Function(String),
    	Template(Template),
    	Literal(ServValue),
    	Parantheses(Expression),
-   	// MetaExpr(Expression),
-   	List(Vec<Expression>),
 }
 
 impl Display for Word {
@@ -20,7 +17,6 @@ impl Display for Word {
             Self::Function(t) => f.write_str(t)?,
             Self::Template(t) => t.fmt(f)?,
             Self::Literal(l)  => l.fmt(f)?,
-            Self::List(l) => todo!(),
             Self::Parantheses(e) => {
 				f.write_str("(")?;
 				for word in e.0.iter() {
@@ -29,14 +25,6 @@ impl Display for Word {
 				}
 				f.write_str(")")?;
             },
-    //         Self::MetaExpr(e) => {
-				// f.write_str("[")?;
-				// for word in e.0.iter() {
-    // 				word.fmt(f)?;
-    // 				f.write_str(" ")?;
-				// }
-				// f.write_str("]")?;
-    //         },
         }
 
 		Ok(())

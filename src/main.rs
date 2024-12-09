@@ -103,9 +103,6 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
 
 #[tokio::main]
 async fn main() {
-	parsetool::test();
-
-
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
 

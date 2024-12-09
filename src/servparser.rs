@@ -9,6 +9,7 @@ use parsetool::parser::ServError;
 type Parser<'a> = parsetool::parser::Parser<'a, TokenKind>;
 
 fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
+
     let open = parser.expect(TokenKind::TemplateOpen)?.to_string();
     parser.incr()?;
 
@@ -22,8 +23,7 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
         	},
         	TokenKind::Dollar => elements.push({
             	parser.incr();
-            	todo!();
-            	// ast::TemplateElement::Expression(parser.parse_word()?)
+            	ast::TemplateElement::Expression(parse_word(parser)?)
         	}),
 
         	TokenKind::TemplateOpen => {
@@ -32,6 +32,7 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
         	},
         	TokenKind::TemplateClose => { unreachable!(); },
         	_ => return Err("token not supported in template".into()),
+        	// a => panic!("token {:?} not supported in template", a),
     	}
 	}
 
@@ -112,9 +113,9 @@ fn parse_root(parser: &mut Parser) -> Result<ast::AstRoot, ServError> {
 	Ok(ast::AstRoot(output))
 }
 
-pub fn parse_template_from_text(input: &str) -> Result<ast::Template, ServError> {
+pub fn parse_template_from_text(input: &str, brackets: bool) -> Result<ast::Template, ServError> {
     let chars: Vec<char> = input.chars().collect();
-    let tokens = servlexer::tokenize_serv(&chars);
+    let tokens = servlexer::tokenize_template(&chars);
     let mut parser = Parser::new(&tokens);
     let ast = parse_template(&mut parser)?;
 

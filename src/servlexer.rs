@@ -92,6 +92,7 @@ impl<'i> Cursor<'i> {
                 ':'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '<'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '>'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '~'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
 
 
                 '[' => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
@@ -115,7 +116,7 @@ impl<'i> Cursor<'i> {
                     self.skip_token();
                 },
             
-                '{' | '"' => self.tokenize_template(),
+                '{' | '"' => self.tokenize_template(true),
                 
                 c @ _ if c.is_alphabetic() => {
                     self.input.incr_while( |x| x.is_alphanumeric() || x == '_' || x == '.');
@@ -132,17 +133,20 @@ impl<'i> Cursor<'i> {
     	}
     }
 
-    fn tokenize_template(&mut self) {
-        assert_eq!(self.input.get(0), Some('{'));
-        self.input.incr(1);
+    fn tokenize_template(&mut self, brackets: bool) {
+        if brackets {
+            assert_eq!(self.input.get(0), Some('{'));
+            self.input.incr(1);
+        }
+
         self.push_token(TokenKind::TemplateOpen);
-
         let special_characters = ['{', '\\', '$', '}'];
+        let close_test = if brackets { Some('}') } else { None };
 
-        while self.input.get(0).expect("reached end of input while parsing string") != '}' {
+        while self.input.get(0) != close_test {
             let c = self.input.get(0).unwrap();
             match c {
-                '{'  => self.tokenize_template(), 
+                '{'  => self.tokenize_template(true),
                 '$'  => self.tokenize_dollar(),
                 '\\' => self.tokenize_escape_sequence(),
 
@@ -153,7 +157,7 @@ impl<'i> Cursor<'i> {
             }
         }
 
-        self.input.incr(1);
+        if brackets { self.input.incr(1); }
         self.push_token(TokenKind::TemplateClose);
     }
 
@@ -190,5 +194,11 @@ impl<'i> Cursor<'i> {
 pub fn tokenize_serv<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
     let mut cursor = Cursor::new(input);
     cursor.tokenize_root();
+    std::mem::take(&mut cursor.output)
+}
+
+pub fn tokenize_template<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
+    let mut cursor = Cursor::new(input);
+    cursor.tokenize_template(false);
     std::mem::take(&mut cursor.output)
 }

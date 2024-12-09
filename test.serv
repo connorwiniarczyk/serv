@@ -1,1 +1,1 @@
-/ => {hello}
+@out => sql { select * from test; }
