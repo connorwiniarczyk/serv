@@ -208,7 +208,11 @@ impl Display for ServValue {
 
 				let mut iter = table.iter().peekable();
 				while let Some((k, v)) = iter.next() {
-    				write!(f, r#""{}": {}"#, k, v)?;
+    				match v {
+        				Self::Text(ref t) => write!(f, r#""{}": "{}""#, k, v),
+        				otherwise     => write!(f, r#""{}": "{}""#, k, v),
+    				}?;
+
     				if iter.peek().is_some() {f.write_str(", ")?}
 				}
 
