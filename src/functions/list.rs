@@ -5,6 +5,33 @@ use crate::servparser;
 use crate::VecDeque;
 use crate::{Label, ServFn};
 
+
+fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
+    let arg  = input.pop_front().expect("word expected");
+   	let ServValue::Ref(name @ Label::Name(_)) = arg else { panic!("'<' expects a ref") };
+
+   	let rest = crate::value::eval(input, scope)?;
+
+   	let out = match rest {
+       	ServValue::List(mut l) => { scope.insert(name, l.pop_front().ok_or("")?); ServValue::List(l) },
+       	element => { scope.insert(name, element); ServValue::None },
+   	};
+   	
+   	Ok(out)
+
+   	// f(arg, rest, scope)
+
+    // if let ServValue::Ref(Label::Name(ref name)) = arg {
+    //     scope.insert("");
+    //     let transform = Transform(Rc::new(|s: &mut Stack| { s.insert_name(name, ServValue::None) }));
+    //     let out = ServValue::Transform(Box::new(input), transform);
+    //     Ok(out)
+    // }
+    // else { return Ok(input) }
+
+   	// todo!();
+}
+
 fn count(input: ServValue, scope: &Stack) -> ServResult {
     let max = input.expect_int()?;
     let mut output = VecDeque::new();
@@ -60,8 +87,8 @@ pub fn bind(scope: &mut Stack) {
 
 	scope.insert(Label::name("count"), ServValue::Func(ServFn::Core(count)));
 	scope.insert(Label::name("|"),     ServValue::Func(ServFn::Meta(generate_list)));
-	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Core(pop)));
-	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Core(pop)));
+	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
+	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
 
 }

@@ -1,3 +1,2 @@
-include file test
-
-out = name
+@tag => with_header {test = abcd} {<$t>$:</$t>} [ <t ]
+@out => tag {li} {hello}

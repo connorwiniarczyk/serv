@@ -131,7 +131,7 @@ fn with_header(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResul
     	.or_insert(ServValue::List(VecDeque::new()));
 
 	let ServValue::List(list) = headers else {panic!()};
-	list.push_back(arg);
+	list.push_back(arg.call(None, scope)?);
 	Ok(input)
 }
 
@@ -177,9 +177,9 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("inline"),      ServValue::Func(ServFn::Core(inline)));
 	scope.insert(Label::name("markdown"),    ServValue::Func(ServFn::Core(markdown)));
 	scope.insert(Label::name("~"),           ServValue::Func(ServFn::Core(as_template)));
-	scope.insert(Label::name("with_header"), ServValue::Func(ServFn::ArgFn(with_option)));
-	scope.insert(Label::name("with_status"), ServValue::Func(ServFn::ArgFn(with_header)));
+	scope.insert(Label::name("with_header"), ServValue::Func(ServFn::ArgFn(with_header)));
 	scope.insert(Label::name("with_status"), ServValue::Func(ServFn::ArgFn(with_status)));
+	scope.insert(Label::name("with_option"), ServValue::Func(ServFn::ArgFn(with_option)));
 	// scope.insert(Label::name("*"),            ServFunction::Meta(apply));
 
 	list::bind(scope);

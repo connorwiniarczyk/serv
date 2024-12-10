@@ -95,8 +95,8 @@ impl<'parent, V: Clone, M> StackDictionary<'parent, V, M> {
 
     pub fn get<L: Into<Label>>(&self, l: L) -> Option<V> {
         let key: Label = l.into();
-        self.words.get(&key).map(|s| s.clone()).or_else(|| {
-            self.parent.and_then(|p| p.get_label(&key))
+        self.words.get(&key).cloned().or_else(|| {
+            self.parent?.get_label(&key)
         })
     }
 

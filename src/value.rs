@@ -25,12 +25,19 @@ pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
             f(expr, scope)
         },
 
-        Some(ServValue::Func(ServFn::Expr(e, _))) => {
+        Some(ServValue::Func(ServFn::Expr(e, true))) => {
             for word in e.into_iter().rev() {
                 expr.push_front(word);
             }
             eval(expr, scope)
         },
+
+        Some(ServValue::Func(ServFn::Expr(e, false))) => {
+            let front = eval(e, scope)?;
+            expr.push_front(front);
+            eval(expr, scope)
+        },
+
        	Some(ServValue::Func(ServFn::ArgFn(f))) => {
            	let arg  = expr.pop_front().ok_or("word expected")?;
            	let rest = eval(expr, scope)?;
