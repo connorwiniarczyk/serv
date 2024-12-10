@@ -10,6 +10,8 @@ pub enum TokenKind {
     TemplateText,
     TemplateVariable,
 
+    Semicolon,
+
     Comment,
 
 	OpenParenthesis,
@@ -18,10 +20,9 @@ pub enum TokenKind {
 
     WhiteSpace,
     At,
-    WideArrow,
+    Equals,
     Dollar,
     NewLine,
-    Equals,
 }
 
 struct Cursor<'input> {
@@ -53,6 +54,11 @@ impl<'i> Cursor<'i> {
                     self.push_token(TokenKind::Route);
                 },
 
+                ';' | '\n' => {
+                    self.input.incr(1);
+                    self.push_token(TokenKind::Semicolon)
+                },
+
                 '@'  => {
                     self.input.incr(1);
                     self.push_token(TokenKind::At)
@@ -67,7 +73,7 @@ impl<'i> Cursor<'i> {
                 '=' => {
                     let i = if self.input.get(1) == Some('>') {2} else {1};
                     self.input.incr(i);
-                    self.push_token(TokenKind::WideArrow);
+                    self.push_token(TokenKind::Equals);
                 }
 
                 _ => self.tokenize_expression(),
@@ -110,7 +116,7 @@ impl<'i> Cursor<'i> {
                     return;
                 },
               
-                '\n' => {self.input.incr(1); self.skip_token()},
+                // '\n' => {self.input.incr(1); self.skip_token()},
                 '\t' | ' ' => {
                     self.input.incr_while(|x| x == '\t' || x == ' ');
                     self.skip_token();

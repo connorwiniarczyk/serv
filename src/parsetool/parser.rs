@@ -14,7 +14,7 @@ pub struct Parser<'input, K> {
     index: isize,
 }
 
-impl<'input, K> Parser<'input, K> where K: Clone + PartialEq {
+impl<'input, K> Parser<'input, K> where K: Copy + Clone + PartialEq {
     fn len(&self) -> isize {
         self.input.len().try_into().unwrap()
     }
@@ -41,6 +41,10 @@ impl<'input, K> Parser<'input, K> where K: Clone + PartialEq {
         if i < 0 || i >= self.len() { return Err("out of bounds".into()); }
 
        	Ok(&self.input[i as usize])
+    }
+
+    pub fn kind(&self, offset: isize) -> Result<K, ServError> {
+		Ok(self.get(offset)?.kind)
     }
 
     pub fn next_if_kind(&mut self, kind: K) -> Result<Token<K>, ServError> {

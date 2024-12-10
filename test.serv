@@ -1,1 +1,3 @@
-@out => sql { select * from test; }
+include file test
+
+out = name

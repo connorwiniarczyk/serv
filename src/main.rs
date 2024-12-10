@@ -101,6 +101,27 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
     std::fs::read_to_string(&path).map_err(|e| "could not open file".into())
 }
 
+fn ast_bind_to_scope(ast: ast::AstRoot, scope: &mut Stack) {
+	for declaration in ast.0 {
+    	if declaration.kind == "word" {
+        	let func = compile(declaration.value, scope);
+        	scope.insert(declaration.key.to_owned().into(), func);
+    	}
+
+    	else if declaration.kind == "route" {
+        	let func = compile(declaration.value, scope);
+        	scope.router.as_mut().unwrap().insert(declaration.key, func);
+    	}
+
+    	else if declaration.kind == "include" {
+        	let func = compile(declaration.value, scope);
+        	let value = func.call(None, &scope).expect("include function failed").to_string();
+        	let ast = servparser::parse_root_from_text(&value).expect("include string failed to parse");
+			ast_bind_to_scope(ast, scope);
+    	}
+	}
+}
+
 #[tokio::main]
 async fn main() {
     let mut args = CliArgs::parse();
@@ -118,26 +139,14 @@ async fn main() {
     	let ast = servparser::parse_root_from_text(&input).unwrap();
     	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
+    	ast_bind_to_scope(ast, &mut scope);
 
-    	for declaration in ast.0 {
-        	if declaration.kind == "word" {
-            	let func = compile(declaration.value, &mut scope);
-            	scope.insert(declaration.key.to_owned().into(), func);
-        	}
-
-        	else if declaration.kind == "route" {
-            	let func = compile(declaration.value, &mut scope);
-            	scope.router.as_mut().unwrap().insert(declaration.key, func);
-        	}
-    	}
-
-    	// if let Some(out) = scope.get(&Label::Name("out".into())) {
     	if let Some(out) = scope.get("out") {
         	let res = out.call(None, &scope);
         	println!("{}", res.unwrap());
     	}
 
-    	println!("starting web server");
+    	// println!("starting web server");
     	webserver::run_webserver(scope).await;
 	}
 }
