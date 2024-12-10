@@ -2,9 +2,9 @@
 
 function files { find -name "*.rs" -or -name "*.serv"; }
 
-if [ $1 = "run" ]; then
+if [[ $1 = "run" ]]; then
 	files | entr -r sh -c "clear && cargo run -- test.serv";
-elif [ $1 = "test" ]; then
+elif [[ $1 = "test" ]]; then
 	files | entr -r sh -c "clear && cargo test";
 else
 	files | entr -r sh -c "clear && cargo build";

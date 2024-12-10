@@ -1,11 +1,11 @@
 #![allow(unused)]
 
+mod servlexer;
+mod servparser;
+
 mod tape;
 mod error;
 mod functions;
-mod lexer;
-mod generic_tokenizer;
-mod parser;
 mod template;
 mod ast;
 mod value;
@@ -14,12 +14,12 @@ mod webserver;
 
 use crate::error::ServError;
 
-use lexer::TokenKind;
-use lexer::*;
+use servlexer::TokenKind;
+
 use value::ServValue;
 use template::Template;
 use functions::*;
-use dictionary::FnLabel;
+use dictionary::Label;
 
 use clap::Parser;
 
@@ -29,85 +29,43 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use matchit::Router;
 
-use tape::Words;
-
 type ServResult = Result<ServValue, &'static str>;
-pub type Scope<'a> = dictionary::StackDictionary<'a, ServFunction>;
 
-impl<'a> Scope<'a> {
-    pub fn get_str(&self, input: &str) -> Result<ServFunction, &'static str> {
-        self.get(&FnLabel::name(input)).ok_or("word not found")
-    }
-}
+use dictionary::StackDictionary;
 
+type Stack<'a> = StackDictionary<'a, ServValue, ()>;
 
-#[derive(Clone)]
-pub enum ServFunction {
-    Literal(ServValue),
-    Core(fn(ServValue, &Scope) -> ServResult),
-    Meta(fn(&mut Words, ServValue, &Scope) -> ServResult),
-    Template(Template),
-    List(Vec<FnLabel>),
-    Composition(Vec<FnLabel>),
-}
+use crate::value::ServFn;
 
-impl ServFunction {
-    pub fn call(&self, input: ServValue, scope: &Scope) -> ServResult {
-        match self {
-            Self::Core(f)        => f(input, scope),
-            Self::Literal(l)     => Ok(l.clone()),
-            Self::Template(t)    => {
-                let mut child = scope.make_child();
-                child.insert_name("in", ServFunction::Literal(input));
-                t.render(&child)
-            },
-            Self::Composition(v) => {
-                let mut child_scope = scope.make_child();
-                child_scope.insert_name("in", ServFunction::Literal(input.clone()));
+// fn compile_meta(input: Vec<ast::Word>, scope: &mut Stack) -> ServValue {
+//     let ServValue::FnLiteral(ServFn::Expr(e)) = compile(input, scope) else { panic!() };
+//     ServValue::FnLiteral(ServFn::ExprMeta(e))
+// }
 
-                let mut words: VecDeque<FnLabel> = v.clone().into();
-                Words(words).eval(input, &child_scope)
-            },
-            Self::List(l) => {
-                let mut list: VecDeque<ServValue> = VecDeque::new();
-                for f in l {
-                    list.push_back(scope.get(f).unwrap().call(input.clone(), scope)?);
-                }
-                Ok(ServValue::List(list))
-            }
-            Self::Meta(_) => Err("called a meta function when it was not appropriate"),
-        }
-    }
-}
-
-fn compile(input: Vec<ast::Word>, scope: &mut Scope) -> ServFunction {
-    let mut output: Vec<FnLabel> = Vec::new();
-    let mut iter = input.into_iter();
+fn compile(input: ast::Expression, scope: &mut Stack) -> ServValue {
+    let mut output: VecDeque<ServValue> = VecDeque::new();
+    let mut iter = input.0.into_iter();
     while let Some(word) = iter.next() {
         match word {
-            ast::Word::Function(t) => output.push(FnLabel::Name(t.contents)),
-            ast::Word::List(l) => {
-                let mut inner: Vec<FnLabel> = Vec::new();
-                for expression in l {
-					let func = compile(expression.0, scope);
-                    inner.push(scope.insert_anonymous(func));
-                }
-                output.push(scope.insert_anonymous(ServFunction::List(inner)));
-            },
+            ast::Word::Function(t) => output.push_back(ServValue::Ref(Label::Name(t))),
+            ast::Word::Literal(v) => output.push_back(v),
             ast::Word::Template(t) => {
-                output.push(scope.insert_anonymous(ServFunction::Template(t)));
+                let template = ServFn::Template(t);
+                let label = scope.insert_anonymous(ServValue::Func(template));
+                output.push_back(ServValue::Ref(label));
             },
-            ast::Word::Parantheses(expression) => {
-                let func = compile(expression.0, scope);
-                output.push(scope.insert_anonymous(func));
+            ast::Word::Parantheses(e) => {
+                // let inner = if meta { compile_meta(words, scope) } else { compile(words, scope) };
+                let inner = compile(e, scope);
+                output.push_back(inner);
             },
-            ast::Word::Literal(v) => {
-                output.push(scope.insert_anonymous(ServFunction::Literal(v)));
-            },
+
+            otherwise => panic!(),
         };
     }
 
-    ServFunction::Composition(output)
+    let func = ServFn::Expr(output, input.1);
+    ServValue::Func(func)
 }
 
 /// A parser for serv files
@@ -143,40 +101,50 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
     std::fs::read_to_string(&path).map_err(|e| "could not open file".into())
 }
 
+fn ast_bind_to_scope(ast: ast::AstRoot, scope: &mut Stack) {
+	for declaration in ast.0 {
+    	if declaration.kind == "word" {
+        	let key = declaration.key();
+        	let func = compile(declaration.value, scope);
+        	scope.insert(key.into(), func);
+    	}
+
+    	else if declaration.kind == "route" {
+        	let key = declaration.key();
+        	let func = compile(declaration.value, scope);
+        	scope.router.as_mut().unwrap().insert(key, func);
+    	}
+
+    	else if declaration.kind == "include" {
+        	let func = compile(declaration.value, scope);
+        	let value = func.call(None, &scope).expect("include function failed").to_string();
+        	let ast = servparser::parse_root_from_text(&value).expect("include string failed to parse");
+			ast_bind_to_scope(ast, scope);
+    	}
+	}
+}
+
 #[tokio::main]
 async fn main() {
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
 
 	if args.execute {
-    	let ast = parser::parse_expression_from_text(&input).unwrap();
-    	let mut scope: Scope = Scope::empty();
+    	let ast = servparser::parse_expression_from_text(&input).unwrap();
+    	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
 
-    	let func = compile(ast.0, &mut scope);
-
-    	let output = func.call(ServValue::None, &scope).expect("error");
-    	println!("{}", output);
+    	let func = compile(ast, &mut scope);
+    	let output = func.call(None, &scope).expect("error");
 
 	} else {
-    	let ast = parser::parse_root_from_text(&input).unwrap();
-    	let mut scope: Scope = Scope::empty();
+    	let ast = servparser::parse_root_from_text(&input).unwrap();
+    	let mut scope = Stack::empty();
     	crate::functions::bind_standard_library(&mut scope);
+    	ast_bind_to_scope(ast, &mut scope);
 
-    	for declaration in ast.0 {
-        	if declaration.kind == "word" {
-            	let func = compile(declaration.value.0, &mut scope);
-            	scope.insert(declaration.key.to_owned().into(), func);
-        	}
-
-        	else if declaration.kind == "route" {
-            	let func = compile(declaration.value.0, &mut scope);
-            	scope.router.as_mut().unwrap().insert(declaration.key, func);
-        	}
-    	}
-
-    	if let Ok(out) = scope.get_str("out") {
-        	let res = out.call(ServValue::None, &scope);
+    	if let Some(out) = scope.get("out") {
+        	let res = out.call(None, &scope);
         	println!("{}", res.unwrap());
     	}
 

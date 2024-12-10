@@ -1,4 +1,4 @@
-# SERV!
+# SERV
 
 Serv is a swiss army knife for writing http servers quickly and with as
 little friction as possible. It is similar in function to web frameworks
@@ -33,17 +33,21 @@ Here are some examples of Serv in action:
 /index => markdown file {www/index.md}
 
 # Define your own functions:
-# in refers to the input of the function, % calculates a mathematical expression
-@square => %{ $in * $in }
+plus3 = %{ $: * $: }
 /api/square/{x} => square x
 
 # Write API endpoints directly in SQL
 # serv automatically sanitizes your input, and converts the output to JSON
-@sql.database  => {my_database.sqlite}
+sql.database  = {my_database.sqlite}
 /api/{user}/posts => sql { SELECT (title, content) FROM posts WHERE user = $user; }
 
 # Compute the Fibonnaci sequence
-@fib => switch (in) [1, 1, %{ $(fib decr) + $(fib decr decr) }]
+fib = switch {
+	(eq 0) => 1
+	(eq 1) => 1
+	(else) => sum | (fib-) (fib--)
+}
+
 /fib/{length} => map fib count length
 ```
 
@@ -64,9 +68,9 @@ functions are defined.
 
 ```python
 # main.serv
-@serv.port    => 443
-@serv.tlscert => file {certfile.pem}
-@serv.tlskey  => file {keyfile.pem}
+serv.port    = 443
+serv.tlscert = file {certfile.pem}
+serv.tlskey  = file {keyfile.pem}
 
 / => {Hello World}
 ```
@@ -76,6 +80,29 @@ serv main.serv
 starting encrypted server
 listening on port 443
 ```
+
+## Syntax
+
+Serv is a *concatinative* functional language with a prefix call notation.
+Every expression is composed of a sequence of functions, and every function
+operates on everything that comes after it in the expression. Typically, an
+expression is evaluated by taking the leftmost function out of the expression,
+then recursively evaluating the remainder of the expression until no functions remain,
+then calling the function on the result.
+
+For example, the expression `+ + + 0` is evaluated by taking the first function (`+`)
+which adds 1 to it's input, then evaluating all of `+ + 0`, and so on until reaching `0`,
+which is a function returning 0. Each `+` is then called in reverse order, right to left,
+until the expression eventually returns 3.
+
+### Strings
+
+Strings in serv are functions as well, and are denoted with curly brackets `{}`. Strings
+are allowed to span multiple lines and can contain most special characters, even additional
+balanced pairs of curly brackets, without needing to be escaped. If a string contains
+a `$` followed by an expression, that expression will be evaluated and its result inserted into
+the string at that location. 
+
 
 ## Functions
 
@@ -88,8 +115,8 @@ constantly
 | uppercase | convert the input to uppercase    |
 | %         | compute a mathematical expression |
 | !         | drop the next word                |
-| incr      | increase the value by 1           |
-| decr      | decrease the value by 1           |
+| +         | increase the value by 1           |
+| -         | decrease the value by 1           |
 | file      | read the contents of the file to a string     |
 | file.raw  | read the contents of the file to a byte array    |
 | exec      | execute a program on the host machine and return the result    |
@@ -103,5 +130,3 @@ constantly
 | fold      | reduce a list by calling a function on each element |
 | using     | define additional words to be used in the rest of the expression |
 | switch    | take an index and a list of functions, apply the function at that index to the input |
-| join      | join a list into a single string with the given separator |
-| split     | split a string into a list by the given separator |

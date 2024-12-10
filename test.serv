@@ -1,0 +1,4 @@
+out = {$name has $number} with @{
+	name = {name}
+	number = +++1
+}

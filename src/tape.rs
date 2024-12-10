@@ -1,38 +1,47 @@
-use crate::Scope;
-use crate::FnLabel;
-use crate::VecDeque;
-use crate::ServValue;
-use crate::ServResult;
-use crate::ServFunction;
+// use crate::Scope;
+// use crate::FnLabel;
+// use crate::VecDeque;
+// use crate::ServValue;
+// use crate::ServResult;
+// use crate::ServFunction;
 
-pub struct Words(pub VecDeque<FnLabel>);
+// pub struct Words(pub VecDeque<FnLabel>);
 
-impl Words {
-    pub fn next(&mut self) -> Option<FnLabel> {
-        self.0.pop_front()
-    }
+// impl Words {
+//     pub fn next(&mut self) -> Option<FnLabel> {
+//         self.0.pop_front()
+//     }
 
-    pub fn empty() -> Self {
-        Self(VecDeque::new())
-    }
+//     pub fn empty() -> Self {
+//         Self(VecDeque::new())
+//     }
 
-    pub fn take_next(&mut self, scope: &Scope) -> ServResult {
-        let next_word = self.next().ok_or("not enough arguments")?;
-        let func = scope.get(&next_word).ok_or("word not found")?;
-        let output = func.call(ServValue::None, scope)?;
+//     pub fn take_next(&mut self, scope: &Scope) -> ServResult {
+//         let next_word = self.next().ok_or("not enough arguments")?;
+//         let func = scope.get(&next_word).ok_or("word not found")?;
+//         let output = func.call(ServValue::None, scope)?;
 
-		Ok(output)
-    }
+// 		Ok(output)
+//     }
 
-    pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
-        let Some(next) = self.next() else { return Ok(input) };
-        let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
+//     pub fn take_next_with_input(&mut self, scope: &Scope, input: ServValue) -> ServResult {
+//         let next_word = self.next().ok_or("not enough arguments")?;
+//         let func = scope.get(&next_word).ok_or("word not found")?;
+//         let output = func.call(input, scope)?;
 
-        if let ServFunction::Meta(m) = next_fn {
-			return (m)(self, input, scope);
-        } else {
-            let rest = self.eval(input, scope)?;
-            return next_fn.call(rest, scope)
-        }
-    }
-}
+// 		Ok(output)
+//     }
+
+//     pub fn eval(&mut self, input: ServValue, scope: &Scope) -> ServResult {
+//         let Some(next) = self.next() else { return Ok(input) };
+//         let Some(next_fn) = scope.get(&next) else { panic!("word not found: {:?}", next)};
+
+//         if let ServFunction::Meta(m) = next_fn {
+//             todo!();
+// 			// return (m)(self, input, scope);
+//         } else {
+//             let rest = self.eval(input, scope)?;
+//             return next_fn.call(rest, scope)
+//         }
+//     }
+// }

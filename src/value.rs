@@ -4,8 +4,87 @@ use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+use crate::Stack;
+use crate::Label;
+use crate::ServResult;
+
+pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
+    match expr.pop_front() {
+        Some(ServValue::Ref(label)) => {
+            if let Some(func) = scope.get(label.clone()) {
+    			expr.push_front(func);
+    			eval(expr, scope)
+            }
+            else {
+                let rest = eval(expr, scope)?;
+                scope.get(label.clone()).ok_or("not found")?.call(Some(rest), scope)
+            }
+        },
+
+        Some(ServValue::Func(ServFn::Meta(f))) => {
+            f(expr, scope)
+        },
+
+        Some(ServValue::Func(ServFn::Expr(e, true))) => {
+            for word in e.into_iter().rev() {
+                expr.push_front(word);
+            }
+            eval(expr, scope)
+        },
+
+        Some(ServValue::Func(ServFn::Expr(mut e, false))) => {
+            let rest = eval(expr, scope)?;
+            e.push_back(rest);
+            eval(e, scope)
+        },
+
+       	Some(ServValue::Func(ServFn::ArgFn(f))) => {
+           	let arg  = expr.pop_front().ok_or("word expected")?;
+           	let rest = eval(expr, scope)?;
+           	f(arg, rest, scope)
+       	},
+
+        Some(ref f @ ServValue::Func(ref a)) => {
+            let rest = eval(expr, scope)?;
+            f.call(Some(rest), scope)
+        },
+
+        Some(constant) => {
+            _ = eval(expr, scope)?;
+            Ok(constant)
+        },
+        None => Ok(ServValue::Func(ServFn::Ident)),
+    }
+}
+
+#[derive(Clone)]
+pub enum ServFn {
+    Ident,
+    Core     (fn(ServValue, &Stack) -> ServResult),
+    Meta     (fn(VecDeque<ServValue>, &mut Stack) -> ServResult),
+    ArgFn    (fn(ServValue, ServValue, &Stack) -> ServResult),
+    Expr     (VecDeque<ServValue>, bool),
+    Template (Template),
+}
+
+impl std::fmt::Debug for ServFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::Ident    => f.write_str("Ident"),
+            Self::Core(_)     => f.write_str("Core"),
+            Self::Meta(_)     => f.write_str("Meta"),
+            Self::ArgFn(_)   => f.write_str("ArgFn"),
+            Self::Expr(_, _)     => f.write_str("Expr"),
+            Self::Template(_) => f.write_str("Template "),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum ServValue {
+    Ref(Label),
+    Func(ServFn),
+
     None,
     Bool(bool),
     Int(i64),
@@ -15,23 +94,60 @@ pub enum ServValue {
 
     List(VecDeque<ServValue>),
     Table(HashMap<String, ServValue>),
+
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
+
+    // Transform (Box<ServValue>, fn(&mut Stack)) ,
 }
 
-impl Default for ServValue {
-	fn default() -> Self {
-    	Self::None
-	}
+use std::rc::Rc;
+
+#[derive(Clone)]
+pub struct Transform (pub Rc<dyn Fn(&mut Stack)>);
+
+impl std::fmt::Debug for Transform {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str("f")
+    }
 }
+
+struct ValueMetadata {}
 
 impl ServValue {
+    pub fn call(&self, input: Option<ServValue>, scope: &Stack) -> ServResult {
+       	match self {
+           	Self::Ref(label) => scope.get(label.clone()).ok_or("not found")?.call(input, scope),
+
+           	Self::Func(ServFn::Core(f)) => f(input.unwrap_or_default(), scope),
+           	Self::Func(ServFn::Expr(e, _)) => {
+               	let mut child = e.clone();
+               	if let Some(v) = input { child.push_back(v); }
+               	eval(child, &mut scope.make_child())
+           	},
+           	Self::Func(ServFn::Ident) => Ok(input.unwrap_or_default()),
+           	Self::Func(ServFn::Template(t)) => {
+               	if let Some(v) = input {
+                   	let mut child = scope.make_child();
+                   	child.insert("in".into(), v.clone());
+                   	child.insert(":".into(), v);
+                   	t.render(&child)
+               	}
+               	else {
+                   	t.render(scope)
+               	}
+           	},
+
+
+           	constant => Ok(constant.clone()),
+       	}
+    }
+
     pub fn expect_int(&self) -> Result<i64, &'static str> {
         if let Self::Meta { inner, metadata } = self { return inner.expect_int() };
         let Self::Int(i) = self else { return Err("expected an int") };
         Ok(i.clone())
     }
 
-    // pub fn insert_metadata(&mut self, key: &str, value: ServValue) {
     pub fn metadata(&mut self) -> &mut HashMap<String, ServValue> {
     	if let ServValue::Meta { ref inner, ref mut metadata } = self {
         	metadata
@@ -62,6 +178,12 @@ impl ServValue {
     }
 }
 
+impl Default for ServValue {
+	fn default() -> Self {
+    	Self::None
+	}
+}
+
 impl From<i64> for ServValue {
     fn from(value: i64) -> Self {
         Self::Int(value)
@@ -71,11 +193,16 @@ impl From<i64> for ServValue {
 impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::None => f.write_str("")?,
-            Self::Bool(v) => v.fmt(f)?,
-            Self::Float(v) => v.fmt(f)?,
-            Self::Text(ref t) => f.write_str(t)?,
-            // Self::Raw(bytes) => f.debug_list().entries(bytes.iter()).finish()?,
+            Self::Ref(Label::Name(n))       => f.write_str(n)?,
+            Self::Ref(Label::Anonymous(id)) => f.write_str("()")?,
+            Self::Func(v)                   => f.write_str("()")?,
+
+
+            Self::None                      => f.write_str("NONE")?,
+            Self::Bool(v)                   => v.fmt(f)?,
+            Self::Float(v)                  => v.fmt(f)?,
+            Self::Int(i)                    => i.fmt(f)?,
+            Self::Text(ref t)               => f.write_str(t)?,
             Self::Raw(bytes) => {
                 if let Ok(text) = std::str::from_utf8(bytes) {
                     f.write_str(text)?;
@@ -83,51 +210,36 @@ impl Display for ServValue {
                     f.debug_list().entries(bytes.iter()).finish()?
                 }
             },
-            Self::Int(i) => write!(f, "{}", i)?,
-            Self::Meta { inner, metadata } => inner.fmt(f)?,
             Self::Table(table) => {
                 f.write_str("{")?;
 
 				let mut iter = table.iter().peekable();
 				while let Some((k, v)) = iter.next() {
-    				f.write_str("\"")?;
-    				f.write_str(k)?;
-    				f.write_str("\"")?;
-    				f.write_str(": ")?;
-
     				match v {
-        				ServValue::None => f.write_str("0")?,
-        				ServValue::Text(t) => {
-            				f.write_str("\"")?;
-            				t.fmt(f)?;
-            				f.write_str("\"")?;
-        				},
-        				a => a.fmt(f)?,
-    				}
+        				Self::Text(ref t) => write!(f, r#""{}": "{}""#, k, v),
+        				otherwise     => write!(f, r#""{}": "{}""#, k, v),
+    				}?;
 
     				if iter.peek().is_some() {f.write_str(", ")?}
 				}
 
                 f.write_str("}")?;
             },
+
             Self::List(l) => {
                 f.write_str("[")?;
 				let mut iter = l.iter().peekable();
 				while let Some(element) = iter.next() {
-    				match element {
-        				ServValue::None => f.write_str("0")?,
-        				ServValue::Text(t) => {
-            				f.write_str("\"")?;
-            				t.fmt(f)?;
-            				f.write_str("\"")?;
-        				},
-        				a => a.fmt(f)?,
-    				}
+    				element.fmt(f)?;
     				if iter.peek().is_some() {f.write_str(", ")?}
 				}
                 f.write_str("]")?;
             }
+
+            Self::Meta { inner, metadata } => inner.fmt(f)?,
+            _ => todo!(),
         }
+
 		Ok(())
     }
 }

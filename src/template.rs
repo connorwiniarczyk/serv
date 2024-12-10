@@ -1,7 +1,6 @@
-use crate::lexer::{Token, TokenKind};
 use crate::value::ServValue;
 use crate::ast;
-use crate::{ Scope, ServResult };
+use crate::{ Stack, ServResult };
 use std::fmt::Display;
 
 #[derive (Clone)]
@@ -29,9 +28,9 @@ impl FormatOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum TemplateElement {
-	Text(Token),
+	Text(String),
 	Template(Template),
 	Expression(ast::Word),
 }
@@ -39,7 +38,7 @@ pub enum TemplateElement {
 impl Display for TemplateElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-    		TemplateElement::Text(t)       => f.write_str(t.contents.as_str()),
+    		TemplateElement::Text(t)       => f.write_str(t.as_str()),
             TemplateElement::Template(t)   => t.fmt(f),
             TemplateElement::Expression(e) => {
                 f.write_str("$(")?;
@@ -51,39 +50,52 @@ impl Display for TemplateElement {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Template {
-    pub open: Token,
-    pub close: Token,
+    pub open: String,
+    pub close: String,
     pub elements: Vec<TemplateElement>,
 }
 
 impl Display for Template {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(self.open.contents.as_str())?;
+        f.write_str(self.open.as_str())?;
         for element in self.elements.iter() {
             element.fmt(f)?;
         }
-        f.write_str(self.close.contents.as_str())?;
+        f.write_str(self.close.as_str())?;
         Ok(())
     }
 }
+
 
 impl Template {
     pub fn literal(&self) -> ServValue {
         ServValue::Text(self.to_string())
     }
 
-    pub fn render(&self, ctx: &Scope) -> ServResult {
-        let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None };
+    pub fn literal_inner(&self) -> ServValue {
+        let empty = crate::StackDictionary::empty();
+        let mut renderer = Renderer::new(&empty);
+        let mut options = FormatOptions::default();
+        options.resolve_functions = false;
+        renderer.render(self, options);
+
+		ServValue::Text(std::mem::take(&mut renderer.output))
+    }
+
+    pub fn render(&self, ctx: &Stack) -> ServResult {
+        // let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None, new_context: None };
+        let mut renderer = Renderer::new(ctx);
         let options = FormatOptions::default();
         renderer.render(self, options);
 		Ok(ServValue::Text(std::mem::take(&mut renderer.output)))
     }
 
-    pub fn render_sql(&self, ctx: &Scope) -> (String, Vec<crate::FnLabel>) {
+    pub fn render_sql<'scope>(&self, ctx: &'scope Stack) -> (Stack<'scope>, String, Vec<crate::Label>) {
         let mut renderer = Renderer::new(ctx);
         renderer.sql_bindings = Some(Vec::new());
+        renderer.new_context = Some(renderer.ctx.make_child());
 
         let mut options = FormatOptions::default();
         options.sql_mode = true;
@@ -92,31 +104,36 @@ impl Template {
 
         let output = std::mem::take(&mut renderer.output);
         let bindings = std::mem::take(&mut renderer.sql_bindings).unwrap();
+        let new_context = std::mem::take(&mut renderer.new_context).unwrap();
 
-		(output, bindings)
+		(new_context, output, bindings)
     }
 }
 
 struct Renderer<'scope> {
     output: String,
-    ctx: &'scope Scope<'scope>,
-    sql_bindings: Option<Vec<crate::FnLabel>>,
+    sql_bindings: Option<Vec<crate::Label>>,
+    ctx: &'scope Stack<'scope>,
+    new_context: Option<Stack<'scope>>,
 }
 
 impl<'scope> Renderer<'scope> {
-    fn new(ctx: &'scope Scope) -> Self {
+    fn new(ctx: &'scope Stack) -> Self {
 		Self {
     		output: String::new(),
     		ctx: ctx,
     		sql_bindings: None,
+    		new_context: None,
 		}
     }
     fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
         match expression {
-            ast::Word::Function(token) => {
-                let value = self.ctx.get(&token.contents.clone().into())
-                    .ok_or("does not exist")?
-                    .call(ServValue::None, &self.ctx)?
+            ast::Word::Function(name) => {
+            	// let input = self.ctx.get(&crate::Label::Name("in".into()));
+
+            	let input = self.ctx.get("in");
+                let value = self.ctx.get(name).unwrap()
+                    .call(input, &self.ctx)?
                     .to_string();
 
                 self.output.push_str(&value);
@@ -124,8 +141,9 @@ impl<'scope> Renderer<'scope> {
 
             ast::Word::Parantheses(words) => {
                 let mut child = self.ctx.make_child();
-            	let func = crate::compile(words.0.clone(), &mut child);
-            	let value = func.call(self.ctx.get_str("in")?.call(ServValue::None, &child)?, &child)?;
+            	let func = crate::compile(words.clone(), &mut child);
+            	// let value = func.call(self.ctx.get(&crate::Label::Name("in".into())), &child)?;
+            	let value = func.call(self.ctx.get("in"), &child)?;
                 self.output.push_str(value.to_string().as_str());
             },
 
@@ -136,19 +154,31 @@ impl<'scope> Renderer<'scope> {
     }
 
 	fn render(&mut self, input: &Template, options: FormatOptions) {
-        if options.include_brackets { self.output.push_str(&input.open.contents); }
+        if options.include_brackets { self.output.push_str(&input.open); }
         for elem in input.elements.iter() {
             match elem {
-                TemplateElement::Text(t)     => self.output.push_str(&t.contents),
+                TemplateElement::Text(t)     => self.output.push_str(t),
                 TemplateElement::Template(t) => self.render(t, options.with_brackets()),
-                TemplateElement::Expression(t) if options.resolve_functions => {
-                    self.resolve_function(t).unwrap();
-                },
+
+                // be careful, order is important here
                 TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        sql_bindings.push(crate::FnLabel::Name(t.contents.clone()));
+                        sql_bindings.push(crate::Label::Name(t.clone()));
                     }
+                },
+
+                TemplateElement::Expression(ast::Word::Parantheses(e)) if options.sql_mode => {
+                    let Some(mut ctx)  = self.new_context.as_mut() else { return };
+                    let func = crate::compile(e.clone(), &mut ctx);
+                    self.output.push('?');
+                    if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
+                        sql_bindings.push(ctx.insert_anonymous(func));
+                    }
+                },
+
+                TemplateElement::Expression(t) if options.resolve_functions => {
+                    self.resolve_function(t).unwrap();
                 },
                 TemplateElement::Expression(t) => {
                     self.output.push('$');
@@ -158,7 +188,7 @@ impl<'scope> Renderer<'scope> {
                 },
             }
         }
-        if options.include_brackets { self.output.push_str(&input.close.contents); }
+        if options.include_brackets { self.output.push_str(&input.close); }
 	}
 }
 
