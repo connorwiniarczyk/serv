@@ -1,3 +1,4 @@
-out = name with json {{
+test = (name)
+out = (test) with json {{
 	"name": "test"
 }}

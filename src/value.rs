@@ -32,10 +32,10 @@ pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
             eval(expr, scope)
         },
 
-        Some(ServValue::Func(ServFn::Expr(e, false))) => {
-            let front = eval(e, scope)?;
-            expr.push_front(front);
-            eval(expr, scope)
+        Some(ServValue::Func(ServFn::Expr(mut e, false))) => {
+            let rest = eval(expr, scope)?;
+            e.push_back(rest);
+            eval(e, scope)
         },
 
        	Some(ServValue::Func(ServFn::ArgFn(f))) => {
