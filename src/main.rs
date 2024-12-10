@@ -104,13 +104,15 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
 fn ast_bind_to_scope(ast: ast::AstRoot, scope: &mut Stack) {
 	for declaration in ast.0 {
     	if declaration.kind == "word" {
+        	let key = declaration.key();
         	let func = compile(declaration.value, scope);
-        	scope.insert(declaration.key.to_owned().into(), func);
+        	scope.insert(key.into(), func);
     	}
 
     	else if declaration.kind == "route" {
+        	let key = declaration.key();
         	let func = compile(declaration.value, scope);
-        	scope.router.as_mut().unwrap().insert(declaration.key, func);
+        	scope.router.as_mut().unwrap().insert(key, func);
     	}
 
     	else if declaration.kind == "include" {

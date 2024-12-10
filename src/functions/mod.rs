@@ -19,6 +19,10 @@ mod sql;
 mod json;
 // mod request;
 
+fn yes(input: ServValue, scope: &Stack) -> ServResult {
+    Ok(ServValue::Bool(true))
+}
+
 fn hello_world(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::Text("hello world".to_owned()))
 }
@@ -82,8 +86,10 @@ fn using(mut input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
 
 	for declaration in ast.0 {
     	if declaration.kind == "word" {
+        	let key = declaration.key();
         	let func = crate::compile(declaration.value, &mut new_scope);
-        	new_scope.insert(declaration.key.to_owned().into(), func);
+        	// new_scope.insert(declaration.key.to_owned().into(), func);
+        	new_scope.insert(key.into(), func);
     	}
 	}
 
@@ -164,6 +170,44 @@ fn choose(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
     }.call(Some(value), scope)
 }
 
+fn switch(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
+    let map = input.pop_front().unwrap_or(ServValue::None);
+    let mut expr = input.pop_front().unwrap_or(ServValue::None);
+    if let ServValue::Ref(label) = expr { expr = scope.get(label).unwrap() };
+
+    let text = match expr {
+        ServValue::Func(ServFn::Template(t)) => t.literal_inner(),
+        ref otherwise => expr.call(None, scope)?,
+    }.to_string();
+
+	let ast = servparser::parse_root_from_text(&text).expect("failed to parse switch expression");
+    let value = crate::value::eval(input, scope)?;
+
+    let mut child = scope.make_child();
+
+	for declaration in ast.0 {
+    	if let crate::ast::Pattern::Expr(pattern) = declaration.key {
+        	match crate::compile(pattern, &mut child).call(Some(value.clone()), &child)? {
+            	ServValue::None        => continue,
+            	ServValue::Bool(false) => continue,
+            	ServValue::Int(0)      => continue,
+            	otherwise => {
+                	return crate::compile(declaration.value, &mut child).call(Some(value.clone()), &child)
+            	},
+        	}
+    	}
+	}
+
+	Ok(ServValue::None)
+}
+
+fn equals(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    Ok(ServValue::Bool(match (arg.call(None, scope)?, input) {
+        (ServValue::Int(a), ServValue::Int(b)) => a == b,
+        _ => todo!(),
+    }))
+}
+
 pub fn bind_standard_library(scope: &mut crate::Stack) {
 
 	scope.insert(Label::name("["),           ServValue::Func(ServFn::Core(dequote)));
@@ -172,8 +216,10 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("let"),         ServValue::Func(ServFn::Meta(using)));
 	scope.insert(Label::name("!"),           ServValue::Func(ServFn::ArgFn(drop)));
 	scope.insert(Label::name("choose"),      ServValue::Func(ServFn::Meta(choose)));
+	scope.insert(Label::name("switch"),      ServValue::Func(ServFn::Meta(switch)));
 	scope.insert(Label::name("+"),           ServValue::Func(ServFn::Core(incr)));
 	scope.insert(Label::name("-"),           ServValue::Func(ServFn::Core(decr)));
+	scope.insert(Label::name("eq"),           ServValue::Func(ServFn::ArgFn(equals)));
 	scope.insert(Label::name("%"),           ServValue::Func(ServFn::Core(math_expr)));
 	scope.insert(Label::name("*"),           ServValue::Func(ServFn::Core(apply)));
 	scope.insert(Label::name("hello"),       ServValue::Func(ServFn::Core(hello_world)));
@@ -184,7 +230,9 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("with_header"), ServValue::Func(ServFn::ArgFn(with_header)));
 	scope.insert(Label::name("with_status"), ServValue::Func(ServFn::ArgFn(with_status)));
 	scope.insert(Label::name("with_option"), ServValue::Func(ServFn::ArgFn(with_option)));
-	// scope.insert(Label::name("*"),            ServFunction::Meta(apply));
+
+	scope.insert(Label::name("true"), ServValue::Func(ServFn::Core(yes)));
+	scope.insert(Label::name("else"), ServValue::Func(ServFn::Core(yes)));
 
 	list::bind(scope);
 	host::bind(scope);

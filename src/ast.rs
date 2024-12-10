@@ -34,11 +34,41 @@ impl Display for Word {
 #[derive(Clone)]
 pub struct Expression(pub Vec<Word>, pub bool);
 
+pub enum Pattern {
+    Key(String),
+    Expr(Expression),
+}
+
 // #[derive(Debug)]
 pub struct Declaration {
    	pub kind: String,
-	pub key: String,
+	pub key: Pattern,
 	pub value: Expression,
+}
+
+impl Declaration {
+    pub fn with_key(kind: &str, key: &str, value: Expression) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            key: Pattern::Key(key.to_owned()),
+            value: value,
+        }
+    }
+
+    pub fn with_expr(kind: &str, key: Expression, value: Expression) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            key: Pattern::Expr(key),
+            value: value,
+        }
+    }
+
+    pub fn key(&self) -> String {
+        match &self.key {
+            Pattern::Key(s) => s.clone(),
+            Pattern::Expr(e) => panic!(),
+        }
+    }
 }
 
 // #[derive(Debug)]

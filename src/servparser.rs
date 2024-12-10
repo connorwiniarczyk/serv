@@ -32,7 +32,6 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
         	},
         	TokenKind::TemplateClose => { unreachable!(); },
         	_ => return Err("token not supported in template".into()),
-        	// a => panic!("token {:?} not supported in template", a),
     	}
 	}
 
@@ -90,58 +89,28 @@ fn parse_declaration(parser: &mut Parser) -> Result<ast::Declaration, ServError>
     	Route => {
         	let route = parser.next_if_kind(Route).unwrap();
             _ = parser.next_if_kind(Equals)?;
-            Ok(ast::Declaration {
-                kind: "route".to_string(),
-                key:   route.to_string(),
-                value: parse_expression(parser)?,
-            })
+            Ok(ast::Declaration::with_key("route", &route.value, parse_expression(parser)?))
     	},
 
     	Identifier if next.value == "include" => {
         	let _ = parser.next_if_kind(Identifier)?;
-            Ok(ast::Declaration {
-                kind: "include".to_string(),
-                key:  "include".to_string(),
-                value: parse_expression(parser)?,
-            })
+            Ok(ast::Declaration::with_key("include", "", parse_expression(parser)?))
     	},
 
     	Identifier => {
         	let ident = parser.next_if_kind(Identifier).unwrap();
             _ = parser.next_if_kind(Equals)?;
-            Ok(ast::Declaration {
-                kind: "word".to_string(),
-                key:   ident.to_string(),
-                value: parse_expression(parser)?,
-            })
+            Ok(ast::Declaration::with_key("word", &ident.value, parse_expression(parser)?))
+    	},
+
+    	otherwise => {
+        	let pattern = parse_expression(parser)?;
+        	_ = parser.next_if_kind(Equals)?;
+        	Ok(ast::Declaration::with_expr("pattern", pattern, parse_expression(parser)?))
     	},
 
     	otherwise => panic!("unexpected {:?}", next),
 	}
-
-
-
-    // if let Ok(route) = parser.next_if_kind(Route) {
-    //     _ = parser.next_if_kind(Equals)?;
-    //     Ok(ast::Declaration {
-    //         kind: "route".to_string(),
-    //         key:   route.to_string(),
-    //         value: parse_expression(parser)?,
-    //     })
-    // }
-
-    // else if let Ok(word) = parser.next_if_kind(Identifier) {
-    //     _ = parser.next_if_kind(Equals)?;
-    //     Ok(ast::Declaration {
-    //         kind: "word".to_string(),
-    //         key:   word.to_string(),
-    //         value: parse_expression(parser)?,
-    //     })
-    // }
-
-    // else {
-    //     Err(format!("token {:?} is not a valid way to start a route", parser.get(0)).as_str().into())
-    // }
 }
 
 fn parse_root(parser: &mut Parser) -> Result<ast::AstRoot, ServError> {

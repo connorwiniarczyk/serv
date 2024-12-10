@@ -74,6 +74,16 @@ impl Template {
         ServValue::Text(self.to_string())
     }
 
+    pub fn literal_inner(&self) -> ServValue {
+        let empty = crate::StackDictionary::empty();
+        let mut renderer = Renderer::new(&empty);
+        let mut options = FormatOptions::default();
+        options.resolve_functions = false;
+        renderer.render(self, options);
+
+		ServValue::Text(std::mem::take(&mut renderer.output))
+    }
+
     pub fn render(&self, ctx: &Stack) -> ServResult {
         // let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None, new_context: None };
         let mut renderer = Renderer::new(ctx);
