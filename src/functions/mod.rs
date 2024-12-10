@@ -16,8 +16,8 @@ use std::io::Read;
 mod host;
 mod list;
 mod sql;
+mod json;
 // mod request;
-// mod json;
 
 fn hello_world(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::Text("hello world".to_owned()))
@@ -95,18 +95,21 @@ fn as_template(input: ServValue, scope: &Stack) -> ServResult {
     template.render(&scope)
 }
 
-// pub fn apply(words: &mut Words, input: ServValue, scope: &Stack) -> ServResult {
-//     let next = words.next().ok_or("not enought arguments")?;
-//     let arg = scope.get(&next).ok_or("not found")?.call(input.clone(), scope)?;
+pub fn apply(input: ServValue, scope: &Stack) -> ServResult {
+	let mut child = scope.make_child();
+	let text = input.to_string();
+	let Ok(ast) = servparser::parse_expression_from_text(&text) else {
+    	panic!("failed to parse serv text in apply statement: {:?}", text);
+	};
 
-// 	let mut new_scope = scope.make_child();
-// 	let ast = parser::parse_expression_from_text(arg.to_string().as_str()).unwrap();
-// 	let func = compile(ast.0, &mut new_scope);
+	let func = crate::compile(ast, &mut child);
+	func.call(None, &child)
+	// eval(expr, &mut child)
 
-//     let rest = words.eval(input, scope)?;
+    // let rest = words.eval(input, scope)?;
 
-//     func.call(rest, &new_scope)
-// }
+    // func.call(rest, &new_scope)
+}
 
 fn with_option(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResult {
     fn parse_key_value(input: &str) -> Result<(String, String), &'static str> {
@@ -172,6 +175,7 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("+"),           ServValue::Func(ServFn::Core(incr)));
 	scope.insert(Label::name("-"),           ServValue::Func(ServFn::Core(decr)));
 	scope.insert(Label::name("%"),           ServValue::Func(ServFn::Core(math_expr)));
+	scope.insert(Label::name("*"),           ServValue::Func(ServFn::Core(apply)));
 	scope.insert(Label::name("hello"),       ServValue::Func(ServFn::Core(hello_world)));
 	scope.insert(Label::name("uppercase"),   ServValue::Func(ServFn::Core(uppercase)));
 	scope.insert(Label::name("inline"),      ServValue::Func(ServFn::Core(inline)));
@@ -184,6 +188,7 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 
 	list::bind(scope);
 	host::bind(scope);
+	json::bind(scope);
 	sql::bind(scope);
 
 	// request::bind(scope);

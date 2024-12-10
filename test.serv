@@ -1,2 +1,3 @@
-@tag => with_header {test = abcd} {<$t>$:</$t>} [ <t ]
-@out => tag {li} {hello}
+out = name with json {{
+	"name": "test"
+}}

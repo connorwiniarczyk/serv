@@ -1,8 +1,11 @@
-use crate::cursor::Tokenizer as Cursor;
-use crate::cursor::Token;
-use crate::ServValue;
+use parsetool::cursor::{ Tokenizer, Token };
+use crate::{Stack, ServResult, Label, ServValue, ServFn };
 
-use crate::{Scope, ServResult, FnLabel, ServFunction};
+use std::iter::Peekable;
+struct Parser<I>(Peekable<I>) where I: Iterator<Item = JsonToken>;
+
+use crate::VecDeque;
+use std::collections::HashMap;
 
 #[derive (PartialEq, Clone, Copy, Debug)]
 enum TokenKind {
@@ -21,7 +24,7 @@ use TokenKind::*;
 
 type JsonToken = Token<TokenKind>;
 
-fn tokenize_json<'input>(cursor: &mut Cursor<'input>) -> Vec<JsonToken> {
+fn tokenize_json<'input>(cursor: &mut Tokenizer<'input>) -> Vec<JsonToken> {
     let mut output: Vec<JsonToken> = Vec::new();
     while cursor.get(0).is_some() {
 		match cursor.get(0).unwrap() {
@@ -65,11 +68,6 @@ fn tokenize_json<'input>(cursor: &mut Cursor<'input>) -> Vec<JsonToken> {
     output
 }
 
-use std::iter::Peekable;
-struct Parser<I>(Peekable<I>) where I: Iterator<Item = JsonToken>;
-
-use crate::VecDeque;
-use std::collections::HashMap;
 
 impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
     fn new(input: I) -> Self {
@@ -117,18 +115,18 @@ impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
 
 fn parse_json_from_str(input: &str) -> ServValue {
     let chars: Vec<char> = input.chars().collect();
-    let mut cursor = Cursor::new(&chars);
+    let mut cursor = Tokenizer::new(&chars);
     let tokens = tokenize_json(&mut cursor);
     let mut parser = Parser::new(tokens.into_iter());
 
     parser.parse_value().unwrap()
 }
 
-fn json_from(input: ServValue, scope: &Scope) -> ServResult {
+fn json_from(input: ServValue, scope: &Stack) -> ServResult {
     Ok(parse_json_from_str(&input.to_string()))
 }
 
-pub fn bind(scope: &mut Scope) {
-	scope.insert(FnLabel::name("json.from"), ServFunction::Core(json_from));
-	scope.insert(FnLabel::name("json"), ServFunction::Core(json_from));
+pub fn bind(scope: &mut Stack) {
+	scope.insert(Label::name("json"),      ServValue::Func(ServFn::Core(json_from)));
+	scope.insert(Label::name("json.from"), ServValue::Func(ServFn::Core(json_from)));
 }

@@ -18,18 +18,17 @@ fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
    	};
    	
    	Ok(out)
+}
 
-   	// f(arg, rest, scope)
+fn take_keys(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
+    let result = crate::value::eval(input, scope)?.ignore_metadata();
+    let ServValue::Table(m) = result else { panic!("take_keys expects a table, received {:?}", result) };
 
-    // if let ServValue::Ref(Label::Name(ref name)) = arg {
-    //     scope.insert("");
-    //     let transform = Transform(Rc::new(|s: &mut Stack| { s.insert_name(name, ServValue::None) }));
-    //     let out = ServValue::Transform(Box::new(input), transform);
-    //     Ok(out)
-    // }
-    // else { return Ok(input) }
+    for (k, v) in m.into_iter() {
+        scope.insert(k.into(), v);
+    }
 
-   	// todo!();
+    Ok(ServValue::None)
 }
 
 fn count(input: ServValue, scope: &Stack) -> ServResult {
@@ -90,6 +89,7 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
+	scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(take_keys)));
 
 }
 
