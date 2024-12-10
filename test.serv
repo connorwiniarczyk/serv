@@ -1,8 +1,4 @@
-fib = switch {
-	(eq 0) => 1
-	(eq 1) => 1
-	(else) => %{$(fib-) + $(fib--)}
+out = {$name has $number} with @{
+	name = {name}
+	number = +++1
 }
-
-out = map fib count 15
-

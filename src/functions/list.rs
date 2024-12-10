@@ -4,6 +4,7 @@ use crate::Stack;
 use crate::servparser;
 use crate::VecDeque;
 use crate::{Label, ServFn};
+use std::collections::HashMap;
 
 
 fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
@@ -20,7 +21,7 @@ fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
    	Ok(out)
 }
 
-fn take_keys(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
+fn with(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
     let result = crate::value::eval(input, scope)?.ignore_metadata();
     let ServValue::Table(m) = result else { panic!("take_keys expects a table, received {:?}", result) };
 
@@ -80,6 +81,48 @@ fn generate_list(input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult 
     Ok(ServValue::List(output))
 }
 
+fn table(input: ServValue, scope: &Stack) -> ServResult {
+    let text = input.to_string();
+    let ast = servparser::parse_root_from_text(&text).unwrap();
+    let mut output = HashMap::new();
+    let mut child = scope.make_child();
+
+    for declaration in ast.0 {
+        let value = crate::compile(declaration.value, &mut child).call(None, &child)?;
+        if (declaration.kind == "include") {
+            let text = value.to_string();
+        	let ast = servparser::parse_root_from_text(&text).expect("include string failed to parse");
+			crate::ast_bind_to_scope(ast, &mut child);
+        } else {
+            match declaration.key {
+                crate::ast::Pattern::Expr(expr) => output.insert(crate::compile(expr, &mut child).call(None, &child)?.to_string(), value),
+                crate::ast::Pattern::Key(name) => output.insert(name, value),
+            };
+        }
+    }
+
+    Ok(ServValue::Table(output))
+
+}
+
+fn sum(input: ServValue, scope: &Stack) -> ServResult {
+    let ServValue::List(list) = input.ignore_metadata() else { return Err("sum needs to operate on a list") };
+    let mut iter = list.into_iter().filter(|x| !matches!(x, ServValue::None)).peekable();
+
+    let output: ServValue = match iter.peek().ok_or("tried to sum an empty list")? {
+        ServValue::Int(i) => ServValue::Int(iter.map(|x| x.expect_int().unwrap()).sum()),
+        ServValue::Text(t) => {
+            let mut output = String::new();
+            for element in iter {
+                output.push_str(element.to_string().as_str());
+            }
+            ServValue::Text(output)
+        },
+        _ => return Err("please don't try to sum that"),
+    };
+
+	Ok(output)
+}
 
 pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("map"), ServValue::Func(ServFn::ArgFn(map)));
@@ -89,46 +132,11 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
-	scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(take_keys)));
+	scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(with)));
+	scope.insert(Label::name("sum"),     ServValue::Func(ServFn::Core(sum)));
+	scope.insert(Label::name("@"),     ServValue::Func(ServFn::Core(table)));
 
 }
-
-// pub fn switch(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-
-//     let arg1 = words.next().unwrap();
-//     // let arg1 = (scope)?.expect_int()?;
-//     let arg2 = words.next().ok_or("not enough arguments")?;
-//     let ServFunction::List(options) = scope.get(&arg2).ok_or("not found")? else { return Err("switch needs its second arg to be a list literal") };
-
-//     let rest = words.eval(input, scope)?;
-//     let index: usize = scope.get(&arg1).unwrap().call(rest.clone(), scope)?.expect_int()?.try_into().unwrap();
-
-// 	// let index: usize = arg1.try_into().unwrap();
-//     let choice = options[index.clamp(0, options.len() - 1)].clone();
-
-//     let output = scope.get(&choice).ok_or("not found")?.call(rest, scope)?;
-
-// 	Ok(output)
-// }
-
-// pub fn sum(input: ServValue, scope: &Scope) -> ServResult {
-//     let ServValue::List(list) = input.ignore_metadata() else { return Err("sum needs to operate on a list") };
-//     let mut iter = list.into_iter().filter(|x| !matches!(x, ServValue::None)).peekable();
-
-//     let output: ServValue = match iter.peek().ok_or("tried to sum an empty list")? {
-//         ServValue::Int(i) => ServValue::Int(iter.map(|x| x.expect_int().unwrap()).sum()),
-//         ServValue::Text(t) => {
-//             let mut output = String::new();
-//             for element in iter {
-//                 output.push_str(element.to_string().as_str());
-//             }
-//             ServValue::Text(output)
-//         },
-//         _ => return Err("please don't try to sum that"),
-//     };
-
-// 	Ok(output)
-// }
 
 // pub fn join(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
 //     let intersperse = words.take_next(scope)?.to_string();

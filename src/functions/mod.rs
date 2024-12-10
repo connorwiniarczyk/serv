@@ -171,7 +171,6 @@ fn choose(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
 }
 
 fn switch(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
-    // let map = input.pop_front().unwrap_or(ServValue::None);
     let mut expr = input.pop_front().unwrap_or(ServValue::None);
     if let ServValue::Ref(label) = expr { expr = scope.get(label).unwrap() };
 
@@ -240,5 +239,4 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	sql::bind(scope);
 
 	// request::bind(scope);
-	// json::bind(scope);
 }
