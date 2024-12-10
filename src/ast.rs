@@ -1,25 +1,22 @@
-use crate::lexer::Token;
 use crate::value::ServValue;
 pub use crate::template::{TemplateElement, Template};
 
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Word {
-   	Function(Token),
+   	Function(String),
    	Template(Template),
    	Literal(ServValue),
    	Parantheses(Expression),
-   	List(Vec<Expression>),
 }
 
 impl Display for Word {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::Function(t) => f.write_str(t.contents.as_str())?,
+            Self::Function(t) => f.write_str(t)?,
             Self::Template(t) => t.fmt(f)?,
             Self::Literal(l)  => l.fmt(f)?,
-            Self::List(l) => todo!(),
             Self::Parantheses(e) => {
 				f.write_str("(")?;
 				for word in e.0.iter() {
@@ -34,15 +31,45 @@ impl Display for Word {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Expression(pub Vec<Word>);
+#[derive(Clone)]
+pub struct Expression(pub Vec<Word>, pub bool);
 
-#[derive(Debug)]
+pub enum Pattern {
+    Key(String),
+    Expr(Expression),
+}
+
+// #[derive(Debug)]
 pub struct Declaration {
    	pub kind: String,
-	pub key: String,
+	pub key: Pattern,
 	pub value: Expression,
 }
 
-#[derive(Debug)]
+impl Declaration {
+    pub fn with_key(kind: &str, key: &str, value: Expression) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            key: Pattern::Key(key.to_owned()),
+            value: value,
+        }
+    }
+
+    pub fn with_expr(kind: &str, key: Expression, value: Expression) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            key: Pattern::Expr(key),
+            value: value,
+        }
+    }
+
+    pub fn key(&self) -> String {
+        match &self.key {
+            Pattern::Key(s) => s.clone(),
+            Pattern::Expr(e) => panic!(),
+        }
+    }
+}
+
+// #[derive(Debug)]
 pub struct AstRoot(pub Vec<Declaration>);

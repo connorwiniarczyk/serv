@@ -1,6 +1,11 @@
-use crate::{Scope, ServValue, ServResult, FnLabel, ServFunction};
-use crate::generic_tokenizer::Tokenizer;
+use crate::ServValue;
+use crate::ServResult;
+use crate::Stack;
+use crate::servparser;
+use crate::VecDeque;
+use crate::{Label, ServFn};
 
+use parsetool::Tokenizer;
 use std::collections::HashMap;
 
 fn parse_query_string(input: &str) -> ServValue {
@@ -11,10 +16,10 @@ fn parse_query_string(input: &str) -> ServValue {
 
     while !cursor.is_done() {
         cursor.incr_while(|c| c != '=');
-        let key = cursor.emit().to_string();
+        let key = cursor.emit(()).to_string();
         cursor.skip();
         cursor.incr_while(|c| c != '&');
-        let value = cursor.emit().to_string();
+        let value = cursor.emit(()).to_string();
         cursor.skip();
         output.insert(key, ServValue::Text(value));
     }
