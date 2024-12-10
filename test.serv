@@ -1,4 +1,4 @@
-fib = switch () {
+fib = switch {
 	(eq 0) => 1
 	(eq 1) => 1
 	(else) => %{$(fib-) + $(fib--)}
