@@ -1,17 +1,27 @@
 # SERV
 
-Serv is a swiss army knife for writing http servers quickly and with as
-little friction as possible. It is similar in function to web frameworks
-like Express and Flask, but instead of existing as a library on top of a
-general purpose language like Javascript or Python, Serv uses its own
-custom language, implemented from the ground up specifically
-for writing web backends.
+Serv is a swiss army knife for writing web servers and APIs, designed
+to make the developer experience as simple and enjoyable as possible.
+It is an entirely new language and runtime, which virtually eliminates
+the need for boilerplate code and makes many of the most common web
+tasks, such as reading a file, rendering a template, and querying a
+database, trivial one liners.
 
-By doing so, Serv frees itself from almost
-all of the boilerplate required to build a web server in the traditional
-way. It is a single executable with a fully featured web server built
-directly into the runtime, a standard library full of useful tools,
-and a dedicated syntax for assigning routes.
+Serv was heavily inspired by this lecture by Brian Kernighan:
+In it, he references languages like Awk and talks about the
+practice of crafting languages around a particular domain,
+such that problems inside that domain are easy to express.
+This is becoming increasingly rare, particularly in the web domain
+where most tools are implemented as libraries on top of existing
+languages like javascript or python. Doing so lowers the barrier to
+entry, but loses some of the power that a truly custom language can
+provide. Serv aims to continue this tradition by becoming a
+sort of "Awk for web programming", not necessarily the most
+efficient, or easiest to learn, but once understood, the most
+natural way to solve most problems in its domain.
+
+[https://www.youtube.com/watch?v=Sg4U4r_AgJU&pp=ygUfYnJpYW4ga2VybmlnaGFuIGxhbmd1YWdlIGRlc2lnbg%3D%3D](https://www.youtube.com/watch?v=Sg4U4r_AgJU&pp=ygUfYnJpYW4ga2VybmlnaGFuIGxhbmd1YWdlIGRlc2lnbg%3D%3D)
+
 
 Here are some examples of Serv in action:
 
@@ -33,7 +43,7 @@ Here are some examples of Serv in action:
 /index => markdown file {www/index.md}
 
 # Define your own functions:
-plus3 = %{ $: * $: }
+square = %{ $: * $: }
 /api/square/{x} => square x
 
 # Write API endpoints directly in SQL
@@ -95,6 +105,34 @@ which adds 1 to it's input, then evaluating all of `+ + 0`, and so on until reac
 which is a function returning 0. Each `+` is then called in reverse order, right to left,
 until the expression eventually returns 3.
 
+### Metaprogramming
+
+Metaprogramming in serv is implemented with a pair of functions called quote (`]`)
+and dequote (`[`). The quote function skips the recursive evaluation step described above,
+and instead returns the remaining program as a list of functions to be manipulated.
+The dequote function does the reverse of this, evaluating a list of functions into
+a value. Typically a meta expression will exist between a dequote and a quote function.
+
+For example, it is common in serv for functions to take more than one argument, such
+as `map` which maps a function onto a list. This can be done with the meta expression
+`[ pop arg ]`, which will first call quote on the remainder of the program, then
+call `pop` on the list, removing the first element and placing it into the scope as
+the word `arg`, then calling dequote on the rest of the list. Other common meta functions
+are drop (`!`) which removes the next word, list (`|`) which calls dequote on each
+element individually to create a list of values.
+
+```
+sum map (++) | 1 2 3 4
+```
+
+This example is evaluated in the following way: First sum is taken out of
+the expression and the remainder is evaluated as its input. When map is called,
+it also pops the function `(++)` out of the expression as its argument. Then
+`| 1 2 3 4` is evaluated. The list function `|` does not evaluate, `1 2 3 4`,
+(which would return 1), but instead evaluates each element individually and
+returns the list `[1, 2, 3, 4]`. Then map calls `(++)` on each element,
+returning `[3, 4, 5, 6]`, and sum adds them together, returning 18.
+
 ### Strings
 
 Strings in serv are functions as well, and are denoted with curly brackets `{}`. Strings
@@ -102,7 +140,6 @@ are allowed to span multiple lines and can contain most special characters, even
 balanced pairs of curly brackets, without needing to be escaped. If a string contains
 a `$` followed by an expression, that expression will be evaluated and its result inserted into
 the string at that location. 
-
 
 ## Functions
 
