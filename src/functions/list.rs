@@ -4,14 +4,15 @@ use crate::Stack;
 use crate::servparser;
 use crate::VecDeque;
 use crate::{Label, ServFn};
+use crate::module::Expression;
 use std::collections::HashMap;
 
 
-fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
-    let arg  = input.pop_front().expect("word expected");
+fn take(mut input: Expression, scope: &mut Stack) -> ServResult {
+    let arg  = input.next().expect("word expected");
    	let ServValue::Ref(name @ Label::Name(_)) = arg else { panic!("'<' expects a ref") };
 
-   	let rest = crate::value::eval(input, scope)?;
+   	let rest = input.eval(scope)?;
 
    	let out = match rest {
        	ServValue::List(mut l) => { scope.insert(name, l.pop_front().ok_or("")?); ServValue::List(l) },
@@ -21,16 +22,16 @@ fn take(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
    	Ok(out)
 }
 
-fn with(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
-    let result = crate::value::eval(input, scope)?.ignore_metadata();
-    let ServValue::Table(m) = result else { panic!("take_keys expects a table, received {:?}", result) };
+// fn with(mut input: Expression, scope: &mut Stack) -> ServResult {
+//     let result = crate::value::eval(input, scope)?.ignore_metadata();
+//     let ServValue::Table(m) = result else { panic!("take_keys expects a table, received {:?}", result) };
 
-    for (k, v) in m.into_iter() {
-        scope.insert(k.into(), v);
-    }
+//     for (k, v) in m.into_iter() {
+//         scope.insert(k.into(), v);
+//     }
 
-    Ok(ServValue::None)
-}
+//     Ok(ServValue::None)
+// }
 
 fn count(input: ServValue, scope: &Stack) -> ServResult {
     let max = input.expect_int()?;
@@ -73,35 +74,38 @@ fn map(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::List(output))
 }
 
-fn generate_list(input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
+fn generate_list(input: Expression, scope: &mut Stack) -> ServResult {
     let mut output = VecDeque::new();
-    for item in input.into_iter() {
+    let ServValue::List(list) = input.as_list() else { unreachable!() };
+
+    for item in list.into_iter() {
         output.push_back(item.call(None, scope)?);
     }
     Ok(ServValue::List(output))
 }
 
 fn table(input: ServValue, scope: &Stack) -> ServResult {
-    let text = input.to_string();
-    let ast = servparser::parse_root_from_text(&text).unwrap();
-    let mut output = HashMap::new();
-    let mut child = scope.make_child();
+    todo!();
+   //  let text = input.to_string();
+   //  let ast = servparser::parse_root_from_text(&text).unwrap();
+   //  let mut output = HashMap::new();
+   //  let mut child = scope.make_child();
 
-    for declaration in ast.0 {
-        let value = crate::compile(declaration.value, &mut child).call(None, &child)?;
-        if (declaration.kind == "include") {
-            let text = value.to_string();
-        	let ast = servparser::parse_root_from_text(&text).expect("include string failed to parse");
-			crate::ast_bind_to_scope(ast, &mut child);
-        } else {
-            match declaration.key {
-                crate::ast::Pattern::Expr(expr) => output.insert(crate::compile(expr, &mut child).call(None, &child)?.to_string(), value),
-                crate::ast::Pattern::Key(name) => output.insert(name, value),
-            };
-        }
-    }
+   //  for declaration in ast.0 {
+   //      let value = crate::compile(declaration.value, &mut child).call(None, &child)?;
+   //      if (declaration.kind == "include") {
+   //          let text = value.to_string();
+   //      	let ast = servparser::parse_root_from_text(&text).expect("include string failed to parse");
+			// crate::ast_bind_to_scope(ast, &mut child);
+   //      } else {
+   //          match declaration.key {
+   //              crate::ast::Pattern::Expr(expr) => output.insert(crate::compile(expr, &mut child).call(None, &child)?.to_string(), value),
+   //              crate::ast::Pattern::Key(name) => output.insert(name, value),
+   //          };
+   //      }
+   //  }
 
-    Ok(ServValue::Table(output))
+   //  Ok(ServValue::Table(output))
 
 }
 
@@ -132,7 +136,7 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
-	scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(with)));
+	// scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(with)));
 	scope.insert(Label::name("sum"),     ServValue::Func(ServFn::Core(sum)));
 	scope.insert(Label::name("@"),     ServValue::Func(ServFn::Core(table)));
 

@@ -6,6 +6,7 @@ use std::fmt::Display;
 #[derive(Clone)]
 pub enum Word {
    	Function(String),
+   	Route(String),
    	Template(Template),
    	Literal(ServValue),
    	Parantheses(Expression),
@@ -15,6 +16,7 @@ impl Display for Word {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Self::Function(t) => f.write_str(t)?,
+            Self::Route(r) => f.write_str(r)?,
             Self::Template(t) => t.fmt(f)?,
             Self::Literal(l)  => l.fmt(f)?,
             Self::Parantheses(e) => {
@@ -33,6 +35,23 @@ impl Display for Word {
 
 #[derive(Clone)]
 pub struct Expression(pub Vec<Word>, pub bool);
+
+pub struct Equality {
+    lhs: Expression,
+    rhs: Expression,
+}
+
+pub enum Line {
+    Statement(Expression),
+    Definition {
+        lhs: String,
+        rhs: Expression,
+    },
+    Equality {
+        lhs: Expression,
+        rhs: Expression,
+    }
+}
 
 pub enum Pattern {
     Key(String),
@@ -72,4 +91,5 @@ impl Declaration {
 }
 
 // #[derive(Debug)]
-pub struct AstRoot(pub Vec<Declaration>);
+// pub struct AstRoot(pub Vec<Declaration>);
+pub struct AstRoot(pub Vec<Line>);

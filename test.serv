@@ -1,4 +1,2 @@
-out = {$name has $number} with @{
-	name = {name}
-	number = +++1
-}
+name = {connor}
+print {hello $name}

@@ -79,42 +79,21 @@ fn parse_expression(parser: &mut Parser) -> Result<ast::Expression, ServError> {
     Ok(ast::Expression(output, meta))
 }
 
-fn parse_declaration(parser: &mut Parser) -> Result<ast::Declaration, ServError> {
+fn parse_declaration(parser: &mut Parser) -> Result<ast::Line, ServError> {
     while let Ok(_) = parser.next_if_kind(Semicolon) {}
 
     if let Ok(_) = parser.next_if_kind(At) {};
 
-	let next = parser.get(0)?;
-	match next.kind {
-    	Route => {
-        	let route = parser.next_if_kind(Route).unwrap();
-            _ = parser.next_if_kind(Equals)?;
-            Ok(ast::Declaration::with_key("route", &route.value, parse_expression(parser)?))
-    	},
+    let lhs = parse_expression(parser)?;
+    let Ok(_) = parser.next_if_kind(Equals) else { return Ok(ast::Line::Statement(lhs)) };
 
-    	Identifier if next.value == "include" => {
-        	let _ = parser.next_if_kind(Identifier)?;
-            Ok(ast::Declaration::with_key("include", "", parse_expression(parser)?))
-    	},
+    let rhs = parse_expression(parser)?;
 
-    	Identifier => {
-        	let ident = parser.next_if_kind(Identifier).unwrap();
-            _ = parser.next_if_kind(Equals)?;
-            Ok(ast::Declaration::with_key("word", &ident.value, parse_expression(parser)?))
-    	},
-
-    	otherwise => {
-        	let pattern = parse_expression(parser)?;
-        	_ = parser.next_if_kind(Equals)?;
-        	Ok(ast::Declaration::with_expr("pattern", pattern, parse_expression(parser)?))
-    	},
-
-    	otherwise => panic!("unexpected {:?}", next),
-	}
+    Ok(ast::Line::Equality{ lhs, rhs })
 }
 
 fn parse_root(parser: &mut Parser) -> Result<ast::AstRoot, ServError> {
-	let mut output: Vec<ast::Declaration> = Vec::new();
+	let mut output: Vec<ast::Line> = Vec::new();
 
 	while parser.get(0).is_ok() {
     	if parser.get(0)?.kind == Comment { continue };

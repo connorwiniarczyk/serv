@@ -3,20 +3,22 @@ use crate::ServResult;
 
 use crate::Label;
 use crate::value::ServFn;
-use crate::value::eval;
+// use crate::value::eval;
 use crate::error::ServError;
 use crate::Stack;
 use crate::servparser;
 use std::collections::HashMap;
-use std::collections::VecDeque;
+
+use crate::module::Expression;
+// use std::collections::Expression;
 
 // use crate::compile;
 use std::io::Read;
 
 mod host;
 mod list;
-mod sql;
-mod json;
+// mod sql;
+// mod json;
 // mod request;
 
 fn yes(input: ServValue, scope: &Stack) -> ServResult {
@@ -77,23 +79,24 @@ fn drop(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     Ok(input)
 }
 
-fn using(mut input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
-    let arg = input.pop_front().ok_or("using expects an arg")?;
-    let text = arg.call(None, &scope)?.to_string();
+fn using(mut input: Expression, scope: &mut Stack) -> ServResult {
+   todo!();
+ //    let arg = input.pop_front().ok_or("using expects an arg")?;
+ //    let text = arg.call(None, &scope)?.to_string();
 
-	let ast = servparser::parse_root_from_text(&text).unwrap();
-	let mut new_scope = scope.make_child();
+	// let ast = servparser::parse_root_from_text(&text).unwrap();
+	// let mut new_scope = scope.make_child();
 
-	for declaration in ast.0 {
-    	if declaration.kind == "word" {
-        	let key = declaration.key();
-        	let func = crate::compile(declaration.value, &mut new_scope);
-        	// new_scope.insert(declaration.key.to_owned().into(), func);
-        	new_scope.insert(key.into(), func);
-    	}
-	}
+	// for declaration in ast.0 {
+ //    	if declaration.kind == "word" {
+ //        	let key = declaration.key();
+ //        	let func = crate::compile(declaration.value, &mut new_scope);
+ //        	// new_scope.insert(declaration.key.to_owned().into(), func);
+ //        	new_scope.insert(key.into(), func);
+ //    	}
+	// }
 
-    eval(input, &mut new_scope)
+ //    eval(input, &mut new_scope)
 }
 
 fn as_template(input: ServValue, scope: &Stack) -> ServResult {
@@ -118,15 +121,16 @@ pub fn apply(input: ServValue, scope: &Stack) -> ServResult {
 }
 
 fn with_option(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResult {
-    fn parse_key_value(input: &str) -> Result<(String, String), &'static str> {
-        let mut iter = input.split("=").map(str::trim).map(str::to_string);
-        Ok((iter.next().ok_or("invalid option")?, iter.next().ok_or("invalid_option")?))
-    }
+    todo!();
+ //    fn parse_key_value(input: &str) -> Result<(String, String), &'static str> {
+ //        let mut iter = input.split("=").map(str::trim).map(str::to_string);
+ //        Ok((iter.next().ok_or("invalid option")?, iter.next().ok_or("invalid_option")?))
+ //    }
 
-    let text = arg.call(None, scope)?.to_string();
-    let (key, value) = parse_key_value(&text)?;
-	input.metadata().insert(key, ServValue::Text(value));
-	Ok(input)
+ //    let text = arg.call(None, scope)?.to_string();
+ //    let (key, value) = parse_key_value(&text)?;
+	// input.metadata().insert(key, ServValue::Text(value));
+	// Ok(input)
 }
 
 fn with_status(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResult {
@@ -134,32 +138,34 @@ fn with_status(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResul
 	Ok(input)
 }
 
-fn with_header(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResult {
-	let headers: &mut ServValue = input.metadata()
-    	.entry("headers".to_owned())
-    	.or_insert(ServValue::List(VecDeque::new()));
+// fn with_header(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResult {
+// 	let headers: &mut ServValue = input.metadata()
+//     	.entry("headers".to_owned())
+//     	.or_insert(ServValue::List(Expression::new()));
 
-	let ServValue::List(list) = headers else {panic!()};
-	list.push_back(arg.call(None, scope)?);
-	Ok(input)
-}
+// 	let ServValue::List(list) = headers else {panic!()};
+// 	list.push_back(arg.call(None, scope)?);
+// 	Ok(input)
+// }
 
 fn dequote(input: ServValue, scope: &Stack) -> ServResult {
-    match input {
-		ServValue::List(words) => crate::value::eval(words, &mut scope.make_child()),
-		i => Ok(i),
-    }
+    todo!();
+  //   match input {
+		// ServValue::List(words) => crate::value::eval(words, &mut scope.make_child()),
+		// i => Ok(i),
+  //   }
 }
 
-fn quote(input: VecDeque::<ServValue>, scope: &mut Stack) -> ServResult {
-    Ok(ServValue::List(input))
+fn quote(input: Expression, scope: &mut Stack) -> ServResult {
+    todo!();
+    // Ok(ServValue::List(input))
 }
 
-fn choose(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
-    let if_true  = input.pop_front().unwrap_or(ServValue::None);
-    let if_false = input.pop_front().unwrap_or(ServValue::None);
+fn choose(mut input: Expression, scope: &mut Stack) -> ServResult {
+    let if_true  = input.next().unwrap_or(ServValue::None);
+    let if_false = input.next().unwrap_or(ServValue::None);
 
-    let value = crate::value::eval(input, scope)?;
+	let value = input.eval(scope)?;
 
     match &value {
         ServValue::None        => if_false,
@@ -170,34 +176,35 @@ fn choose(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
     }.call(Some(value), scope)
 }
 
-fn switch(mut input: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
-    let mut expr = input.pop_front().unwrap_or(ServValue::None);
-    if let ServValue::Ref(label) = expr { expr = scope.get(label).unwrap() };
+fn switch(mut input: Expression, scope: &mut Stack) -> ServResult {
+    todo!();
+ //    let mut expr = input.pop_front().unwrap_or(ServValue::None);
+ //    if let ServValue::Ref(label) = expr { expr = scope.get(label).unwrap() };
 
-    let text = match expr {
-        ServValue::Func(ServFn::Template(t)) => t.literal_inner(),
-        ref otherwise => expr.call(None, scope)?,
-    }.to_string();
+ //    let text = match expr {
+ //        ServValue::Func(ServFn::Template(t)) => t.literal_inner(),
+ //        ref otherwise => expr.call(None, scope)?,
+ //    }.to_string();
 
-	let ast = servparser::parse_root_from_text(&text).expect("failed to parse switch expression");
-    let value = crate::value::eval(input, scope)?;
+	// let ast = servparser::parse_root_from_text(&text).expect("failed to parse switch expression");
+ //    let value = crate::value::eval(input, scope)?;
 
-    let mut child = scope.make_child();
+ //    let mut child = scope.make_child();
 
-	for declaration in ast.0 {
-    	if let crate::ast::Pattern::Expr(pattern) = declaration.key {
-        	match crate::compile(pattern, &mut child).call(Some(value.clone()), &child)? {
-            	ServValue::None        => continue,
-            	ServValue::Bool(false) => continue,
-            	ServValue::Int(0)      => continue,
-            	otherwise => {
-                	return crate::compile(declaration.value, &mut child).call(Some(value.clone()), &child)
-            	},
-        	}
-    	}
-	}
+	// for declaration in ast.0 {
+ //    	if let crate::ast::Pattern::Expr(pattern) = declaration.key {
+ //        	match crate::compile(pattern, &mut child).call(Some(value.clone()), &child)? {
+ //            	ServValue::None        => continue,
+ //            	ServValue::Bool(false) => continue,
+ //            	ServValue::Int(0)      => continue,
+ //            	otherwise => {
+ //                	return crate::compile(declaration.value, &mut child).call(Some(value.clone()), &child)
+ //            	},
+ //        	}
+ //    	}
+	// }
 
-	Ok(ServValue::None)
+	// Ok(ServValue::None)
 }
 
 fn equals(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
@@ -226,17 +233,17 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("inline"),      ServValue::Func(ServFn::Core(inline)));
 	scope.insert(Label::name("markdown"),    ServValue::Func(ServFn::Core(markdown)));
 	scope.insert(Label::name("~"),           ServValue::Func(ServFn::Core(as_template)));
-	scope.insert(Label::name("with_header"), ServValue::Func(ServFn::ArgFn(with_header)));
-	scope.insert(Label::name("with_status"), ServValue::Func(ServFn::ArgFn(with_status)));
-	scope.insert(Label::name("with_option"), ServValue::Func(ServFn::ArgFn(with_option)));
+	// scope.insert(Label::name("with_header"), ServValue::Func(ServFn::ArgFn(with_header)));
+	// scope.insert(Label::name("with_status"), ServValue::Func(ServFn::ArgFn(with_status)));
+	// scope.insert(Label::name("with_option"), ServValue::Func(ServFn::ArgFn(with_option)));
 
 	scope.insert(Label::name("true"), ServValue::Func(ServFn::Core(yes)));
 	scope.insert(Label::name("else"), ServValue::Func(ServFn::Core(yes)));
 
-	list::bind(scope);
-	host::bind(scope);
-	json::bind(scope);
-	sql::bind(scope);
+	// list::bind(scope);
+	// host::bind(scope);
+	// json::bind(scope);
+	// sql::bind(scope);
 
 	// request::bind(scope);
 }
