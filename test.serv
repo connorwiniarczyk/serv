@@ -1,2 +1,1 @@
-name = {connor}
-print {hello $name}
+print exec.pipe {/bin/sh} {echo hello}

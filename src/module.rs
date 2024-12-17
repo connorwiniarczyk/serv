@@ -7,10 +7,14 @@ use crate::ServResult;
 
 use std::collections::VecDeque;
 
-#[derive(Clone, Debug)]
-pub struct Expression(VecDeque<ServValue>, bool);
+#[derive(Clone, Debug, Default)]
+pub struct Expression(pub VecDeque<ServValue>, bool);
 
 impl Expression {
+    pub fn empty() -> Self {
+        Self(VecDeque::new(), false)
+    }
+
     pub fn next(&mut self) -> Option<ServValue> {
         self.0.pop_front()
     }
@@ -37,6 +41,7 @@ impl Expression {
 			_ => panic!(),
 		}
     }
+
     pub fn compile(input: ast::Expression) -> Self {
         let is_meta = input.1;
         let mut output = VecDeque::new();
@@ -47,7 +52,7 @@ impl Expression {
 		Self(output, is_meta)
     }
 
-    fn prepend<I: Iterator<Item = ServValue> + std::iter::DoubleEndedIterator>(&mut self, input: I) {
+    pub fn prepend<I: Iterator<Item = ServValue> + std::iter::DoubleEndedIterator>(&mut self, input: I) {
         for value in input.rev() {
             self.0.push_front(value);
         }
@@ -73,7 +78,8 @@ impl Expression {
 			},
 
             ServValue::Func(ServFn::Meta(f)) => {
-                todo!();
+                f(std::mem::take(self), scope)
+                // todo!();
             },
 
             ServValue::Func(ServFn::ArgFn(f)) => {
@@ -84,6 +90,20 @@ impl Expression {
 
             f => f.call(Some(self.eval(scope)?), scope),
         }
+    }
+}
+
+struct Element {
+    pub pattern: Option<Expression>,
+    pub action: Expression,
+}
+
+impl Element {
+    pub fn as_route(self) -> Option<(String, Expression)> {
+        let Some(p) = self.pattern else {return None};
+
+        if p.0.len() != 1 { return None };
+        todo!();
     }
 }
 

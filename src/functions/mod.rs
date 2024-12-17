@@ -17,8 +17,8 @@ use std::io::Read;
 
 mod host;
 mod list;
-// mod sql;
-// mod json;
+mod sql;
+mod json;
 // mod request;
 
 fn yes(input: ServValue, scope: &Stack) -> ServResult {
@@ -105,14 +105,15 @@ fn as_template(input: ServValue, scope: &Stack) -> ServResult {
 }
 
 pub fn apply(input: ServValue, scope: &Stack) -> ServResult {
-	let mut child = scope.make_child();
-	let text = input.to_string();
-	let Ok(ast) = servparser::parse_expression_from_text(&text) else {
-    	panic!("failed to parse serv text in apply statement: {:?}", text);
-	};
+    todo!();
+	// let mut child = scope.make_child();
+	// let text = input.to_string();
+	// let Ok(ast) = servparser::parse_expression_from_text(&text) else {
+ //    	panic!("failed to parse serv text in apply statement: {:?}", text);
+	// };
 
-	let func = crate::compile(ast, &mut child);
-	func.call(None, &child)
+	// let func = crate::compile(ast, &mut child);
+	// func.call(None, &child)
 	// eval(expr, &mut child)
 
     // let rest = words.eval(input, scope)?;
@@ -149,16 +150,17 @@ fn with_status(arg: ServValue, mut input: ServValue, scope: &Stack) -> ServResul
 // }
 
 fn dequote(input: ServValue, scope: &Stack) -> ServResult {
-    todo!();
-  //   match input {
-		// ServValue::List(words) => crate::value::eval(words, &mut scope.make_child()),
-		// i => Ok(i),
-  //   }
+    let mut expr = Expression::empty();
+    match input {
+		ServValue::List(words) => expr.prepend(words.into_iter()),
+		value => expr.push(value),
+    };
+
+	expr.eval(&mut scope.make_child())
 }
 
 fn quote(input: Expression, scope: &mut Stack) -> ServResult {
-    todo!();
-    // Ok(ServValue::List(input))
+    Ok(ServValue::List(input.0))
 }
 
 fn choose(mut input: Expression, scope: &mut Stack) -> ServResult {
@@ -240,10 +242,10 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert(Label::name("true"), ServValue::Func(ServFn::Core(yes)));
 	scope.insert(Label::name("else"), ServValue::Func(ServFn::Core(yes)));
 
-	// list::bind(scope);
-	// host::bind(scope);
-	// json::bind(scope);
-	// sql::bind(scope);
+	list::bind(scope);
+	host::bind(scope);
+	json::bind(scope);
+	sql::bind(scope);
 
 	// request::bind(scope);
 }

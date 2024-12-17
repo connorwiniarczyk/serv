@@ -45,8 +45,8 @@ use crate::value::ServFn;
 //     ServValue::FnLiteral(ServFn::ExprMeta(e))
 // }
 
-fn compile(input: ast::Expression, scope: &mut Stack) -> ServValue {
-    todo!();
+// fn compile(input: ast::Expression, scope: &mut Stack) -> ServValue {
+//     todo!();
     // let mut output: VecDeque<ServValue> = VecDeque::new();
     // let mut iter = input.0.into_iter();
     // while let Some(word) = iter.next() {
@@ -70,7 +70,7 @@ fn compile(input: ast::Expression, scope: &mut Stack) -> ServValue {
 
     // let func = ServFn::Expr(output, input.1);
     // ServValue::Func(func)
-}
+// }
 
 /// A parser for serv files
 #[derive(Parser, Debug)]
@@ -145,6 +145,7 @@ async fn main() {
 
     let mut scope = Stack::empty();
 
+	functions::bind_standard_library(&mut scope);
     scope.insert(Label::name("print"), ServValue::Func(ServFn::Core(print)));
 
     root_module.bind_to_scope(&mut scope);

@@ -1,6 +1,6 @@
 use crate::value::ServValue;
 use crate::ast;
-use crate::{ Stack, ServResult };
+use crate::{ Stack, ServResult, ServFn };
 use std::fmt::Display;
 
 #[derive (Clone)]
@@ -141,9 +141,14 @@ impl<'scope> Renderer<'scope> {
 
             ast::Word::Parantheses(words) => {
                 let mut child = self.ctx.make_child();
-            	let func = crate::compile(words.clone(), &mut child);
+                let expr = crate::module::Expression::compile(words.clone());
+                let func = ServValue::Func(ServFn::Expr(expr, false));
+
+                let value = func.call(self.ctx.get("in"), &child)?;
+                // todo!();
+            	// let func = crate::compile(words.clone(), &mut child);
             	// let value = func.call(self.ctx.get(&crate::Label::Name("in".into())), &child)?;
-            	let value = func.call(self.ctx.get("in"), &child)?;
+            	// let value = func.call(self.ctx.get("in"), &child)?;
                 self.output.push_str(value.to_string().as_str());
             },
 
@@ -170,10 +175,11 @@ impl<'scope> Renderer<'scope> {
 
                 TemplateElement::Expression(ast::Word::Parantheses(e)) if options.sql_mode => {
                     let Some(mut ctx)  = self.new_context.as_mut() else { return };
-                    let func = crate::compile(e.clone(), &mut ctx);
+                    let mut expr = crate::module::Expression::compile(e.clone());
+
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        sql_bindings.push(ctx.insert_anonymous(func));
+                        sql_bindings.push(ctx.insert_anonymous(ServValue::Func(crate::ServFn::Expr(expr, false))));
                     }
                 },
 
