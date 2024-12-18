@@ -7,6 +7,8 @@ use std::future::Future;
 use std::task::{Poll, Context};
 use tokio_rustls::rustls;
 
+use matchit::Router;
+
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
 
@@ -47,7 +49,7 @@ impl Body for ServBody {
 use http_body_util::BodyExt;
 
 #[derive(Clone)]
-struct Serv(Arc<Stack<'static>>);
+struct Serv(Arc<Stack<'static>>, Arc<Router<ServValue>>);
 
 impl Service<Request<IncomingBody>> for Serv {
 	type Response = Response<ServBody>;
@@ -56,11 +58,13 @@ impl Service<Request<IncomingBody>> for Serv {
 
 	fn call(&self, mut req: Request<IncomingBody>) -> Self::Future {
     	let root = self.0.clone();
+    	let router = self.1.clone();
     	let output = async move {
-        	let router = root.router.as_ref().unwrap();
+        	// let router = root.router.as_ref().unwrap();
         	let (parts, body) = req.into_parts();
         	let parts_a = parts.clone();
         	let Ok(matched) = router.at(parts_a.uri.path()) else {
+        	// let Ok(matched) = self.1.at(parts_a.uri.path()) else {
             	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
             	let res = Response::builder()
                 	.status(404)
@@ -179,11 +183,15 @@ fn get_tls_info(scope: &Stack<'static>) -> Option<Arc<rustls::ServerConfig>> {
 	Some(Arc::new(output))
 }
 
-pub async fn run_webserver(scope: Stack<'static>) {
+use crate::{ServFn, ServModule};
+
+pub async fn run_webserver(scope: Stack<'static>, router: Router<ServValue>) {
     let port: u16 = get_port(&scope).unwrap_or(4000);
 	let addr = SocketAddr::from(([0,0,0,0], port));
 	let listener = TcpListener::bind(addr).await.unwrap();
 	let scope_arc = Arc::new(scope);
+	let router_arc = Arc::new(router);
+
 
 	if let Some(config) = get_tls_info(&scope_arc) {
     	println!("starting encrypted server");
@@ -193,12 +201,13 @@ pub async fn run_webserver(scope: Stack<'static>) {
     	loop {
     		let (tcp_stream, _) = listener.accept().await.unwrap();
     		let scope_arc = scope_arc.clone();
+    		let router_arc = router_arc.clone();
     		let tls_acceptor = tls_acceptor.clone();
 
     		tokio::task::spawn(async move {
         		let Ok(tls_stream) = tls_acceptor.accept(tcp_stream).await else { panic!() };
     			http1::Builder::new()
-    				.serve_connection(TokioIo::new(tls_stream), Serv(scope_arc))
+    				.serve_connection(TokioIo::new(tls_stream), Serv(scope_arc, router_arc))
     				.await
     				.unwrap();
     		});
@@ -210,10 +219,11 @@ pub async fn run_webserver(scope: Stack<'static>) {
     	loop {
     		let (tcp_stream, _) = listener.accept().await.unwrap();
     		let scope_arc = scope_arc.clone();
+    		let router_arc = router_arc.clone();
 
     		tokio::task::spawn(async move {
     			http1::Builder::new()
-    				.serve_connection(TokioIo::new(tcp_stream), Serv(scope_arc))
+    				.serve_connection(TokioIo::new(tcp_stream), Serv(scope_arc, router_arc))
     				.await
     				.unwrap();
     		});

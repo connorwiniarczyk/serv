@@ -1,1 +1,1 @@
-print exec.pipe {/bin/sh} {echo hello}
+/ => {hello world}

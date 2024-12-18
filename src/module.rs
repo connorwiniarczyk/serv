@@ -1,4 +1,3 @@
-use crate::ast;
 use crate::ServValue;
 use crate::Stack;
 use crate::Label;
@@ -8,7 +7,7 @@ use crate::ServResult;
 use std::collections::VecDeque;
 
 #[derive(Clone, Debug, Default)]
-pub struct Expression(pub VecDeque<ServValue>, bool);
+pub struct Expression(pub VecDeque<ServValue>, pub bool);
 
 impl Expression {
     pub fn empty() -> Self {
@@ -25,31 +24,6 @@ impl Expression {
 
     pub fn push_back(&mut self, input: ServValue) {
         self.0.push_back(input)
-    }
-
-    fn compile_word(input: ast::Word) -> ServValue {
-		match input {
-			ast::Word::Function(v) => ServValue::Ref(Label::Name(v)),
-			ast::Word::Literal(v) => v,
-			ast::Word::Template(v) => ServValue::Func(ServFn::Template(v)),
-			ast::Word::Parantheses(e) => {
-    			let is_meta = e.1;
-    			let inner = Self::compile(e);
-    			// ServValue::Func(ServFn::Expr(inner.0, is_meta))
-    			ServValue::Func(ServFn::Expr(inner, is_meta))
-			},
-			_ => panic!(),
-		}
-    }
-
-    pub fn compile(input: ast::Expression) -> Self {
-        let is_meta = input.1;
-        let mut output = VecDeque::new();
-        for word in input.0.into_iter() {
-            output.push_back(Self::compile_word(word));
-        }
-
-		Self(output, is_meta)
     }
 
     pub fn prepend<I: Iterator<Item = ServValue> + std::iter::DoubleEndedIterator>(&mut self, input: I) {
@@ -93,64 +67,38 @@ impl Expression {
     }
 }
 
-struct Element {
-    pub pattern: Option<Expression>,
+#[derive(Clone, Debug)]
+pub struct Element {
+    pub pattern: Option<ServValue>,
     pub action: Expression,
 }
 
-impl Element {
-    pub fn as_route(self) -> Option<(String, Expression)> {
-        let Some(p) = self.pattern else {return None};
-
-        if p.0.len() != 1 { return None };
-        todo!();
-    }
+#[derive(Clone, Debug, Default)]
+pub struct ServModule {
+    pub statements:  Vec<Expression>,
+    pub routes:      Vec<(String, Expression)>,
+    pub definitions: Vec<(Label, Expression)>,
+    pub equalities:  Vec<(Expression, Expression)>,
 }
-
-#[derive(Clone, Debug)]
-enum Line {
-    Statement(Expression),
-    Route(String, Expression),
-    Definition(String, Expression),
-    Equality(Expression, Expression),
-}
-
-#[derive(Clone, Debug)]
-pub struct ServModule (Vec<Line>);
 
 impl ServModule {
-	pub fn compile(input: ast::AstRoot) -> Self {
-    	let mut output = Vec::new();
-    	for line in input.0 {
-			output.push(match line {
-    			ast::Line::Statement(e) => Line::Statement(Expression::compile(e)),
-    			ast::Line::Equality{ lhs, rhs } if lhs.0.len() == 1 => {
-        			match lhs.0[0].clone() {
-						ast::Word::Function(name) => Line::Definition(name, Expression::compile(rhs)),
-						ast::Word::Route(name) => Line::Route(name, Expression::compile(rhs)),
-						otherwise => panic!("invalid"),
-        			}
-    			},
 
-    			otherwise => todo!(),
-			});
-    	}
+    pub fn push_element(&mut self, input: Element) {
+        let Element { pattern, action } = input;
+        match (pattern, action) {
+            (None, expr) => self.statements.push(expr),
+            (Some(ServValue::Ref(label)), expr) => self.definitions.push((label, expr)),
+            (Some(ServValue::Func(ServFn::Route(r))), expr) => self.routes.push((r, expr)),
+            (Some(ServValue::Func(ServFn::Expr(e, _))), expr) => self.equalities.push((e, expr)),
+            _ => panic!("invalid element"),
+        }
+    }
 
-		Self(output)
-	}
-
-	pub fn bind_to_scope(&self, scope: &mut Stack) {
-		for line in &self.0 {
-    		match line {
-        		Line::Statement(e) => _ = e.clone().eval(scope),
-        		Line::Definition(name, Expression(e, is_meta)) => {
-            		let expr = ServFn::Expr(Expression(e.clone(), *is_meta), *is_meta);
-            		scope.insert_name(name, ServValue::Func(expr))
-        		},
-        		otherwise => todo!(),
-    		};
-		}
-	}
-
-	// pub fn eq
+    pub fn from_elements<I>(input: I) -> Self where I: Iterator<Item = Element> {
+        let mut output = Self::default();
+        for e in input {
+            output.push_element(e);
+        }
+        output
+    }
 }

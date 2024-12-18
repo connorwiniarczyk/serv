@@ -27,12 +27,8 @@ fn exec_pipe(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let cmd = arg.call(None, scope)?.to_string();
     let mut args = cmd.split_whitespace();
     let mut command = Command::new(args.next().ok_or("bad input")?);
-    for arg in args {
-        // println!("{:?}", arg);
-        command.arg(arg);
-    }
+    for arg in args { command.arg(arg); }
 
-    // let mut command = Command::new(command.to_string())
     let mut result = command
         .stderr(Stdio::null())
         .stdout(Stdio::piped())

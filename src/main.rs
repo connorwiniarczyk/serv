@@ -8,7 +8,7 @@ mod tape;
 mod error;
 mod functions;
 mod template;
-mod ast;
+// mod ast;
 mod value;
 mod dictionary;
 mod webserver;
@@ -105,30 +105,6 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
     std::fs::read_to_string(&path).map_err(|e| "could not open file".into())
 }
 
-fn ast_bind_to_scope(ast: ast::AstRoot, scope: &mut Stack) {
-    todo!();
-	// for declaration in ast.0 {
- //    	if declaration.kind == "word" {
- //        	let key = declaration.key();
- //        	let func = compile(declaration.value, scope);
- //        	scope.insert(key.into(), func);
- //    	}
-
- //    	else if declaration.kind == "route" {
- //        	let key = declaration.key();
- //        	let func = compile(declaration.value, scope);
- //        	scope.router.as_mut().unwrap().insert(key, func);
- //    	}
-
- //    	else if declaration.kind == "include" {
- //        	let func = compile(declaration.value, scope);
- //        	let value = func.call(None, &scope).expect("include function failed").to_string();
- //        	let ast = servparser::parse_root_from_text(&value).expect("include string failed to parse");
-	// 		ast_bind_to_scope(ast, scope);
- //    	}
-	// }
-}
-
 fn print(input: ServValue, scope: &Stack) -> ServResult {
     println!("{}", input);
     Ok(input)
@@ -140,39 +116,25 @@ async fn main() {
     let input = get_input(&mut args).unwrap();
 
 
-    let syntax_tree = servparser::parse_root_from_text(&input).unwrap();
-    let root_module = ServModule::compile(syntax_tree);
-
+    let root_module = servparser::parse_root_from_text(&input).unwrap();
     let mut scope = Stack::empty();
 
 	functions::bind_standard_library(&mut scope);
     scope.insert(Label::name("print"), ServValue::Func(ServFn::Core(print)));
 
-    root_module.bind_to_scope(&mut scope);
+    for (label, expression) in root_module.definitions {
+        scope.insert(label, ServValue::Func(ServFn::Expr(expression, false)));
+    }
 
+    for mut expr in root_module.statements {
+        expr.eval(&mut scope);
+    }
 
-    todo!();
+    let mut router = Router::new();
 
-	// if args.execute {
- //    	let ast = servparser::parse_expression_from_text(&input).unwrap();
- //    	let mut scope = Stack::empty();
- //    	crate::functions::bind_standard_library(&mut scope);
+    for (route, expr) in root_module.routes {
+    	router.insert(route, ServValue::Func(ServFn::Expr(expr, false)));
+    }
 
- //    	let func = compile(ast, &mut scope);
- //    	let output = func.call(None, &scope).expect("error");
-
-	// } else {
- //    	let ast = servparser::parse_root_from_text(&input).unwrap();
- //    	let mut scope = Stack::empty();
- //    	crate::functions::bind_standard_library(&mut scope);
- //    	ast_bind_to_scope(ast, &mut scope);
-
- //    	if let Some(out) = scope.get("out") {
- //        	let res = out.call(None, &scope);
- //        	println!("{}", res.unwrap());
- //    	}
-
- //    	// println!("starting web server");
- //    	webserver::run_webserver(scope).await;
-	// }
+    webserver::run_webserver(scope, router).await;
 }

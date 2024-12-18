@@ -1,4 +1,3 @@
-use crate::ast;
 use crate::template::Template;
 use std::collections::VecDeque;
 use std::collections::HashMap;
@@ -10,76 +9,27 @@ use crate::ServResult;
 
 use crate::module::Expression;
 
-// pub fn eval(mut expr: VecDeque<ServValue>, scope: &mut Stack) -> ServResult {
-    // todo!();
-    // match expr.pop_front() {
-    //     Some(ServValue::Ref(label)) => {
-    //         if let Some(func) = scope.get(label.clone()) {
-    // 			expr.push_front(func);
-    // 			eval(expr, scope)
-    //         }
-    //         else {
-    //             let rest = eval(expr, scope)?;
-    //             scope.get(label.clone()).ok_or("not found")?.call(Some(rest), scope)
-    //         }
-    //     },
-
-    //     Some(ServValue::Func(ServFn::Meta(f))) => {
-    //         f(expr, scope)
-    //     },
-
-    //     Some(ServValue::Func(ServFn::Expr(e, true))) => {
-    //         for word in e.into_iter().rev() {
-    //             expr.push_front(word);
-    //         }
-    //         eval(expr, scope)
-    //     },
-
-    //     Some(ServValue::Func(ServFn::Expr(mut e, false))) => {
-    //         let rest = eval(expr, scope)?;
-    //         e.push_back(rest);
-    //         eval(e, scope)
-    //     },
-
-    //    	Some(ServValue::Func(ServFn::ArgFn(f))) => {
-    //        	let arg  = expr.pop_front().ok_or("word expected")?;
-    //        	let rest = eval(expr, scope)?;
-    //        	f(arg, rest, scope)
-    //    	},
-
-    //     Some(ref f @ ServValue::Func(ref a)) => {
-    //         let rest = eval(expr, scope)?;
-    //         f.call(Some(rest), scope)
-    //     },
-
-    //     Some(constant) => {
-    //         _ = eval(expr, scope)?;
-    //         Ok(constant)
-    //     },
-    //     None => Ok(ServValue::Func(ServFn::Ident)),
-    // }
-// }
-
 #[derive(Clone)]
 pub enum ServFn {
     Ident,
     Core     (fn(ServValue, &Stack) -> ServResult),
-    // Meta     (fn(VecDeque<ServValue>, &mut Stack) -> ServResult),
     Meta     (fn(Expression, &mut Stack) -> ServResult),
     ArgFn    (fn(ServValue, ServValue, &Stack) -> ServResult),
-    // Expr     (VecDeque<ServValue>, bool),
     Expr     (Expression, bool),
+
+    Route(String),
     Template (Template),
 }
 
 impl std::fmt::Debug for ServFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::Ident    => f.write_str("Ident"),
+            Self::Ident       => f.write_str("Ident"),
             Self::Core(_)     => f.write_str("Core"),
             Self::Meta(_)     => f.write_str("Meta"),
-            Self::ArgFn(_)   => f.write_str("ArgFn"),
-            Self::Expr(_, _)     => f.write_str("Expr"),
+            Self::ArgFn(_)    => f.write_str("ArgFn"),
+            Self::Expr(_, _)  => f.write_str("Expr"),
+            Self::Route(_)    => f.write_str("Route "),
             Self::Template(_) => f.write_str("Template "),
         }
     }
@@ -101,8 +51,6 @@ pub enum ServValue {
     Table(HashMap<String, ServValue>),
 
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
-
-    // Transform (Box<ServValue>, fn(&mut Stack)) ,
 }
 
 use std::rc::Rc;

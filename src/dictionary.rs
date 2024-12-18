@@ -44,7 +44,7 @@ pub struct StackDictionary<'parent, V, M> {
 	pub metadata: Option<M>,
 
 	pub request: Option<Parts>,
-	pub router: Option<Router<V>>,
+	// pub router: Option<Router<V>>,
 }
 
 impl<'parent, V: Clone, M> StackDictionary<'parent, V, M> {
@@ -57,7 +57,7 @@ impl<'parent, V: Clone, M> StackDictionary<'parent, V, M> {
 
 			// deprecated
             request: None,
-            router: Some(Router::new()),
+            // router: Some(Router::new()),
         }
     }
 
@@ -70,7 +70,7 @@ impl<'parent, V: Clone, M> StackDictionary<'parent, V, M> {
 
 			// deprecated
             request: None,
-            router: Some(Router::new()),
+            // router: Some(Router::new()),
         }
     }
 

@@ -1,5 +1,4 @@
 use crate::value::ServValue;
-use crate::ast;
 use crate::{ Stack, ServResult, ServFn };
 use std::fmt::Display;
 
@@ -32,7 +31,8 @@ impl FormatOptions {
 pub enum TemplateElement {
 	Text(String),
 	Template(Template),
-	Expression(ast::Word),
+	// Expression(ast::Word),
+	Expression(ServValue),
 }
 
 impl Display for TemplateElement {
@@ -85,7 +85,6 @@ impl Template {
     }
 
     pub fn render(&self, ctx: &Stack) -> ServResult {
-        // let mut renderer = Renderer { output: String::new(), ctx, sql_bindings: None, new_context: None };
         let mut renderer = Renderer::new(ctx);
         let options = FormatOptions::default();
         renderer.render(self, options);
@@ -126,37 +125,6 @@ impl<'scope> Renderer<'scope> {
     		new_context: None,
 		}
     }
-    fn resolve_function(&mut self, expression: &ast::Word) -> ServResult {
-        match expression {
-            ast::Word::Function(name) => {
-            	// let input = self.ctx.get(&crate::Label::Name("in".into()));
-
-            	let input = self.ctx.get("in");
-                let value = self.ctx.get(name).unwrap()
-                    .call(input, &self.ctx)?
-                    .to_string();
-
-                self.output.push_str(&value);
-            },
-
-            ast::Word::Parantheses(words) => {
-                let mut child = self.ctx.make_child();
-                let expr = crate::module::Expression::compile(words.clone());
-                let func = ServValue::Func(ServFn::Expr(expr, false));
-
-                let value = func.call(self.ctx.get("in"), &child)?;
-                // todo!();
-            	// let func = crate::compile(words.clone(), &mut child);
-            	// let value = func.call(self.ctx.get(&crate::Label::Name("in".into())), &child)?;
-            	// let value = func.call(self.ctx.get("in"), &child)?;
-                self.output.push_str(value.to_string().as_str());
-            },
-
-            _ => unreachable!(),
-        }
-
-        Ok(ServValue::None)
-    }
 
 	fn render(&mut self, input: &Template, options: FormatOptions) {
         if options.include_brackets { self.output.push_str(&input.open); }
@@ -166,25 +134,28 @@ impl<'scope> Renderer<'scope> {
                 TemplateElement::Template(t) => self.render(t, options.with_brackets()),
 
                 // be careful, order is important here
-                TemplateElement::Expression(ast::Word::Function(t)) if options.sql_mode => {
+                TemplateElement::Expression(ServValue::Ref(label)) if options.sql_mode => {
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        sql_bindings.push(crate::Label::Name(t.clone()));
+                        // sql_bindings.push(crate::Label::Name(t.clone()));
+                        sql_bindings.push(label.clone());
                     }
                 },
 
-                TemplateElement::Expression(ast::Word::Parantheses(e)) if options.sql_mode => {
+                TemplateElement::Expression(word) if options.sql_mode => {
                     let Some(mut ctx)  = self.new_context.as_mut() else { return };
-                    let mut expr = crate::module::Expression::compile(e.clone());
+                    // let mut expr = crate::module::Expression::compile(e.clone());
 
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        sql_bindings.push(ctx.insert_anonymous(ServValue::Func(crate::ServFn::Expr(expr, false))));
+                        // sql_bindings.push(ctx.insert_anonymous(ServValue::Func(crate::ServFn::Expr(expr, false))));
+                        sql_bindings.push(ctx.insert_anonymous(word.clone()));
                     }
                 },
 
                 TemplateElement::Expression(t) if options.resolve_functions => {
-                    self.resolve_function(t).unwrap();
+                    let value = t.call(None, self.ctx).unwrap();
+                    self.output.push_str(&value.to_string());
                 },
                 TemplateElement::Expression(t) => {
                     self.output.push('$');
