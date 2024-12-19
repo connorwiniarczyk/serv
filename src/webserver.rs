@@ -18,9 +18,10 @@ use std::io::{BufReader, Read, Write};
 
 use crate::{ServValue, Label};
 use crate::Stack;
-use crate::VecDeque;
-use crate::SocketAddr;
-use crate::TcpListener;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
+
+use std::collections::VecDeque;
 
 pub struct ServBody(Option<VecDeque<u8>>);
 

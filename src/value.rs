@@ -50,6 +50,8 @@ pub enum ServValue {
     List(VecDeque<ServValue>),
     Table(HashMap<String, ServValue>),
 
+    Module(crate::ServModule),
+
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
 }
 
@@ -189,6 +191,8 @@ impl Display for ServValue {
 				}
                 f.write_str("]")?;
             }
+
+            Self::Module(m) => f.write_str("a module")?,
 
             Self::Meta { inner, metadata } => inner.fmt(f)?,
             _ => todo!(),

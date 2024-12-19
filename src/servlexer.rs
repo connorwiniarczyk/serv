@@ -59,10 +59,10 @@ impl<'i> Cursor<'i> {
                     self.push_token(TokenKind::Semicolon)
                 },
 
-                '@'  => {
-                    self.input.incr(1);
-                    self.push_token(TokenKind::At)
-                },
+                // '@'  => {
+                //     self.input.incr(1);
+                //     self.push_token(TokenKind::At)
+                // },
 
                 '#'  => {
                     self.input.incr(1);

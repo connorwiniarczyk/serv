@@ -2,9 +2,10 @@ use crate::ServValue;
 use crate::ServResult;
 use crate::Stack;
 use crate::servparser;
-use crate::VecDeque;
 use crate::{Label, ServFn};
 use crate::module::Expression;
+
+use std::collections::VecDeque;
 use std::collections::HashMap;
 
 
@@ -84,31 +85,6 @@ fn generate_list(input: Expression, scope: &mut Stack) -> ServResult {
     Ok(ServValue::List(output))
 }
 
-fn table(input: ServValue, scope: &Stack) -> ServResult {
-    todo!();
-   //  let text = input.to_string();
-   //  let ast = servparser::parse_root_from_text(&text).unwrap();
-   //  let mut output = HashMap::new();
-   //  let mut child = scope.make_child();
-
-   //  for declaration in ast.0 {
-   //      let value = crate::compile(declaration.value, &mut child).call(None, &child)?;
-   //      if (declaration.kind == "include") {
-   //          let text = value.to_string();
-   //      	let ast = servparser::parse_root_from_text(&text).expect("include string failed to parse");
-			// crate::ast_bind_to_scope(ast, &mut child);
-   //      } else {
-   //          match declaration.key {
-   //              crate::ast::Pattern::Expr(expr) => output.insert(crate::compile(expr, &mut child).call(None, &child)?.to_string(), value),
-   //              crate::ast::Pattern::Key(name) => output.insert(name, value),
-   //          };
-   //      }
-   //  }
-
-   //  Ok(ServValue::Table(output))
-
-}
-
 fn sum(input: ServValue, scope: &Stack) -> ServResult {
     let ServValue::List(list) = input.ignore_metadata() else { return Err("sum needs to operate on a list") };
     let mut iter = list.into_iter().filter(|x| !matches!(x, ServValue::None)).peekable();
@@ -138,7 +114,6 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
 	// scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(with)));
 	scope.insert(Label::name("sum"),     ServValue::Func(ServFn::Core(sum)));
-	scope.insert(Label::name("@"),     ServValue::Func(ServFn::Core(table)));
 
 }
 

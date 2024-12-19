@@ -2,9 +2,9 @@ use crate::ServValue;
 use crate::ServResult;
 use crate::Stack;
 use crate::servparser;
-use crate::VecDeque;
 use crate::{Label, ServFn};
 
+use std::collections::VecDeque;
 use std::collections::HashMap;
 
 fn get_database_location(scope: &Stack) -> Option<String> {

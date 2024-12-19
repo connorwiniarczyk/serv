@@ -21,6 +21,11 @@ mod sql;
 mod json;
 // mod request;
 
+fn print(input: ServValue, scope: &Stack) -> ServResult {
+    println!("{}", input);
+    Ok(input)
+}
+
 fn yes(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::Bool(true))
 }
@@ -216,31 +221,38 @@ fn equals(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     }))
 }
 
+fn parse_module(input: ServValue, scope: &Stack) -> ServResult {
+    let module = servparser::parse_root_from_text(&input.to_string()).unwrap();
+    Ok(ServValue::Module(module))
+}
+
+
+
 pub fn bind_standard_library(scope: &mut crate::Stack) {
 
-	scope.insert(Label::name("["),           ServValue::Func(ServFn::Core(dequote)));
-	scope.insert(Label::name("]"),           ServValue::Func(ServFn::Meta(quote)));
-	scope.insert(Label::name("using"),       ServValue::Func(ServFn::Meta(using)));
-	scope.insert(Label::name("let"),         ServValue::Func(ServFn::Meta(using)));
-	scope.insert(Label::name("!"),           ServValue::Func(ServFn::ArgFn(drop)));
-	scope.insert(Label::name("choose"),      ServValue::Func(ServFn::Meta(choose)));
-	scope.insert(Label::name("switch"),      ServValue::Func(ServFn::Meta(switch)));
-	scope.insert(Label::name("+"),           ServValue::Func(ServFn::Core(incr)));
-	scope.insert(Label::name("-"),           ServValue::Func(ServFn::Core(decr)));
-	scope.insert(Label::name("eq"),           ServValue::Func(ServFn::ArgFn(equals)));
-	scope.insert(Label::name("%"),           ServValue::Func(ServFn::Core(math_expr)));
-	scope.insert(Label::name("*"),           ServValue::Func(ServFn::Core(apply)));
-	scope.insert(Label::name("hello"),       ServValue::Func(ServFn::Core(hello_world)));
-	scope.insert(Label::name("uppercase"),   ServValue::Func(ServFn::Core(uppercase)));
-	scope.insert(Label::name("inline"),      ServValue::Func(ServFn::Core(inline)));
-	scope.insert(Label::name("markdown"),    ServValue::Func(ServFn::Core(markdown)));
-	scope.insert(Label::name("~"),           ServValue::Func(ServFn::Core(as_template)));
-	// scope.insert(Label::name("with_header"), ServValue::Func(ServFn::ArgFn(with_header)));
-	// scope.insert(Label::name("with_status"), ServValue::Func(ServFn::ArgFn(with_status)));
-	// scope.insert(Label::name("with_option"), ServValue::Func(ServFn::ArgFn(with_option)));
+	scope.insert_name("print",       ServValue::Func(ServFn::Core(print)));
+	scope.insert_name("[",           ServValue::Func(ServFn::Core(dequote)));
+	scope.insert_name("]",           ServValue::Func(ServFn::Meta(quote)));
+	scope.insert_name("using",       ServValue::Func(ServFn::Meta(using)));
+	scope.insert_name("let",         ServValue::Func(ServFn::Meta(using)));
+	scope.insert_name("!",           ServValue::Func(ServFn::ArgFn(drop)));
+	scope.insert_name("choose",      ServValue::Func(ServFn::Meta(choose)));
+	scope.insert_name("switch",      ServValue::Func(ServFn::Meta(switch)));
+	scope.insert_name("+",           ServValue::Func(ServFn::Core(incr)));
+	scope.insert_name("-",           ServValue::Func(ServFn::Core(decr)));
+	scope.insert_name("eq",          ServValue::Func(ServFn::ArgFn(equals)));
+	scope.insert_name("%",           ServValue::Func(ServFn::Core(math_expr)));
+	scope.insert_name("*",           ServValue::Func(ServFn::Core(apply)));
+	scope.insert_name("hello",       ServValue::Func(ServFn::Core(hello_world)));
+	scope.insert_name("uppercase",   ServValue::Func(ServFn::Core(uppercase)));
+	scope.insert_name("inline",      ServValue::Func(ServFn::Core(inline)));
+	scope.insert_name("markdown",    ServValue::Func(ServFn::Core(markdown)));
+	scope.insert_name("~",           ServValue::Func(ServFn::Core(as_template)));
 
 	scope.insert(Label::name("true"), ServValue::Func(ServFn::Core(yes)));
 	scope.insert(Label::name("else"), ServValue::Func(ServFn::Core(yes)));
+
+	scope.insert_name("@", ServValue::Func(ServFn::Core(parse_module)));
 
 	list::bind(scope);
 	host::bind(scope);

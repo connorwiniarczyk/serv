@@ -4,7 +4,7 @@ use crate::{Stack, ServResult, Label, ServValue, ServFn };
 use std::iter::Peekable;
 struct Parser<I>(Peekable<I>) where I: Iterator<Item = JsonToken>;
 
-use crate::VecDeque;
+use std::collections::VecDeque;
 use std::collections::HashMap;
 
 #[derive (PartialEq, Clone, Copy, Debug)]
