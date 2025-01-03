@@ -128,28 +128,6 @@ fn with_headers(mut input: Expression, scope: &mut Stack) -> ServResult {
     scope.insert_name("res.headers", arg);
 
     input.eval(scope)
-
-  //   let mut list = match scope.get("res.headers") {
-  //       Ok(ServValue::List(l)) => l.clone(),
-		// Ok(_) => VecDeque::new(),
-		// Err(_)=> VecDeque::new(),
-  //   };
-
-
-    // for (mut pattern, action) in m.equalities {
-    //     let mut child = scope.make_child();
-    //     scope.insert_name(&pattern.eval(&mut child)?.to_string(), action.into());
-    // }
-
-    // todo!();
-
-	// let headers: &mut ServValue = input.metadata()
- //    	.entry("headers".to_owned())
- //    	.or_insert(ServValue::List(VecDeque::new()));
-
-	// let ServValue::List(list) = headers else {panic!()};
-	// list.push_back(arg.call(None, scope)?);
-	// Ok(input)
 }
 
 fn dequote(input: ServValue, scope: &Stack) -> ServResult {
@@ -247,8 +225,6 @@ fn parse_module(input: ServValue, scope: &Stack) -> ServResult {
     let module = servparser::parse_root_from_text(&input.to_string()).unwrap();
     Ok(ServValue::Module(module))
 }
-
-
 
 pub fn bind_standard_library(scope: &mut crate::Stack) {
 

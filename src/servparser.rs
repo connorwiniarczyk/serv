@@ -92,8 +92,6 @@ fn get_pattern(mut input: Expression) -> Option<ServValue> {
 fn parse_declaration(parser: &mut Parser) -> Result<module::Element, ServError> {
     while let Ok(_) = parser.next_if_kind(Semicolon) {}
 
-    if let Ok(_) = parser.next_if_kind(At) {};
-
     let lhs = parse_expression(parser)?;
     let Ok(_) = parser.next_if_kind(Equals) else {
         return Ok(module::Element { pattern: None, action: lhs })
@@ -108,7 +106,7 @@ fn parse_module(parser: &mut Parser) -> Result<ServModule, ServError> {
 	let mut output: Vec<module::Element> = Vec::new();
 
 	while parser.get(0).is_ok() {
-    	if parser.get(0)?.kind == ModuleClose { parser.incr(); break; }
+    	if parser.get(0)?.kind == ModuleClose { break; }
     	if parser.get(0)?.kind == Comment { continue };
     	output.push(parse_declaration(parser)?);
 	}

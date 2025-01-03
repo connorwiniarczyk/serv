@@ -64,7 +64,6 @@ fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
 async fn main() {
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
-
     let root_module = servparser::parse_root_from_text(&input).unwrap();
     let mut scope = Stack::empty();
 

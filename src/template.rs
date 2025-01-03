@@ -31,7 +31,6 @@ impl FormatOptions {
 pub enum TemplateElement {
 	Text(String),
 	Template(Template),
-	// Expression(ast::Word),
 	Expression(ServValue),
 }
 
@@ -137,18 +136,15 @@ impl<'scope> Renderer<'scope> {
                 TemplateElement::Expression(ServValue::Ref(label)) if options.sql_mode => {
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        // sql_bindings.push(crate::Label::Name(t.clone()));
                         sql_bindings.push(label.clone());
                     }
                 },
 
                 TemplateElement::Expression(word) if options.sql_mode => {
                     let Some(mut ctx)  = self.new_context.as_mut() else { return };
-                    // let mut expr = crate::module::Expression::compile(e.clone());
 
                     self.output.push('?');
                     if let Some(ref mut sql_bindings) = &mut self.sql_bindings {
-                        // sql_bindings.push(ctx.insert_anonymous(ServValue::Func(crate::ServFn::Expr(expr, false))));
                         sql_bindings.push(ctx.insert_anonymous(word.clone()));
                     }
                 },
@@ -157,6 +153,7 @@ impl<'scope> Renderer<'scope> {
                     let value = t.call(self.ctx.get("in").ok(), self.ctx).unwrap();
                     self.output.push_str(&value.to_string());
                 },
+
                 TemplateElement::Expression(t) => {
                     self.output.push('$');
                     self.output.push('(');
