@@ -1,8 +1,9 @@
-use crate::template::Template;
 use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::rc::Rc;
 
+use crate::template::Template;
 use crate::Stack;
 use crate::Label;
 use crate::ServResult;
@@ -55,7 +56,6 @@ pub enum ServValue {
     Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
 }
 
-use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Transform (pub Rc<dyn Fn(&mut Stack)>);
@@ -66,12 +66,10 @@ impl std::fmt::Debug for Transform {
     }
 }
 
-struct ValueMetadata {}
-
 impl ServValue {
     pub fn call(&self, input: Option<ServValue>, scope: &Stack) -> ServResult {
        	match self {
-           	Self::Ref(label) => scope.get(label.clone()).ok_or("not found")?.call(input, scope),
+           	Self::Ref(label) => scope.get(label.clone())?.call(input, scope),
 
            	Self::Func(ServFn::Core(f)) => f(input.unwrap_or_default(), scope),
            	Self::Func(ServFn::Expr(e, _)) => {
@@ -143,6 +141,12 @@ impl Default for ServValue {
 impl From<i64> for ServValue {
     fn from(value: i64) -> Self {
         Self::Int(value)
+    }
+}
+
+impl From<Expression> for ServValue {
+    fn from(value: Expression) -> Self {
+        Self::Func(ServFn::Expr(value, false))
     }
 }
 

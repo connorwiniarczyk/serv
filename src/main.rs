@@ -19,8 +19,8 @@ use clap::Parser;
 use matchit::Router;
 use dictionary::StackDictionary;
 
-type ServResult = Result<ServValue, &'static str>;
-type Stack<'a> = StackDictionary<'a, ServValue, ()>;
+type ServResult = Result<ServValue, ServError>;
+type Stack<'a> = StackDictionary<'a, ServValue>;
 
 
 /// A parser for serv files
@@ -52,6 +52,13 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
     std::fs::read_to_string(&path).map_err(|e| "could not open file".into())
 }
 
+fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
+    if scope.get("serv.port").is_err() {
+        let port: i64 = args.port.into();
+        scope.insert_name("serv.port", port.into());
+    }
+}
+
 
 #[tokio::main]
 async fn main() {
@@ -67,12 +74,13 @@ async fn main() {
         scope.insert(label, ServValue::Func(ServFn::Expr(expression, false)));
     }
 
+    populate_defaults(&mut scope, &args);
+
     for mut expr in root_module.statements {
         expr.eval(&mut scope).expect("failed expression");
     }
 
     let mut router = Router::new();
-
     for (route, expr) in root_module.routes {
     	router.insert(route, ServValue::Func(ServFn::Expr(expr, false)));
     }

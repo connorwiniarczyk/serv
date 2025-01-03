@@ -1,5 +1,6 @@
 use crate::ServValue;
 use crate::ServResult;
+use crate::ServError;
 use crate::Stack;
 use crate::servparser;
 use crate::{Label, ServFn};
@@ -8,31 +9,28 @@ use crate::module::Expression;
 use std::collections::VecDeque;
 use std::collections::HashMap;
 
-
 fn take(mut input: Expression, scope: &mut Stack) -> ServResult {
     let arg  = input.next().expect("word expected");
    	let ServValue::Ref(name @ Label::Name(_)) = arg else { panic!("'<' expects a ref") };
-
    	let rest = input.eval(scope)?;
-
    	let out = match rest {
        	ServValue::List(mut l) => { scope.insert(name, l.pop_front().ok_or("")?); ServValue::List(l) },
        	element => { scope.insert(name, element); ServValue::None },
    	};
-   	
+   
    	Ok(out)
 }
 
-// fn with(mut input: Expression, scope: &mut Stack) -> ServResult {
-//     let result = crate::value::eval(input, scope)?.ignore_metadata();
-//     let ServValue::Table(m) = result else { panic!("take_keys expects a table, received {:?}", result) };
+fn with(mut expr: Expression, scope: &mut Stack) -> ServResult {
+    let input = expr.eval(scope)?;
+    match input {
+        ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert_name(key, value)),
+        ServValue::Module(t) => t.definitions.into_iter().for_each(|(key, value)| scope.insert(key, value.into())),
+        otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
+    };
 
-//     for (k, v) in m.into_iter() {
-//         scope.insert(k.into(), v);
-//     }
-
-//     Ok(ServValue::None)
-// }
+    Ok(ServValue::None)
+}
 
 fn count(input: ServValue, scope: &Stack) -> ServResult {
     let max = input.expect_int()?;
@@ -60,7 +58,7 @@ fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
         (ServValue::Int(index),    ServValue::List(mut list)) => list.remove(index.try_into().map_err(|e| "invalid index")?).ok_or("index not found")?,
-        (_, _) => return Err("invalid key"),
+        (key, _) => return Err(ServError::expected_type("Int | Text", key)),
     };
 
 	Ok(output)
@@ -85,8 +83,12 @@ fn generate_list(input: Expression, scope: &mut Stack) -> ServResult {
     Ok(ServValue::List(output))
 }
 
-fn sum(input: ServValue, scope: &Stack) -> ServResult {
-    let ServValue::List(list) = input.ignore_metadata() else { return Err("sum needs to operate on a list") };
+fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
+    input = input.ignore_metadata();
+    let ServValue::List(list) = input else {
+        return Err(ServError::expected_type("List", input))
+    };
+
     let mut iter = list.into_iter().filter(|x| !matches!(x, ServValue::None)).peekable();
 
     let output: ServValue = match iter.peek().ok_or("tried to sum an empty list")? {
@@ -98,7 +100,7 @@ fn sum(input: ServValue, scope: &Stack) -> ServResult {
             }
             ServValue::Text(output)
         },
-        _ => return Err("please don't try to sum that"),
+        otherwise => return Err(ServError::expected_type("Int | Text", otherwise.clone())),
     };
 
 	Ok(output)
@@ -112,8 +114,8 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
-	// scope.insert(Label::name("with"),     ServValue::Func(ServFn::Meta(with)));
-	scope.insert(Label::name("sum"),     ServValue::Func(ServFn::Core(sum)));
+	scope.insert(Label::name("with"),  ServValue::Func(ServFn::Meta(with)));
+	scope.insert(Label::name("sum"),   ServValue::Func(ServFn::Core(sum)));
 
 }
 

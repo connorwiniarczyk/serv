@@ -40,7 +40,7 @@ impl Expression {
         let Some(mut next) = self.next() else { return Ok(ServValue::None) };
 
         if let ServValue::Ref(ref label) = next {
-            if let Some(value) = scope.get(label.clone()) {
+            if let Ok(value) = scope.get(label.clone()) {
                 next = value;
             }
         }

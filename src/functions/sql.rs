@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use std::collections::HashMap;
 
 fn get_database_location(scope: &Stack) -> Option<String> {
-	let func = scope.get("sql.database")?;
+	let func = scope.get("sql.database").ok()?;
 	Some(func.call(None, scope).ok()?.to_string())
 }
 
@@ -19,19 +19,22 @@ fn sql_exec(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::None)
 }
 
-fn sql(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+fn sql(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let path = get_database_location(scope).unwrap_or("serv.sqlite".to_string());
     let connection = sqlite::open(&path).unwrap();
 
-	let ServValue::Ref(r) = arg else {panic!()};
-	let ServValue::Func(ServFn::Template(t)) = scope.get(r).unwrap() else {panic!()};
+	if let ServValue::Ref(label) = arg {
+    	arg = scope.get(label).unwrap();
+	}
+
+	let ServValue::Func(ServFn::Template(t)) = arg else {panic!()};
 
 	let (ctx, query, params) = t.render_sql(scope);
     let mut statement = connection.prepare(query.to_string()).unwrap();
 
     for (mut i, p) in params.into_iter().enumerate() {
         i += 1;
-        let value = scope.get(p).ok_or("function not found")?.call(Some(input.clone()), &scope).unwrap();
+        let value = scope.get(p)?.call(Some(input.clone()), &scope).unwrap();
         match value {
             ServValue::Int(v)    => statement.bind((i, v)),
             ServValue::Text(t)   => statement.bind((i, t.as_str())),

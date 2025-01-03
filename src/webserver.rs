@@ -7,6 +7,9 @@ use std::future::Future;
 use std::task::{Poll, Context};
 use tokio_rustls::rustls;
 
+use crate::{ServFn, ServModule};
+use crate::ServError;
+
 use matchit::Router;
 
 use hyper_util::rt::{TokioExecutor, TokioIo};
@@ -61,11 +64,9 @@ impl Service<Request<IncomingBody>> for Serv {
     	let root = self.0.clone();
     	let router = self.1.clone();
     	let output = async move {
-        	// let router = root.router.as_ref().unwrap();
         	let (parts, body) = req.into_parts();
         	let parts_a = parts.clone();
         	let Ok(matched) = router.at(parts_a.uri.path()) else {
-        	// let Ok(matched) = self.1.at(parts_a.uri.path()) else {
             	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
             	let res = Response::builder()
                 	.status(404)
@@ -83,29 +84,47 @@ impl Service<Request<IncomingBody>> for Serv {
         	scope.insert(Label::name("req.body"), ServValue::Raw(body.into()));
         	scope.request = Some(parts);
 
-        	// let result = matched.value.call(ServValue::None, &mut scope).unwrap();
-        	let result = matched.value.call(None, &mut scope).unwrap();
     		let mut response = Response::builder();
 
-    		if let Some(data) = result.get_metadata() {
-        		if let Some(status) = data.get("status") {
-            		let code = status.expect_int().unwrap().clone();
-            		response = response.status(u16::try_from(code).unwrap());
-        		}
+        	let result = match matched.value {
+            	ServValue::Func(ServFn::Expr(e, _)) => e.clone().eval(&mut scope),
+            	value => value.call(None, &scope),
+        	}.unwrap();
 
-        		if let Some(ServValue::List(headers)) = data.get("headers") {
-            		for header in headers {
-                		let text = header.to_string();
-                    	let mut iter = text
-                        	.split("=")
-                        	.map(|x| x.trim());
+        	response = response.status(200);
 
-                    	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
-                    	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
-                		response = response.header(key, value);
-            		}
-        		}
-    		}
+        	if let Ok(mime) = scope.get("res.mime") {
+            	response = response.header("Content-Type", mime.call(None, &scope).unwrap().to_string());
+        	}
+
+        	if let Ok(ServValue::Module(m)) = scope.get("res.headers") {
+            	for (mut p, mut a) in m.equalities {
+                	let mut child = scope.make_child();
+                	let key   = p.eval(&mut scope).unwrap().to_string();
+                	let value = a.eval(&mut scope).unwrap().to_string();
+                	response = response.header(&key, &value);
+            	}
+        	}
+
+    		// if let Some(data) = result.get_metadata() {
+      //   		if let Some(status) = data.get("status") {
+      //       		let code = status.expect_int().unwrap().clone();
+      //       		response = response.status(u16::try_from(code).unwrap());
+      //   		}
+
+      //   		if let Some(ServValue::List(headers)) = data.get("headers") {
+      //       		for header in headers {
+      //           		let text = header.to_string();
+      //               	let mut iter = text
+      //                   	.split("=")
+      //                   	.map(|x| x.trim());
+
+      //               	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+      //               	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
+      //           		response = response.header(key, value);
+      //       		}
+      //   		}
+    		// }
 
     		let response_sender = response.body(result.into()).unwrap();
     		Ok(response_sender)
@@ -158,19 +177,24 @@ impl Service<Request<IncomingBody>> for Serv {
 	// }
 }
 
-fn get_port(scope: &Stack) -> Result<u16, &'static str> {
-    let port = scope.get("serv.port").ok_or("serv.port not defined")?.call(None, scope)?.expect_int()?;
-    Ok(port.try_into().unwrap())
+fn get_port(scope: &mut Stack) -> Result<u16, ServError> {
+    match scope.get("serv.port") {
+        Ok(val) => Ok(val.call(None, &scope)?.expect_int()?.try_into().unwrap()),
+        Err(e) => {
+            scope.insert_name("serv.port", 4000.into());
+            Ok(4000)
+        },
+    }
 }
 
 fn get_tls_info(scope: &Stack<'static>) -> Option<Arc<rustls::ServerConfig>> {
-    let key = scope.get("serv.tlskey")?.call(None, scope).expect("Failed running serv.tlskey").to_string();
+    let key = scope.get("serv.tlskey").ok()?.call(None, scope).expect("Failed running serv.tlskey").to_string();
     let mut reader = BufReader::new(key.as_bytes());
     let key = rustls_pemfile::private_key(&mut reader)
         .expect("failed to parse private key")
         .expect("failed to find private key");
 
-    let cert = scope.get("serv.tlscert")?.call(None, scope).expect("Failed running serv.tlscert").to_string();
+    let cert = scope.get("serv.tlscert").ok()?.call(None, scope).expect("Failed running serv.tlscert").to_string();
     let mut reader_cert = BufReader::new(cert.as_bytes());
     let certs = rustls_pemfile::certs(&mut reader_cert)
         .map(|cert| cert.expect("failed to parse cert"))
@@ -184,19 +208,16 @@ fn get_tls_info(scope: &Stack<'static>) -> Option<Arc<rustls::ServerConfig>> {
 	Some(Arc::new(output))
 }
 
-use crate::{ServFn, ServModule};
 
-pub async fn run_webserver(scope: Stack<'static>, router: Router<ServValue>) {
-    let port: u16 = get_port(&scope).unwrap_or(4000);
+pub async fn run_webserver(mut scope: Stack<'static>, router: Router<ServValue>) {
+    let port: u16 = get_port(&mut scope).unwrap_or(4000);
 	let addr = SocketAddr::from(([0,0,0,0], port));
 	let listener = TcpListener::bind(addr).await.unwrap();
 	let scope_arc = Arc::new(scope);
 	let router_arc = Arc::new(router);
 
-
 	if let Some(config) = get_tls_info(&scope_arc) {
     	println!("starting encrypted server");
-    	println!("listening on port: {}", port);
         let tls_acceptor = tokio_rustls::TlsAcceptor::from(config);
 
     	loop {
@@ -216,7 +237,6 @@ pub async fn run_webserver(scope: Stack<'static>, router: Router<ServValue>) {
 
 	} else {
     	println!("starting unencrypted server");
-    	println!("listening on port: {}", port);
     	loop {
     		let (tcp_stream, _) = listener.accept().await.unwrap();
     		let scope_arc = scope_arc.clone();
