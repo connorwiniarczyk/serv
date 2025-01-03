@@ -115,6 +115,15 @@ impl ServValue {
     	}
     }
 
+    pub fn is_truthy(&self) -> bool {
+        match self {
+        	ServValue::None        => false,
+        	ServValue::Bool(false) => false,
+        	ServValue::Int(0)      => false,
+        	otherwise => true,
+        }
+    }
+
     pub fn get_metadata(&self) -> Option<&HashMap<String, ServValue>> {
         if let Self::Meta { inner, metadata } = self {
             Some(metadata)

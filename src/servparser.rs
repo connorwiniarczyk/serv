@@ -48,19 +48,14 @@ fn parse_word(parser: &mut Parser) -> Result<ServValue, ServError> {
         TokenKind::IntLiteral   => ServValue::Int(token.to_string().parse::<i64>().unwrap().into()),
         TokenKind::Route        => ServValue::Func(ServFn::Route(token.to_string())),
         TokenKind::TemplateOpen => ServValue::Func(ServFn::Template(parse_template(parser)?.into())),
+        TokenKind::ModuleOpen   => {
+            parser.incr();
+            ServValue::Module(parse_module(parser)?)
+        },
         TokenKind::OpenParenthesis => {
             parser.incr();
             ServValue::Func(ServFn::Expr(parse_expression(parser)?, false))
         },
-        // TokenKind::Identifier   => ast::Word::Function(token.to_string()),
-    //     TokenKind::ListEnd      => ast::Word::Function(token.to_string()),
-    //     TokenKind::IntLiteral   => ast::Word::Literal(token.to_string().parse::<i64>().unwrap().into()),
-    //     TokenKind::Route        => ast::Word::Literal(ServValue::Func(ServFn::Route(token.to_string()))),
-    //     TokenKind::TemplateOpen => ast::Word::Template(parse_template(parser)?.into()),
-        // TokenKind::OpenParenthesis => {
-        //     parser.incr();
-        //     ast::Word::Parantheses(parse_expression(parser)?)
-        // },
 
         k @ _ => return Err("unhandled token".into()),
     };
@@ -75,16 +70,6 @@ fn parse_expression(parser: &mut Parser) -> Result<module::Expression, ServError
         output.push(word);
     }
 
-    // fn is_meta(words: &Vec<ast::Word>) -> bool {
-    //     match words.last() {
-    //         Some(ast::Word::Function(t)) if t == "]" => true,
-    //         Some(ast::Word::Parantheses(ast::Expression(e, is_meta))) => *is_meta,
-    //         otherwise => false,
-    //     }
-    // }
-
-    // let meta = is_meta(&output);
-
     while let Ok(_) = parser.next_if_kind(Semicolon) {}
     
     Ok(module::Expression(output.into(), false))
@@ -97,7 +82,10 @@ fn get_pattern(mut input: Expression) -> Option<ServValue> {
     match input.next().unwrap() {
         route @ ServValue::Func(ServFn::Route(_)) => Some(route),
         label @ ServValue::Ref(_) => Some(label),
-        otherwise => Some(ServValue::Func(ServFn::Expr(input, false))),
+        other => {
+            input.0.push_front(other);
+            Some(ServValue::Func(ServFn::Expr(input, false)))
+        },
     }
 }
 
@@ -120,6 +108,7 @@ fn parse_module(parser: &mut Parser) -> Result<ServModule, ServError> {
 	let mut output: Vec<module::Element> = Vec::new();
 
 	while parser.get(0).is_ok() {
+    	if parser.get(0)?.kind == ModuleClose { parser.incr(); break; }
     	if parser.get(0)?.kind == Comment { continue };
     	output.push(parse_declaration(parser)?);
 	}

@@ -10,6 +10,9 @@ pub enum TokenKind {
     TemplateText,
     TemplateVariable,
 
+    ModuleOpen,
+    ModuleClose,
+
     Semicolon,
 
     Comment,
@@ -59,11 +62,6 @@ impl<'i> Cursor<'i> {
                     self.push_token(TokenKind::Semicolon)
                 },
 
-                // '@'  => {
-                //     self.input.incr(1);
-                //     self.push_token(TokenKind::At)
-                // },
-
                 '#'  => {
                     self.input.incr(1);
                     self.input.incr_while(|x| x != '\n' && x != '#');
@@ -74,7 +72,13 @@ impl<'i> Cursor<'i> {
                     let i = if self.input.get(1) == Some('>') {2} else {1};
                     self.input.incr(i);
                     self.push_token(TokenKind::Equals);
-                }
+                },
+
+                '}' => {
+                    self.input.incr(1);
+                    self.push_token(TokenKind::ModuleClose);
+                    return;
+                },
 
                 _ => self.tokenize_expression(),
             }
@@ -84,7 +88,6 @@ impl<'i> Cursor<'i> {
     fn tokenize_expression(&mut self) {
         while let Some(c) = self.input.get(0) {
             match c {
-                // ';'  => {self.input.incr(1); self.push_token(TokenKind::Semicolon)},
                 '$'  => {self.input.incr(1); self.push_token(TokenKind::Dollar)},
                 '%'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '.'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
@@ -99,6 +102,13 @@ impl<'i> Cursor<'i> {
                 '<'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '>'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '~'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+
+                '@' if self.input.get(1) == Some('{')  => {
+                    self.input.incr(2);
+                    self.push_token(TokenKind::ModuleOpen);
+                    self.tokenize_root();
+                },
+
                 '@'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
 
 

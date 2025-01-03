@@ -89,7 +89,10 @@ impl ServModule {
             (None, expr) => self.statements.push(expr),
             (Some(ServValue::Ref(label)), expr) => self.definitions.push((label, expr)),
             (Some(ServValue::Func(ServFn::Route(r))), expr) => self.routes.push((r, expr)),
-            (Some(ServValue::Func(ServFn::Expr(e, _))), expr) => self.equalities.push((e, expr)),
+            (Some(ServValue::Func(ServFn::Expr(e, _))), expr) => {
+                // println!("{:?}", e);
+                self.equalities.push((e, expr))
+            },
             _ => panic!("invalid element"),
         }
     }

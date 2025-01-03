@@ -154,7 +154,7 @@ impl<'scope> Renderer<'scope> {
                 },
 
                 TemplateElement::Expression(t) if options.resolve_functions => {
-                    let value = t.call(None, self.ctx).unwrap();
+                    let value = t.call(self.ctx.get("in").ok(), self.ctx).unwrap();
                     self.output.push_str(&value.to_string());
                 },
                 TemplateElement::Expression(t) => {

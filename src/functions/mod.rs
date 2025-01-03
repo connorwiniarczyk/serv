@@ -10,16 +10,12 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 
 use crate::module::Expression;
-// use std::collections::Expression;
-
-// use crate::compile;
 use std::io::Read;
 
 mod host;
 mod list;
 mod sql;
 mod json;
-// mod request;
 
 fn print(input: ServValue, scope: &Stack) -> ServResult {
     println!("{}", input);
@@ -196,8 +192,21 @@ fn include(mut input: Expression, scope: &mut Stack) -> ServResult {
     Ok(ServValue::None)
 }
 
-fn switch(mut input: Expression, scope: &mut Stack) -> ServResult {
-    todo!();
+fn switch(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+
+	// pub fn expected_type(expected: &str, actual: ServValue) -> Self {
+	arg = arg.call(None, scope)?;
+    let ServValue::Module(m) = arg else { return Err(ServError::expected_type("Module", arg)) };
+    for (p, a) in m.equalities {
+        let pattern: ServValue = p.into();
+        let action: ServValue = a.into();
+		if pattern.call(Some(input.clone()), scope).unwrap().is_truthy() {
+    		return Ok(action.call(Some(input), scope).unwrap())
+		}
+    }
+
+    Ok(ServValue::None)
+
  //    let mut expr = input.pop_front().unwrap_or(ServValue::None);
  //    if let ServValue::Ref(label) = expr { expr = scope.get(label).unwrap() };
 
@@ -250,7 +259,9 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	scope.insert_name("let",         ServValue::Func(ServFn::Meta(using)));
 	scope.insert_name("!",           ServValue::Func(ServFn::ArgFn(drop)));
 	scope.insert_name("choose",      ServValue::Func(ServFn::Meta(choose)));
-	scope.insert_name("switch",      ServValue::Func(ServFn::Meta(switch)));
+
+	scope.insert_name("switch",      ServValue::Func(ServFn::ArgFn(switch)));
+
 	scope.insert_name("include",     ServValue::Func(ServFn::Meta(include)));
 	scope.insert_name("+",           ServValue::Func(ServFn::Core(incr)));
 	scope.insert_name("-",           ServValue::Func(ServFn::Core(decr)));
