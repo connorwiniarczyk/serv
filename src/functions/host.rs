@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use std::io::Write;
 use std::io::{BufWriter};
 use std::collections::VecDeque;
+use crate::value::ServList;
 
 fn exec(input: ServValue, scope: &Stack) -> ServResult {
     let text = input.to_string();
@@ -57,7 +58,7 @@ fn read_file_raw(input: ServValue, scope: &Stack) -> ServResult {
 
 fn read_dir(input: ServValue, scope: &Stack) -> ServResult {
     let paths = std::fs::read_dir(input.to_string()).map_err(|_| "invalid path")?;
-    let mut output = VecDeque::new();
+    let mut output = ServList::new();
     for path in paths {
         if let Ok(p) = path { output.push_back(ServValue::Text(p.path().display().to_string())); }
     }

@@ -1,7 +1,9 @@
 use crate::template::{Template, TemplateElement};
 use crate::{ ServValue, ServFn, Label };
-use crate::module::{ ServModule, Expression };
+use crate::module::{ ServModule };
 use crate::module;
+use crate::value;
+use crate::value::ServList;
 
 use crate::servlexer::{TokenKind, TokenKind::*};
 use crate::servlexer;
@@ -64,26 +66,30 @@ fn parse_word(parser: &mut Parser) -> Result<ServValue, ServError> {
     Ok(output)
 }
 
-fn parse_expression(parser: &mut Parser) -> Result<module::Expression, ServError> {
-    let mut output: Vec<ServValue> = Vec::new();
+fn parse_expression(parser: &mut Parser) -> Result<ServList, ServError> {
+    let mut output = ServList::new();
+    // let mut output: Vec<ServValue> = Vec::new();
     while let Ok(word) = parse_word(parser) {
-        output.push(word);
+        output.push_back(word);
     }
 
     while let Ok(_) = parser.next_if_kind(Semicolon) {}
-    
-    Ok(module::Expression(output.into(), false))
+
+    Ok(output)
+
+   
+    // Ok(ServValue(output.into(), false))
 }
 
-fn get_pattern(mut input: Expression) -> Option<ServValue> {
-    if input.0.len() == 0 { return None };
-    if input.0.len()  > 1 { return Some(ServValue::Func(ServFn::Expr(input, false))) };
+fn get_pattern(mut input: ServList) -> Option<ServValue> {
+    if input.len() == 0 { return None };
+    if input.len()  > 1 { return Some(ServValue::Func(ServFn::Expr(input, false))) };
 
-    match input.next().unwrap() {
+    match input.pop().unwrap() {
         route @ ServValue::Func(ServFn::Route(_)) => Some(route),
         label @ ServValue::Ref(_) => Some(label),
         other => {
-            input.0.push_front(other);
+            input.push(other);
             Some(ServValue::Func(ServFn::Expr(input, false)))
         },
     }
@@ -124,7 +130,7 @@ pub fn parse_template_from_text(input: &str, brackets: bool) -> Result<Template,
     // Ok(ast)
 }
 
-pub fn parse_expression_from_text(input: &str) -> Result<module::Expression, ServError> {
+pub fn parse_expression_from_text(input: &str) -> Result<ServValue, ServError> {
     todo!();
     // let chars: Vec<char> = input.chars().collect();
     // let tokens = servlexer::tokenize_serv(&chars);

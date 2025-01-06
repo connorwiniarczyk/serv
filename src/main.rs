@@ -3,6 +3,7 @@
 mod servlexer;
 mod servparser;
 mod module;
+mod servlist;
 
 mod error;
 mod functions;
@@ -58,7 +59,6 @@ fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
         scope.insert_name("serv.port", port.into());
     }
 }
-
 
 #[tokio::main]
 async fn main() {

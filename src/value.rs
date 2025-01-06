@@ -1,22 +1,22 @@
 use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::rc::Rc;
 
 use crate::template::Template;
 use crate::Stack;
 use crate::Label;
+use crate::ServError;
 use crate::ServResult;
 
-use crate::module::Expression;
+pub use crate::servlist::ServList;
 
 #[derive(Clone)]
 pub enum ServFn {
     Ident,
     Core     (fn(ServValue, &Stack) -> ServResult),
-    Meta     (fn(Expression, &mut Stack) -> ServResult),
+    Meta     (fn(ServList, &mut Stack) -> ServResult),
     ArgFn    (fn(ServValue, ServValue, &Stack) -> ServResult),
-    Expr     (Expression, bool),
+    Expr     (ServList, bool),
 
     Route(String),
     Template (Template),
@@ -48,22 +48,10 @@ pub enum ServValue {
     Text(String),
     Raw(Vec<u8>),
 
-    List(VecDeque<ServValue>),
+    List(ServList),
     Table(HashMap<String, ServValue>),
 
     Module(crate::ServModule),
-
-    Meta { inner: Box<ServValue>, metadata: HashMap<String, ServValue> },
-}
-
-
-#[derive(Clone)]
-pub struct Transform (pub Rc<dyn Fn(&mut Stack)>);
-
-impl std::fmt::Debug for Transform {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str("f")
-    }
 }
 
 impl ServValue {
@@ -97,22 +85,8 @@ impl ServValue {
     }
 
     pub fn expect_int(&self) -> Result<i64, &'static str> {
-        if let Self::Meta { inner, metadata } = self { return inner.expect_int() };
         let Self::Int(i) = self else { return Err("expected an int") };
         Ok(i.clone())
-    }
-
-    pub fn metadata(&mut self) -> &mut HashMap<String, ServValue> {
-    	if let ServValue::Meta { ref inner, ref mut metadata } = self {
-        	metadata
-    	} else {
-        	let mut metadata = HashMap::new();
-        	let inner = Box::new(std::mem::take(self));
-        	*self = Self::Meta { inner, metadata };
-
-			let Self::Meta { inner, ref mut metadata } = self else { unreachable!() };
-			metadata
-    	}
     }
 
     pub fn is_truthy(&self) -> bool {
@@ -121,22 +95,6 @@ impl ServValue {
         	ServValue::Bool(false) => false,
         	ServValue::Int(0)      => false,
         	otherwise => true,
-        }
-    }
-
-    pub fn get_metadata(&self) -> Option<&HashMap<String, ServValue>> {
-        if let Self::Meta { inner, metadata } = self {
-            Some(metadata)
-        } else {
-            None
-        }
-    }
-
-    pub fn ignore_metadata(self) -> ServValue {
-        if let Self::Meta { inner, .. } = self {
-            *inner
-        } else {
-            self
         }
     }
 }
@@ -153,11 +111,84 @@ impl From<i64> for ServValue {
     }
 }
 
-impl From<Expression> for ServValue {
-    fn from(value: Expression) -> Self {
-        Self::Func(ServFn::Expr(value, false))
+impl From<ServList> for ServValue {
+    fn from(value: ServList) -> Self {
+        Self::List(value)
     }
 }
+
+pub trait Serializer {
+	fn write<'buf>(&mut self, value: ServValue, dest: &'buf mut Buffer<'buf>) -> Result<(), ServError>;
+}
+
+type Buffer<'a> = dyn std::fmt::Write + 'a;
+
+#[derive(Clone)]
+pub struct JsonSerializer<'scope> {
+    scope: &'scope Stack<'scope>,
+}
+
+impl<'a> JsonSerializer<'a> {
+    pub fn new(scope: &'a Stack<'a>) -> Self {
+        Self { scope }
+    }
+}
+
+impl<'a> Serializer for JsonSerializer<'a> {
+    fn write<'b>(&mut self, value: ServValue, dest: &'b mut Buffer<'b>) -> Result<(), ServError> {
+        match value {
+            _ => todo!(),
+			ServValue::Ref(label) => self.write(self.scope.get(label)?, dest)?,
+			f @ ServValue::Func(_) => self.write(f.call(None, self.scope)?, dest)?,
+
+			ServValue::Raw(t)      => todo!("json serialize raw bytes"),
+			ServValue::Module(t)   => todo!("json serialize modules"),
+			ServValue::None     => dest.write_str("0")?,
+			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
+			ServValue::Float(v) => dest.write_str(&v.to_string())?,
+			ServValue::Int(v)   => dest.write_str(&v.to_string())?,
+			ServValue::Text(t)  => {
+    			dest.write_str("\"");
+    			dest.write_str(&t);
+    			dest.write_str("\"")?
+			},
+
+			ServValue::List(list) => {
+    			dest.write_str("[");
+    			let mut iter = list.peekable();
+    			while let Some(value) = iter.next() {
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			dest.write_str(", ");
+        			}
+    			}
+    			dest.write_str("]")?
+
+			},
+
+			ServValue::Table(table) => {
+    			dest.write_str("{");
+    			let mut iter = table.into_iter().peekable();
+    			while let Some((key, value)) = iter.next() {
+        			dest.write_str("\"");
+        			dest.write_str(&key);
+        			dest.write_str("\"");
+        			dest.write_str(": ");
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			dest.write_str(", ");
+        			}
+    			}
+    			dest.write_str("}")?
+
+			},
+        };
+
+        Ok(())
+    }
+}
+
+
 
 impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -165,7 +196,6 @@ impl Display for ServValue {
             Self::Ref(Label::Name(n))       => f.write_str(n)?,
             Self::Ref(Label::Anonymous(id)) => f.write_str("()")?,
             Self::Func(v)                   => f.write_str("()")?,
-
 
             Self::None                      => f.write_str("NONE")?,
             Self::Bool(v)                   => v.fmt(f)?,
@@ -197,18 +227,16 @@ impl Display for ServValue {
 
             Self::List(l) => {
                 f.write_str("[")?;
-				let mut iter = l.iter().peekable();
+				let mut iter = l.clone().peekable();
 				while let Some(element) = iter.next() {
     				element.fmt(f)?;
     				if iter.peek().is_some() {f.write_str(", ")?}
 				}
                 f.write_str("]")?;
-            }
+            },
 
             Self::Module(m) => f.write_str("a module")?,
-
-            Self::Meta { inner, metadata } => inner.fmt(f)?,
-            _ => todo!(),
+            // _ => todo!(),
         }
 
 		Ok(())

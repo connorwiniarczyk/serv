@@ -1,3 +1,5 @@
+use crate::value::ServList;
+
 use parsetool::cursor::{ Tokenizer, Token };
 use crate::{Stack, ServResult, Label, ServValue, ServFn };
 
@@ -103,7 +105,7 @@ impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
     }
 
     fn parse_list(&mut self) -> Result<ServValue, ()> {
-        let mut output: VecDeque<ServValue> = VecDeque::new();
+        let mut output = ServList::new();
         while self.0.peek().expect("end of input while parsing list").kind != CloseList {
             output.push_back(self.parse_value()?);
             let _comma = self.0.next_if(|t| t.kind == Comma);

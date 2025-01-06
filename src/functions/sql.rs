@@ -44,7 +44,7 @@ fn sql(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
             ServValue::Raw(v)    => todo!(),
             ServValue::List(v)   => todo!(),
             ServValue::Table(v)  => todo!(),
-            ServValue::Meta {..} => todo!(),
+            // ServValue::Meta {..} => todo!(),
 
             otherwise => todo!(),
         }.expect("failed to bind to sqlite statement");

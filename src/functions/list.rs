@@ -4,24 +4,30 @@ use crate::ServError;
 use crate::Stack;
 use crate::servparser;
 use crate::{Label, ServFn};
-use crate::module::Expression;
+use crate::value::ServList;
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
 
-fn take(mut input: Expression, scope: &mut Stack) -> ServResult {
-    let arg  = input.next().expect("word expected");
+fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
+    let arg = input.pop()?;
    	let ServValue::Ref(name @ Label::Name(_)) = arg else { panic!("'<' expects a ref") };
    	let rest = input.eval(scope)?;
    	let out = match rest {
-       	ServValue::List(mut l) => { scope.insert(name, l.pop_front().ok_or("")?); ServValue::List(l) },
-       	element => { scope.insert(name, element); ServValue::None },
+       	ServValue::List(mut l) => {
+           	scope.insert(name, l.pop()?);
+           	ServValue::List(l)
+       	},
+       	element => {
+           	scope.insert(name, element);
+           	ServValue::None
+       	},
    	};
    
    	Ok(out)
 }
 
-fn with(mut expr: Expression, scope: &mut Stack) -> ServResult {
+fn with(mut expr: ServList, scope: &mut Stack) -> ServResult {
     let input = expr.eval(scope)?;
     match input {
         ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert_name(key, value)),
@@ -34,7 +40,7 @@ fn with(mut expr: Expression, scope: &mut Stack) -> ServResult {
 
 fn count(input: ServValue, scope: &Stack) -> ServResult {
     let max = input.expect_int()?;
-    let mut output = VecDeque::new();
+    let mut output = ServList::new();
     let mut i: i64 = 0;
 
     while i < max {
@@ -47,17 +53,23 @@ fn count(input: ServValue, scope: &Stack) -> ServResult {
 
 
 fn pop(input: ServValue, scope: &Stack) -> ServResult {
-    let ServValue::List(mut inner) = input else { return Ok(ServValue::None) };
-    _ = inner.pop_front();
+    todo!();
+    // if let ServValue::List(mut list) = input {
+    //     list.pop()
+    // } else {
 
-    Ok(ServValue::List(inner))
+    // }
+    // let ServValue::List(mut inner) = input else { return Ok(ServValue::None) };
+    // _ = inner.pop_front();
+    // Ok(ServValue::List(inner))
 }
 
 
 fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
+    // let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
+    let output = match (arg, input) {
         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
-        (ServValue::Int(index),    ServValue::List(mut list)) => list.remove(index.try_into().map_err(|e| "invalid index")?).ok_or("index not found")?,
+        (ServValue::Int(index),    ServValue::List(mut list)) => list.get(index.try_into().map_err(|e| "invalid index")?)?.clone(),
         (key, _) => return Err(ServError::expected_type("Int | Text", key)),
     };
 
@@ -65,31 +77,30 @@ fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
 }
 
 fn map(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    let mut output = VecDeque::new();
+    let mut output = ServList::new();
     let ServValue::List(list) = input else { return arg.call(Some(input), scope) };
-    for item in list.into_iter() {
+    for item in list {
         output.push_back(arg.call(Some(item), scope)?);
     }
     Ok(ServValue::List(output))
 }
 
-fn generate_list(input: Expression, scope: &mut Stack) -> ServResult {
-    let mut output = VecDeque::new();
-    let ServValue::List(list) = input.as_list() else { unreachable!() };
+fn generate_list(input: ServList, scope: &mut Stack) -> ServResult {
+    let mut output = ServList::new();
 
-    for item in list.into_iter() {
+    for item in input {
         output.push_back(item.call(None, scope)?);
     }
     Ok(ServValue::List(output))
 }
 
 fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
-    input = input.ignore_metadata();
+    // input = input.ignore_metadata();
     let ServValue::List(list) = input else {
         return Err(ServError::expected_type("List", input))
     };
 
-    let mut iter = list.into_iter().filter(|x| !matches!(x, ServValue::None)).peekable();
+    let mut iter = list.filter(|x| !matches!(x, ServValue::None)).peekable();
 
     let output: ServValue = match iter.peek().ok_or("tried to sum an empty list")? {
         ServValue::Int(i) => ServValue::Int(iter.map(|x| x.expect_int().unwrap()).sum()),

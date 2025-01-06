@@ -2,14 +2,15 @@ use crate::ServValue;
 use crate::ServResult;
 
 use crate::Label;
-use crate::value::ServFn;
 use crate::error::ServError;
 use crate::Stack;
 use crate::servparser;
-use std::collections::HashMap;
-use std::collections::VecDeque;
 
-use crate::module::Expression;
+use std::collections::HashMap;
+
+use crate::value::ServFn;
+use crate::value::ServList;
+
 use std::io::Read;
 
 mod host;
@@ -80,7 +81,7 @@ fn drop(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     Ok(input)
 }
 
-fn using(mut input: Expression, scope: &mut Stack) -> ServResult {
+fn using(mut input: ServList, scope: &mut Stack) -> ServResult {
    todo!();
  //    let arg = input.pop_front().ok_or("using expects an arg")?;
  //    let text = arg.call(None, &scope)?.to_string();
@@ -117,8 +118,8 @@ pub fn apply(input: ServValue, scope: &Stack) -> ServResult {
 	Ok(result)
 }
 
-fn with_headers(mut input: Expression, scope: &mut Stack) -> ServResult {
-    let mut arg = input.next().ok_or(ServError::new(500, "expected an argument"))?;
+fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
+    let mut arg = input.pop()?;
 	arg = arg.call(None, scope)?;
 
     let ServValue::Module(m) = &arg else {
@@ -131,22 +132,22 @@ fn with_headers(mut input: Expression, scope: &mut Stack) -> ServResult {
 }
 
 fn dequote(input: ServValue, scope: &Stack) -> ServResult {
-    let mut expr = Expression::empty();
-    match input {
-		ServValue::List(words) => expr.prepend(words.into_iter()),
-		value => expr.push(value),
-    };
+	if let ServValue::List(mut expr) = input {
+    	expr.eval(&mut scope.make_child())
+	}
 
-	expr.eval(&mut scope.make_child())
+	else {
+    	Ok(input)
+	}
 }
 
-fn quote(input: Expression, scope: &mut Stack) -> ServResult {
-    Ok(ServValue::List(input.0))
+fn quote(input: ServList, scope: &mut Stack) -> ServResult {
+    Ok(ServValue::List(input))
 }
 
-fn choose(mut input: Expression, scope: &mut Stack) -> ServResult {
-    let if_true  = input.next().unwrap_or(ServValue::None);
-    let if_false = input.next().unwrap_or(ServValue::None);
+fn choose(mut input: ServList, scope: &mut Stack) -> ServResult {
+    let if_true  = input.pop().unwrap_or(ServValue::None);
+    let if_false = input.pop().unwrap_or(ServValue::None);
 
 	let value = input.eval(scope)?;
 
@@ -159,7 +160,7 @@ fn choose(mut input: Expression, scope: &mut Stack) -> ServResult {
     }.call(Some(value), scope)
 }
 
-fn include(mut input: Expression, scope: &mut Stack) -> ServResult {
+fn include(mut input: ServList, scope: &mut Stack) -> ServResult {
     let val = input.eval(scope)?;
     let ServValue::Module(m) = val else { return Err(ServError::expected_type("Module", val)) };
 
