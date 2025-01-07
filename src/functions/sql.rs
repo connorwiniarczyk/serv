@@ -3,9 +3,37 @@ use crate::ServResult;
 use crate::Stack;
 use crate::servparser;
 use crate::{Label, ServFn};
+use crate::ServError;
+
+use crate::template::{Template, TemplateElement, Renderer};
+use crate::template;
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
+
+struct SqliteRenderer(Vec<ServValue>);
+
+type Buffer<'a> = &'a mut (dyn std::fmt::Write + 'a);
+
+impl template::Renderer for SqliteRenderer {
+    fn render<'buf>(&mut self, input: &template::Template, dest: Buffer<'buf>) {
+        for element in &input.elements {
+            match element {
+                TemplateElement::Text(t) => dest.write_str(t),
+                TemplateElement::Expression(e) => {
+                    self.0.push(e.clone());
+                    dest.write_str("?")
+                },
+                TemplateElement::Template(inner) => {
+					dest.write_str(&inner.open);
+					self.render(inner, dest);
+					dest.write_str(&inner.close)
+                },
+            };
+        }
+    }
+}
+
 
 fn get_database_location(scope: &Stack) -> Option<String> {
 	let func = scope.get("sql.database").ok()?;
@@ -19,6 +47,27 @@ fn sql_exec(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::None)
 }
 
+fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServValue, scope: &Stack) -> Result<(), ServError> {
+    match param {
+        ServValue::Ref(label) => {
+            let value = scope.get(label)?;
+            sqlite_bind_param(statement, i, value, scope);
+        },
+        ServValue::Int(v)    => statement.bind((i, v)).unwrap(),
+        ServValue::Text(t)   => statement.bind((i, t.as_str())).unwrap(),
+        ServValue::Float(v)  => statement.bind((i, v)).unwrap(),
+        ServValue::None      => statement.bind((i, ())).unwrap(),
+        ServValue::Bool(v)   => todo!(),
+        ServValue::Raw(v)    => todo!(),
+        ServValue::List(v)   => todo!(),
+        ServValue::Table(v)  => todo!(),
+
+        otherwise => todo!(),
+    };
+
+    Ok(())
+}
+
 fn sql(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let path = get_database_location(scope).unwrap_or("serv.sqlite".to_string());
     let connection = sqlite::open(&path).unwrap();
@@ -29,26 +78,16 @@ fn sql(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
 
 	let ServValue::Func(ServFn::Template(t)) = arg else {panic!()};
 
-	let (ctx, query, params) = t.render_sql(scope);
-    let mut statement = connection.prepare(query.to_string()).unwrap();
+    let mut r = SqliteRenderer(Vec::new());
+    let mut query = String::new();
+    r.render(&t, &mut query);
 
-    for (mut i, p) in params.into_iter().enumerate() {
+    let mut statement = connection.prepare(query).unwrap();
+    for (mut i, p) in r.0.into_iter().enumerate() {
         i += 1;
-        let value = scope.get(p)?.call(Some(input.clone()), &scope).unwrap();
-        match value {
-            ServValue::Int(v)    => statement.bind((i, v)),
-            ServValue::Text(t)   => statement.bind((i, t.as_str())),
-            ServValue::Float(v)  => statement.bind((i, v)),
-            ServValue::None      => statement.bind((i, ())),
-            ServValue::Bool(v)   => todo!(),
-            ServValue::Raw(v)    => todo!(),
-            ServValue::List(v)   => todo!(),
-            ServValue::Table(v)  => todo!(),
-            // ServValue::Meta {..} => todo!(),
-
-            otherwise => todo!(),
-        }.expect("failed to bind to sqlite statement");
+        sqlite_bind_param(&mut statement, i, p, scope).unwrap();
     }
+
 
     let mut output: Vec<ServValue> = Vec::new();
     while let Ok(sqlite::State::Row) = statement.next() {

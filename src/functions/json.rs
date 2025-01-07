@@ -9,6 +9,102 @@ struct Parser<I>(Peekable<I>) where I: Iterator<Item = JsonToken>;
 use std::collections::VecDeque;
 use std::collections::HashMap;
 
+use crate::value::Serializer;
+use crate::ServError;
+
+type Buffer<'b> = &'b mut (dyn std::fmt::Write + 'b);
+
+#[derive(Clone)]
+pub struct JsonSerializer<'scope> {
+    tab: &'static str,
+    indent: isize,
+    scope: &'scope Stack<'scope>,
+}
+
+pub fn serializer<'scope>(scope: &'scope Stack<'scope>) -> JsonSerializer<'scope> {
+    JsonSerializer::new(scope)
+}
+
+impl<'a> JsonSerializer<'a> {
+    pub fn new(scope: &'a Stack<'a>) -> Self {
+        Self {
+            indent: 0,
+            tab: "  ",
+            scope
+        }
+    }
+
+    fn line_break<'b>(&self, dest: Buffer<'b>) {
+		dest.write_char('\n');
+		for _ in 0..self.indent { dest.write_str(self.tab); }
+    }
+}
+
+impl<'a> Serializer for JsonSerializer<'a> {
+    fn write<'b>(&mut self, value: ServValue, dest: Buffer<'b>) -> Result<(), ServError> {
+        match value {
+			ServValue::Ref(label) => self.write(self.scope.get(label)?, dest)?,
+			f @ ServValue::Func(_) => self.write(f.call(None, self.scope)?, dest)?,
+
+			ServValue::Raw(ref t)      => todo!("json serialize raw bytes {:?}", value),
+			ServValue::Module(t)   => todo!("json serialize modules"),
+			ServValue::None     => dest.write_str("0")?,
+			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
+			ServValue::Float(v) => dest.write_str(&v.to_string())?,
+			ServValue::Int(v)   => dest.write_str(&v.to_string())?,
+			ServValue::Text(t)  => {
+    			dest.write_str("\"");
+    			dest.write_str(&t);
+    			dest.write_str("\"")?
+			},
+
+			ServValue::List(list) => {
+    			dest.write_str("[");
+    			self.indent += 1;
+    			self.line_break(dest);
+
+    			let mut iter = list.peekable();
+    			while let Some(value) = iter.next() {
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			dest.write_char(',');
+            			self.line_break(dest);
+        			}
+    			}
+
+    			self.indent -= 1;
+    			self.line_break(dest);
+    			dest.write_str("]")?
+
+			},
+
+			ServValue::Table(table) => {
+    			dest.write_str("{");
+    			self.indent += 1;
+    			self.line_break(dest);
+
+    			let mut iter = table.into_iter().peekable();
+    			while let Some((key, value)) = iter.next() {
+        			dest.write_str("\"");
+        			dest.write_str(&key);
+        			dest.write_str("\"");
+        			dest.write_str(": ");
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			dest.write_str(",");
+            			self.line_break(dest);
+        			}
+    			}
+    			self.indent -= 1;
+    			self.line_break(dest);
+    			dest.write_str("}")?
+			},
+        };
+
+        Ok(())
+    }
+}
+
 #[derive (PartialEq, Clone, Copy, Debug)]
 enum TokenKind {
     OpenObject,

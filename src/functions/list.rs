@@ -31,7 +31,12 @@ fn with(mut expr: ServList, scope: &mut Stack) -> ServResult {
     let input = expr.eval(scope)?;
     match input {
         ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert_name(key, value)),
-        ServValue::Module(t) => t.definitions.into_iter().for_each(|(key, value)| scope.insert(key, value.into())),
+        ServValue::Module(t) => {
+            for (key, mut expr) in t.definitions.into_iter() {
+                let value = expr.eval(scope)?;
+                scope.insert(key, value);
+            }
+        },
         otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
     };
 

@@ -17,12 +17,14 @@ pub struct DefaultRenderer<'scope, S: Serializer + Clone> {
 	scope: &'scope Stack<'scope>
 }
 
-impl<'a> DefaultRenderer<'a, crate::value::JsonSerializer<'a>> {
-    fn new(scope: &'a Stack<'a>) -> Self {
+use crate::functions::json;
+
+impl<'a> DefaultRenderer<'a, json::JsonSerializer<'a>> {
+    pub fn new(scope: &'a Stack<'a>) -> Self {
         Self {
             include_brackets: false,
             resolve_expressions: true,
-            serializer: crate::value::JsonSerializer::new(scope),
+            serializer: json::serializer(scope),
             scope: scope,
         }
     }

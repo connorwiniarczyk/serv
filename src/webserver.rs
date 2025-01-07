@@ -28,13 +28,19 @@ use std::collections::VecDeque;
 
 pub struct ServBody(Option<VecDeque<u8>>);
 
-impl From<ServValue> for ServBody {
-	fn from(input: ServValue) -> Self {
-    	match input {
-			ServValue::Raw(bytes) => Self(Some(bytes.into())),
-			_ => Self(Some(input.to_string().bytes().collect())),
-    	}
-	}
+impl ServBody {
+    pub fn generate(input: ServValue, scope: &Stack) -> Self {
+        match input {
+			ServValue::Ref(label) => ServBody::generate(scope.get(label).unwrap(), scope),
+			f @ ServValue::Func(_) => ServBody::generate(f.call(None, scope).unwrap(), scope),
+			ServValue::Raw(t) => Self(Some(t.into())),
+			otherwise => {
+    			let mut output = String::new();
+				crate::value::DefaultSerializer(scope).write(otherwise, &mut output).unwrap();
+				Self(Some(output.bytes().collect()))
+			},
+       }
+    }
 }
 
 impl Body for ServBody {
@@ -51,6 +57,7 @@ impl Body for ServBody {
 }
 
 use http_body_util::BodyExt;
+use crate::value::Serializer;
 
 #[derive(Clone)]
 struct Serv(Arc<Stack<'static>>, Arc<Router<ServValue>>);
@@ -70,7 +77,7 @@ impl Service<Request<IncomingBody>> for Serv {
             	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
             	let res = Response::builder()
                 	.status(404)
-                	.body(ServValue::Text(text).into())
+                	.body(ServBody(Some(text.bytes().collect())))
                 	.unwrap();
             	return Ok(res)
         	};
@@ -94,7 +101,11 @@ impl Service<Request<IncomingBody>> for Serv {
         	response = response.status(200);
 
         	if let Ok(mime) = scope.get("res.mime") {
-            	response = response.header("Content-Type", mime.call(None, &scope).unwrap().to_string());
+            	let value = mime.call(None, &scope);
+            	// println!("{:?}", value.unwrap().to_string());
+            	// response = response.header("Content-Type", mime.call(None, &scope).unwrap().to_string());
+            	// todo!();
+            	response = response.header("Content-Type", value.unwrap().to_string());
         	}
 
         	if let Ok(ServValue::Module(m)) = scope.get("res.headers") {
@@ -106,27 +117,10 @@ impl Service<Request<IncomingBody>> for Serv {
             	}
         	}
 
-    		// if let Some(data) = result.get_metadata() {
-      //   		if let Some(status) = data.get("status") {
-      //       		let code = status.expect_int().unwrap().clone();
-      //       		response = response.status(u16::try_from(code).unwrap());
-      //   		}
-
-      //   		if let Some(ServValue::List(headers)) = data.get("headers") {
-      //       		for header in headers {
-      //           		let text = header.to_string();
-      //               	let mut iter = text
-      //                   	.split("=")
-      //                   	.map(|x| x.trim());
-
-      //               	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
-      //               	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
-      //           		response = response.header(key, value);
-      //       		}
-      //   		}
-    		// }
-
-    		let response_sender = response.body(result.into()).unwrap();
+			// let mut text = String::new();
+			// crate::value::DefaultSerializer(&scope).write(result, &mut text);
+			// let body = ServBody(Some(text.bytes().collect()));
+    		let response_sender = response.body(ServBody::generate(result, &scope)).unwrap();
     		Ok(response_sender)
     	};
 

@@ -70,8 +70,8 @@ impl ServValue {
            	Self::Func(ServFn::Template(t)) => {
                	if let Some(v) = input {
                    	let mut child = scope.make_child();
-                   	child.insert("in".into(), v.clone());
-                   	child.insert(":".into(), v);
+                   	child.insert_name("in", v.clone());
+                   	child.insert_name(":", v);
                    	t.render(&child)
                	}
                	else {
@@ -117,128 +117,44 @@ impl From<ServList> for ServValue {
     }
 }
 
-pub trait Serializer {
-	fn write<'buf>(&mut self, value: ServValue, dest: &'buf mut Buffer<'buf>) -> Result<(), ServError>;
-}
+type Buffer<'a> = &'a mut (dyn std::fmt::Write + 'a);
 
-type Buffer<'a> = dyn std::fmt::Write + 'a;
+pub trait Serializer {
+	fn write<'buf>(&mut self, value: ServValue, dest: Buffer<'buf>) -> Result<(), ServError>;
+}
 
 #[derive(Clone)]
-pub struct JsonSerializer<'scope> {
-    scope: &'scope Stack<'scope>,
-}
+pub struct DefaultSerializer<'s>(pub &'s Stack<'s>);
 
-impl<'a> JsonSerializer<'a> {
-    pub fn new(scope: &'a Stack<'a>) -> Self {
-        Self { scope }
-    }
-}
-
-impl<'a> Serializer for JsonSerializer<'a> {
-    fn write<'b>(&mut self, value: ServValue, dest: &'b mut Buffer<'b>) -> Result<(), ServError> {
+impl<'a> Serializer for DefaultSerializer<'a> {
+    fn write<'b>(&mut self, value: ServValue, dest: Buffer<'b>) -> Result<(), ServError> {
         match value {
-            _ => todo!(),
-			ServValue::Ref(label) => self.write(self.scope.get(label)?, dest)?,
-			f @ ServValue::Func(_) => self.write(f.call(None, self.scope)?, dest)?,
+			ServValue::Ref(label) => self.write(self.0.get(label)?, dest)?,
+			f @ ServValue::Func(_) => self.write(f.call(None, self.0)?, dest)?,
+			ServValue::Text(t) => dest.write_str(&t)?,
 
-			ServValue::Raw(t)      => todo!("json serialize raw bytes"),
-			ServValue::Module(t)   => todo!("json serialize modules"),
-			ServValue::None     => dest.write_str("0")?,
-			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
-			ServValue::Float(v) => dest.write_str(&v.to_string())?,
-			ServValue::Int(v)   => dest.write_str(&v.to_string())?,
-			ServValue::Text(t)  => {
-    			dest.write_str("\"");
-    			dest.write_str(&t);
-    			dest.write_str("\"")?
-			},
-
-			ServValue::List(list) => {
-    			dest.write_str("[");
-    			let mut iter = list.peekable();
-    			while let Some(value) = iter.next() {
-        			self.write(value, dest)?;
-        			if iter.peek().is_some() {
-            			dest.write_str(", ");
-        			}
+			ServValue::Raw(bytes) => {
+				if let Ok(t) = std::str::from_utf8(&bytes) {
+    				dest.write_str(&t)?;
+    			} else {
+        			dest.write_str("RAW")?;
     			}
-    			dest.write_str("]")?
-
 			},
-
-			ServValue::Table(table) => {
-    			dest.write_str("{");
-    			let mut iter = table.into_iter().peekable();
-    			while let Some((key, value)) = iter.next() {
-        			dest.write_str("\"");
-        			dest.write_str(&key);
-        			dest.write_str("\"");
-        			dest.write_str(": ");
-        			self.write(value, dest)?;
-        			if iter.peek().is_some() {
-            			dest.write_str(", ");
-        			}
-    			}
-    			dest.write_str("}")?
-
+			otherwise => {
+				json::serializer(self.0).write(otherwise, dest)?
 			},
-        };
+       };
 
         Ok(())
     }
 }
 
-
+use crate::functions::json;
 
 impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Self::Ref(Label::Name(n))       => f.write_str(n)?,
-            Self::Ref(Label::Anonymous(id)) => f.write_str("()")?,
-            Self::Func(v)                   => f.write_str("()")?,
-
-            Self::None                      => f.write_str("NONE")?,
-            Self::Bool(v)                   => v.fmt(f)?,
-            Self::Float(v)                  => v.fmt(f)?,
-            Self::Int(i)                    => i.fmt(f)?,
-            Self::Text(ref t)               => f.write_str(t)?,
-            Self::Raw(bytes) => {
-                if let Ok(text) = std::str::from_utf8(bytes) {
-                    f.write_str(text)?;
-                } else {
-                    f.debug_list().entries(bytes.iter()).finish()?
-                }
-            },
-            Self::Table(table) => {
-                f.write_str("{")?;
-
-				let mut iter = table.iter().peekable();
-				while let Some((k, v)) = iter.next() {
-    				match v {
-        				Self::Text(ref t) => write!(f, r#""{}": "{}""#, k, v),
-        				otherwise     => write!(f, r#""{}": "{}""#, k, v),
-    				}?;
-
-    				if iter.peek().is_some() {f.write_str(", ")?}
-				}
-
-                f.write_str("}")?;
-            },
-
-            Self::List(l) => {
-                f.write_str("[")?;
-				let mut iter = l.clone().peekable();
-				while let Some(element) = iter.next() {
-    				element.fmt(f)?;
-    				if iter.peek().is_some() {f.write_str(", ")?}
-				}
-                f.write_str("]")?;
-            },
-
-            Self::Module(m) => f.write_str("a module")?,
-            // _ => todo!(),
-        }
-
+        let mut scope = Stack::empty();
+        DefaultSerializer(&scope).write(self.clone(), f).unwrap();
 		Ok(())
     }
 }

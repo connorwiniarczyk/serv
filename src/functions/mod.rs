@@ -16,7 +16,7 @@ use std::io::Read;
 mod host;
 mod list;
 mod sql;
-mod json;
+pub mod json;
 
 fn print(input: ServValue, scope: &Stack) -> ServResult {
     println!("{}", input);
@@ -165,15 +165,13 @@ fn include(mut input: ServList, scope: &mut Stack) -> ServResult {
     let ServValue::Module(m) = val else { return Err(ServError::expected_type("Module", val)) };
 
     for (label, expr) in m.definitions {
-		scope.insert(label, expr.into());
+		scope.insert(label, expr.as_expr());
     }
 
     Ok(ServValue::None)
 }
 
 fn switch(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-
-	// pub fn expected_type(expected: &str, actual: ServValue) -> Self {
 	arg = arg.call(None, scope)?;
     let ServValue::Module(m) = arg else { return Err(ServError::expected_type("Module", arg)) };
     for (p, a) in m.equalities {
