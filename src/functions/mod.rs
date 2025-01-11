@@ -18,6 +18,8 @@ mod list;
 mod sql;
 pub mod json;
 
+mod request;
+
 fn print(input: ServValue, scope: &Stack) -> ServResult {
     println!("{}", input);
     Ok(input)
@@ -259,6 +261,7 @@ pub fn bind_standard_library(scope: &mut crate::Stack) {
 	host::bind(scope);
 	json::bind(scope);
 	sql::bind(scope);
+	request::bind(scope);
 
 	// request::bind(scope);
 }

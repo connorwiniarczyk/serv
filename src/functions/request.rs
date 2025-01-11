@@ -2,10 +2,9 @@ use crate::ServValue;
 use crate::ServResult;
 use crate::Stack;
 use crate::servparser;
-use crate::VecDeque;
 use crate::{Label, ServFn};
 
-use parsetool::Tokenizer;
+use parsetool::cursor::Tokenizer;
 use std::collections::HashMap;
 
 fn parse_query_string(input: &str) -> ServValue {
@@ -27,17 +26,25 @@ fn parse_query_string(input: &str) -> ServValue {
     ServValue::Table(output)
 }
 
-fn query_all(input: ServValue, scope: &Scope) -> ServResult {
+fn headers(input: ServValue, scope: &Stack) -> ServResult {
+    let Some(req) = scope.get_request() else { return Ok(ServValue::None) };
+
+    println!("{:#?}", req.headers);
+    todo!();
+}
+
+fn query_all(input: ServValue, scope: &Stack) -> ServResult {
     let Some(req) = scope.get_request() else { return Ok(ServValue::None) };
     let Some(query) = req.uri.query() else { return Ok(ServValue::None) };
     let table = parse_query_string(&query);
     Ok(table)
 }
 
-fn query_get(input: ServValue, scope: &Scope) -> ServResult {
+fn query_get(input: ServValue, scope: &Stack) -> ServResult {
     todo!();
 }
 
-pub fn bind(scope: &mut Scope) {
-	scope.insert(FnLabel::name("query"), ServFunction::Core(query_all));
+pub fn bind(scope: &mut Stack) {
+	scope.insert_name("query", ServValue::Func(ServFn::Core(query_all)));
+	scope.insert_name("req.headers", ServValue::Func(ServFn::Core(headers)));
 }
