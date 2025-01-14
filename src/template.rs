@@ -120,10 +120,10 @@ impl Template {
         let mut renderer = DefaultRenderer::new(ctx);
 
         renderer.render(self, &mut output);
-		Ok(ServValue::Text(output))
+		Ok(ServValue::Text(output.into()))
     }
 
-    pub fn render_sql<'scope>(&self, ctx: &'scope Stack) -> (Stack<'scope>, String, Vec<crate::Label>) {
+    fn render_sql<'scope>(&self, ctx: &'scope Stack) -> (Stack<'scope>, String, Vec<crate::Label>) {
         todo!();
   //       let mut renderer = Renderer::new(ctx);
   //       renderer.sql_bindings = Some(Vec::new());

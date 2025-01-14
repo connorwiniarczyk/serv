@@ -74,6 +74,12 @@ impl<'i> Cursor<'i> {
                     self.push_token(TokenKind::Equals);
                 },
 
+                ')' => {
+                    self.input.incr(1);
+                    self.push_token(TokenKind::ModuleClose);
+                    return;
+                },
+
                 '}' => {
                     self.input.incr(1);
                     self.push_token(TokenKind::ModuleClose);
@@ -101,6 +107,7 @@ impl<'i> Cursor<'i> {
                 ':'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '<'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '>'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+                '?'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
                 '~'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
 
                 '@' if self.input.get(1) == Some('{')  => {
@@ -117,17 +124,12 @@ impl<'i> Cursor<'i> {
 
                 '(' => {
                     self.input.incr(1);
-                    self.push_token(TokenKind::OpenParenthesis);
-                    self.tokenize_expression();
+                    self.push_token(TokenKind::ModuleOpen);
+                    self.tokenize_root();
                 },
 
-                ')' => {
-                    self.input.incr(1);
-                    self.push_token(TokenKind::CloseParenthesis);
-                    return;
-                },
+                // ')' => return,
               
-                // '\n' => {self.input.incr(1); self.skip_token()},
                 '\t' | ' ' => {
                     self.input.incr_while(|x| x == '\t' || x == ' ');
                     self.skip_token();
@@ -197,8 +199,9 @@ impl<'i> Cursor<'i> {
 		// if we see a parentheses, tokenize a whole expression
         if self.input.get(0) == Some('(') {
             self.input.incr(1);
-            self.push_token(TokenKind::OpenParenthesis);
-            self.tokenize_expression();
+            self.push_token(TokenKind::ModuleOpen);
+            // self.tokenize_expression();
+            self.tokenize_root();
         } else {
 			self.input.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.' || x == ':');
 			self.push_token(TokenKind::Identifier);

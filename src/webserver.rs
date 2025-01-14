@@ -33,7 +33,7 @@ impl ServBody {
         match input {
 			ServValue::Ref(label) => ServBody::generate(scope.get(label).unwrap(), scope),
 			f @ ServValue::Func(_) => ServBody::generate(f.call(None, scope).unwrap(), scope),
-			ServValue::Raw(t) => Self(Some(t.into())),
+			// ServValue::Raw(t) => Self(Some(t.into())),
 			otherwise => {
     			let mut output = String::new();
 				crate::value::DefaultSerializer(scope).write(otherwise, &mut output).unwrap();
@@ -58,6 +58,18 @@ impl Body for ServBody {
 
 use http_body_util::BodyExt;
 use crate::value::Serializer;
+
+fn get_mime_type<'a>(value: &'a ServValue, scope: &'a Stack) -> Option<String> {
+    if let Ok(v) = scope.get("res.mime") {
+		return Some(v.call(None, scope).ok()?.to_string());
+    }
+
+    if let ServValue::Text(t) = value {
+        return Some(t.mime?.to_string())
+    }
+
+    None
+}
 
 #[derive(Clone)]
 struct Serv(Arc<Stack<'static>>, Arc<Router<ServValue>>);
@@ -84,28 +96,25 @@ impl Service<Request<IncomingBody>> for Serv {
 
     		let mut scope = root.make_child();
         	for (k, v) in matched.params.iter() {
-    			scope.insert(Label::name(k), ServValue::Text(v.to_string()));
+            	let value = ServValue::Text(v.into());
+    			scope.insert(Label::name(k), value);
         	}
 
         	let body: bytes::Bytes = body.collect().await.unwrap().to_bytes();
-        	scope.insert(Label::name("req.body"), ServValue::Raw(body.into()));
+        	scope.insert(Label::name("req.body"), ServValue::Text(body.into()));
         	scope.request = Some(parts);
 
     		let mut response = Response::builder();
 
-        	let result = match matched.value {
+        	let mut result = match matched.value {
             	ServValue::Func(ServFn::Expr(e, _)) => e.clone().eval(&mut scope),
             	value => value.call(None, &scope),
         	}.unwrap();
 
         	response = response.status(200);
 
-        	if let Ok(mime) = scope.get("res.mime") {
-            	let value = mime.call(None, &scope);
-            	// println!("{:?}", value.unwrap().to_string());
-            	// response = response.header("Content-Type", mime.call(None, &scope).unwrap().to_string());
-            	// todo!();
-            	response = response.header("Content-Type", value.unwrap().to_string());
+        	if let Some(mime) = get_mime_type(&result, &scope) {
+            	response = response.header("Content-Type", mime);
         	}
 
         	if let Ok(ServValue::Module(m)) = scope.get("res.headers") {
@@ -117,58 +126,22 @@ impl Service<Request<IncomingBody>> for Serv {
             	}
         	}
 
-			// let mut text = String::new();
-			// crate::value::DefaultSerializer(&scope).write(result, &mut text);
-			// let body = ServBody(Some(text.bytes().collect()));
+        	if let Ok(ServValue::Module(m)) = scope.get("res.cookie") {
+            	for (mut p, mut a) in m.equalities {
+                	let mut child = scope.make_child();
+                	let key   = p.eval(&mut scope).unwrap().to_string();
+                	let value = a.eval(&mut scope).unwrap().to_string();
+                	let cookie_text = format!("{}={};path=/;SameSite=Strict", key, value );
+                	response = response.header("Set-Cookie", &cookie_text);
+            	}
+        	}
+
     		let response_sender = response.body(ServBody::generate(result, &scope)).unwrap();
     		Ok(response_sender)
     	};
 
     	Box::pin(output)
 	}
-
-	// fn call(&self, req: Request<IncomingBody>) -> Self::Future {
- //    	let router = self.0.router.as_ref().unwrap();
- //    	let Ok(matched) = router.at(req.uri().path()) else {
- //        	let text ="<h1>Error 404: Page Not Found</h1>".to_string();
- //        	let res = Response::builder()
- //            	.status(404)
- //            	.body(ServValue::Text(text).into())
- //            	.unwrap();
- //        	return Box::pin(async {Ok(res)})
- //    	};
-
-	// 	let mut scope = self.0.make_child();
- //    	for (k, v) in matched.params.iter() {
-	// 		scope.insert(Label::name(k), ServFunction::Literal(ServValue::Text(v.to_string())));
- //    	}
-
- //    	let result = matched.value.call(ServValue::None, &mut scope).unwrap();
-	// 	let mut response = Response::builder();
-
-	// 	if let Some(data) = result.get_metadata() {
- //    		if let Some(status) = data.get("status") {
- //        		let code = status.expect_int().unwrap().clone();
- //        		response = response.status(u16::try_from(code).unwrap());
- //    		}
-
- //    		if let Some(ServValue::List(headers)) = data.get("headers") {
- //        		for header in headers {
- //            		let text = header.to_string();
- //                	let mut iter = text
- //                    	.split("=")
- //                    	.map(|x| x.trim());
-
- //                	let key = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
- //                	let value = iter.next().unwrap(); // .ok_or("invalid header syntax")?;
- //            		response = response.header(key, value);
- //        		}
- //    		}
-	// 	}
-
-	// 	let response_sender = response.body(result.into()).unwrap();
-	// 	Box::pin(async { Ok(response_sender) })
-	// }
 }
 
 fn get_port(scope: &mut Stack) -> Result<u16, ServError> {

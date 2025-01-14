@@ -35,9 +35,14 @@ impl template::Renderer for SqliteRenderer {
 }
 
 
-fn get_database_location(scope: &Stack) -> Option<String> {
-	let func = scope.get("sql.database").ok()?;
-	Some(func.call(None, scope).ok()?.to_string())
+fn get_database_location(scope: &Stack) -> Result<String, ServError> {
+    let value = scope.get("sql.database")?.call(None, scope)?;
+
+    if let ServValue::Text(output) = value {
+        Ok(output.as_str()?.to_string())
+    } else {
+    	Err(ServError::expected_type("string", value))
+    }
 }
 
 fn sql_exec(input: ServValue, scope: &Stack) -> ServResult {
@@ -54,11 +59,10 @@ fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServVal
             sqlite_bind_param(statement, i, value, scope);
         },
         ServValue::Int(v)    => statement.bind((i, v)).unwrap(),
-        ServValue::Text(t)   => statement.bind((i, t.as_str())).unwrap(),
+        ServValue::Text(t)   => statement.bind((i, t.as_str()?)).unwrap(),
         ServValue::Float(v)  => statement.bind((i, v)).unwrap(),
         ServValue::None      => statement.bind((i, ())).unwrap(),
         ServValue::Bool(v)   => todo!(),
-        ServValue::Raw(v)    => todo!(),
         ServValue::List(v)   => todo!(),
         ServValue::Table(v)  => todo!(),
 
@@ -69,7 +73,7 @@ fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServVal
 }
 
 fn sql(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    let path = get_database_location(scope).unwrap_or("serv.sqlite".to_string());
+    let path = get_database_location(scope)?;
     let connection = sqlite::open(&path).unwrap();
 
 	if let ServValue::Ref(label) = arg {
@@ -100,8 +104,8 @@ fn sql(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
                 },
                 sqlite::Type::Float   => ServValue::Float(statement.read(index).unwrap()),
                 sqlite::Type::Integer => ServValue::Int(statement.read(index).unwrap()),
-                sqlite::Type::String  => ServValue::Text(statement.read(index).unwrap()),
                 sqlite::Type::Null    => ServValue::None,
+                sqlite::Type::String  => statement.read::<String, _>(index).unwrap().into(),
 
             };
 			row.insert(name.clone(), value);
