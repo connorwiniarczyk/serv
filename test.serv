@@ -1,4 +1,1 @@
-print {hello world}
-print {listening on port: $serv.port}
-
-/ => file {index.html}
+/ = let (res.mime = {text/plain}) file {/home/connor/projects/wacd/content.html}

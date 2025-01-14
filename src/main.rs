@@ -9,6 +9,7 @@ mod error;
 mod functions;
 mod template;
 mod value;
+mod servstring;
 mod dictionary;
 mod webserver;
 
@@ -80,8 +81,9 @@ async fn main() {
     }
 
     let mut router = Router::new();
-    for (route, expr) in root_module.routes {
-    	router.insert(route, ServValue::Func(ServFn::Expr(expr, false)));
+    for (route, list) in root_module.routes {
+        router.insert(route, list.as_expr());
+    	// router.insert(route, ServValue::Func(ServFn::Expr(expr, false)));
     }
 
     webserver::run_webserver(scope, router).await;

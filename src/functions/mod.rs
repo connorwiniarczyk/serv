@@ -16,35 +16,39 @@ use std::io::Read;
 mod host;
 mod list;
 mod sql;
+mod request;
+mod math;
 pub mod json;
+
+fn serv_try(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+	let ServValue::Module(m) = arg else { return Err(ServError::expected_type("module", input)) };
+
+	let mut child = scope.make_child();
+    for (label, expr) in m.definitions {
+		child.insert(label, ServValue::Func(ServFn::Expr(expr, false)));
+    }
+
+	let mut output: ServResult = Err(ServError::new(500, "empty try statement"));
+    for mut expr in m.statements {
+        output = expr.eval(&mut child);
+        match &output {
+			Err(_) => (),
+			Ok(ServValue::None) => (),
+			Ok(_) => return output,
+        };
+    }
+
+	output
+}
 
 fn print(input: ServValue, scope: &Stack) -> ServResult {
     println!("{}", input);
     Ok(input)
 }
 
-fn yes(input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Bool(true))
-}
-
-fn hello_world(input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Text("hello world".to_owned()))
-}
 
 fn uppercase(input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Text(input.to_string().to_uppercase()))
-}
-
-fn inline(input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Text(input.to_string().lines().collect()))
-}
-
-fn incr(input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Int(input.expect_int()? + 1))
-}
-
-fn decr(input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Int(input.expect_int()? - 1))
+    Ok(input.to_string().to_uppercase().into())
 }
 
 fn markdown(input: ServValue, scope: &Stack) -> ServResult {
@@ -61,44 +65,25 @@ fn markdown(input: ServValue, scope: &Stack) -> ServResult {
     };
 
     let output = markdown::to_html_with_options(input.to_string().as_str(), &options).unwrap();
-    Ok(ServValue::Text(output))
+    Ok(ServValue::Text(output.into()))
 }
 
-pub fn math_expr(input: ServValue, scope: &Stack) -> ServResult {
-    let expression = input.to_string();
-	let res = evalexpr::eval(expression.as_str()).unwrap();
-	Ok(match res {
-		evalexpr::Value::String(s)  => ServValue::Text(s),
-		evalexpr::Value::Int(x)     => ServValue::Int(x),
-		evalexpr::Value::Boolean(x) => ServValue::Bool(x),
-		evalexpr::Value::Float(x)   => ServValue::Float(x),
-		evalexpr::Value::Empty      => ServValue::None,
-		_ => todo!(),
-	})
-}
 
 fn drop(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     Ok(input)
 }
 
 fn using(mut input: ServList, scope: &mut Stack) -> ServResult {
-   todo!();
- //    let arg = input.pop_front().ok_or("using expects an arg")?;
- //    let text = arg.call(None, &scope)?.to_string();
+    let mut arg = input.next().ok_or("using expects an arg")?;
+    arg = arg.call(None, scope)?;
 
-	// let ast = servparser::parse_root_from_text(&text).unwrap();
-	// let mut new_scope = scope.make_child();
+	let ServValue::Module(m) = arg else { return Err(ServError::expected_type("module", arg))};
 
-	// for declaration in ast.0 {
- //    	if declaration.kind == "word" {
- //        	let key = declaration.key();
- //        	let func = crate::compile(declaration.value, &mut new_scope);
- //        	// new_scope.insert(declaration.key.to_owned().into(), func);
- //        	new_scope.insert(key.into(), func);
- //    	}
-	// }
+	for (key, value) in m.definitions {
+        scope.insert(key, value.as_expr());
+	}
 
- //    eval(input, &mut new_scope)
+	input.eval(scope)
 }
 
 fn as_template(input: ServValue, scope: &Stack) -> ServResult {
@@ -108,14 +93,7 @@ fn as_template(input: ServValue, scope: &Stack) -> ServResult {
 
 pub fn apply(input: ServValue, scope: &Stack) -> ServResult {
     let ServValue::Module(m) = input else { return Err(ServError::expected_type("Module", input)) };
-	let mut child = scope.make_child();
-	let mut result = ServValue::default();
-
-	for mut expr in m.statements {
-    	result = expr.eval(&mut child)?;
-	}
-
-	Ok(result)
+    m.call(None, &mut scope.make_child())
 }
 
 fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
@@ -145,19 +123,32 @@ fn quote(input: ServList, scope: &mut Stack) -> ServResult {
     Ok(ServValue::List(input))
 }
 
-fn choose(mut input: ServList, scope: &mut Stack) -> ServResult {
-    let if_true  = input.pop().unwrap_or(ServValue::None);
-    let if_false = input.pop().unwrap_or(ServValue::None);
+fn choose(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let ServValue::Module(m) = arg else { return Err(ServError::expected_type("module", arg))};
 
-	let value = input.eval(scope)?;
+    let mut child = scope.make_child();
+    let mut index = input.clone();
 
-    match &value {
-        ServValue::None        => if_false,
-        ServValue::Bool(false) => if_false,
-        ServValue::Int(0)      => if_false,
+    for (label, mut expr) in m.definitions {
+        if label == Label::Name("i".to_string()) {
+            expr.push_back(input.clone());
+			index = expr.eval(&mut child)?;
+        }
 
-        otherwise => if_true,
-    }.call(Some(value), scope)
+        child.insert(label, ServValue::Func(ServFn::Expr(expr, false)));
+    }
+
+    let mut path = match index {
+        ServValue::None => m.statements.get(0).unwrap().clone(),
+        ServValue::Bool(b) if b == true => m.statements.get(0).unwrap().clone(),
+        ServValue::Bool(b)  => m.statements.get(1).unwrap().clone(),
+        ServValue::Int(i)   => m.statements.get(i as usize).unwrap().clone(),
+
+        other => panic!("not supported {:?}", other),
+    };
+
+    path.push_back(input);
+    path.eval(&mut child)
 }
 
 fn include(mut input: ServList, scope: &mut Stack) -> ServResult {
@@ -183,82 +174,51 @@ fn switch(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     }
 
     Ok(ServValue::None)
-
- //    let mut expr = input.pop_front().unwrap_or(ServValue::None);
- //    if let ServValue::Ref(label) = expr { expr = scope.get(label).unwrap() };
-
- //    let text = match expr {
- //        ServValue::Func(ServFn::Template(t)) => t.literal_inner(),
- //        ref otherwise => expr.call(None, scope)?,
- //    }.to_string();
-
-	// let ast = servparser::parse_root_from_text(&text).expect("failed to parse switch expression");
- //    let value = crate::value::eval(input, scope)?;
-
- //    let mut child = scope.make_child();
-
-	// for declaration in ast.0 {
- //    	if let crate::ast::Pattern::Expr(pattern) = declaration.key {
- //        	match crate::compile(pattern, &mut child).call(Some(value.clone()), &child)? {
- //            	ServValue::None        => continue,
- //            	ServValue::Bool(false) => continue,
- //            	ServValue::Int(0)      => continue,
- //            	otherwise => {
- //                	return crate::compile(declaration.value, &mut child).call(Some(value.clone()), &child)
- //            	},
- //        	}
- //    	}
-	// }
-
-	// Ok(ServValue::None)
 }
 
-fn equals(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    Ok(ServValue::Bool(match (arg.call(None, scope)?, input) {
-        (ServValue::Int(a), ServValue::Int(b)) => a == b,
-        _ => todo!(),
-    }))
-}
 
 fn parse_module(input: ServValue, scope: &Stack) -> ServResult {
     let module = servparser::parse_root_from_text(&input.to_string()).unwrap();
     Ok(ServValue::Module(module))
 }
 
+pub fn assert(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let test = arg.call(Some(input.clone()), scope)?;
+
+    if test.is_truthy() {
+        return Ok(input)
+    } else {
+        return Err(ServError::new(500, "Assertion Failed"))
+    }
+}
+
 pub fn bind_standard_library(scope: &mut crate::Stack) {
 
-	scope.insert_name("print",       ServValue::Func(ServFn::Core(print)));
-	scope.insert_name("[",           ServValue::Func(ServFn::Core(dequote)));
-	scope.insert_name("]",           ServValue::Func(ServFn::Meta(quote)));
-	scope.insert_name("using",       ServValue::Func(ServFn::Meta(using)));
-	scope.insert_name("let",         ServValue::Func(ServFn::Meta(using)));
-	scope.insert_name("!",           ServValue::Func(ServFn::ArgFn(drop)));
-	scope.insert_name("choose",      ServValue::Func(ServFn::Meta(choose)));
+	// error handling
+	scope.insert_name("try",          ServFn::ArgFn(serv_try).into());
+	scope.insert_name("assert",       ServFn::ArgFn(assert).into());
 
-	scope.insert_name("switch",      ServValue::Func(ServFn::ArgFn(switch)));
+	scope.insert_name("print",        ServFn::Core(print).into());
+	scope.insert_name("[",            ServFn::Core(dequote).into());
+	scope.insert_name("]",            ServFn::Meta(quote).into());
+	scope.insert_name("using",        ServFn::Meta(using).into());
+	scope.insert_name("let",          ServFn::Meta(using).into());
+	scope.insert_name("!",            ServFn::ArgFn(drop).into());
+	scope.insert_name("?",            ServFn::ArgFn(choose).into());
+	scope.insert_name("switch",       ServFn::ArgFn(switch).into());
+	scope.insert_name("include",      ServFn::Meta(include).into());
+	scope.insert_name("*",            ServFn::Core(apply).into());
+	scope.insert_name("uppercase",    ServFn::Core(uppercase).into());
+	scope.insert_name("markdown",     ServFn::Core(markdown).into());
+	scope.insert_name("with.header",  ServFn::Meta(with_headers).into());
+	scope.insert_name("~",            ServFn::Core(as_template).into());
+	scope.insert_name("@",            ServFn::Core(parse_module).into());
 
-	scope.insert_name("include",     ServValue::Func(ServFn::Meta(include)));
-	scope.insert_name("+",           ServValue::Func(ServFn::Core(incr)));
-	scope.insert_name("-",           ServValue::Func(ServFn::Core(decr)));
-	scope.insert_name("eq",          ServValue::Func(ServFn::ArgFn(equals)));
-	scope.insert_name("%",           ServValue::Func(ServFn::Core(math_expr)));
-	scope.insert_name("*",           ServValue::Func(ServFn::Core(apply)));
-	scope.insert_name("hello",       ServValue::Func(ServFn::Core(hello_world)));
-	scope.insert_name("uppercase",   ServValue::Func(ServFn::Core(uppercase)));
-	scope.insert_name("inline",      ServValue::Func(ServFn::Core(inline)));
-	scope.insert_name("markdown",    ServValue::Func(ServFn::Core(markdown)));
-	scope.insert_name("with.header", ServValue::Func(ServFn::Meta(with_headers)));
-	scope.insert_name("~",           ServValue::Func(ServFn::Core(as_template)));
 
-	scope.insert(Label::name("true"), ServValue::Func(ServFn::Core(yes)));
-	scope.insert(Label::name("else"), ServValue::Func(ServFn::Core(yes)));
-
-	scope.insert_name("@", ServValue::Func(ServFn::Core(parse_module)));
-
+	math::bind(scope);
 	list::bind(scope);
 	host::bind(scope);
 	json::bind(scope);
 	sql::bind(scope);
-
-	// request::bind(scope);
+	request::bind(scope);
 }

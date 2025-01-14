@@ -1,11 +1,12 @@
 use crate::ServValue;
 use crate::ServResult;
+use crate::ServError;
 use crate::Stack;
 use crate::servparser;
-use crate::VecDeque;
+use crate::servlist::ServList;
 use crate::{Label, ServFn};
 
-use parsetool::Tokenizer;
+use parsetool::cursor::Tokenizer;
 use std::collections::HashMap;
 
 fn parse_query_string(input: &str) -> ServValue {
@@ -21,23 +22,65 @@ fn parse_query_string(input: &str) -> ServValue {
         cursor.incr_while(|c| c != '&');
         let value = cursor.emit(()).to_string();
         cursor.skip();
-        output.insert(key, ServValue::Text(value));
+        output.insert(key, value.into());
     }
 
     ServValue::Table(output)
 }
 
-fn query_all(input: ServValue, scope: &Scope) -> ServResult {
+fn parse_cookie(input: &str) -> ServValue {
+    let mut output: HashMap<String, ServValue> = HashMap::new();
+
+    let chars: Vec<char> = input.chars().collect();
+    let mut cursor = Tokenizer::new(&chars);
+
+    while !cursor.is_done() {
+        cursor.incr_while(|c| c != '=');
+        let key = cursor.emit(()).to_string().trim().to_string();
+        cursor.skip();
+        cursor.incr_while(|c| c != ';');
+        let value = cursor.emit(()).to_string().trim().to_string();
+        cursor.skip();
+        output.insert(key, value.into());
+    }
+
+    ServValue::Table(output)
+}
+
+fn query_all(input: ServValue, scope: &Stack) -> ServResult {
     let Some(req) = scope.get_request() else { return Ok(ServValue::None) };
     let Some(query) = req.uri.query() else { return Ok(ServValue::None) };
     let table = parse_query_string(&query);
     Ok(table)
 }
 
-fn query_get(input: ServValue, scope: &Scope) -> ServResult {
-    todo!();
+fn get_cookies(input: ServValue, scope: &Stack) -> ServResult {
+    let Some(req) = scope.get_request() else { return Ok(ServValue::None) };
+	let cookie = req.headers.get("Cookie").ok_or(ServError::new(500, "expected a cookie"))?;
+
+	Ok(parse_cookie(cookie.to_str().unwrap()))
 }
 
-pub fn bind(scope: &mut Scope) {
-	scope.insert(FnLabel::name("query"), ServFunction::Core(query_all));
+fn set_cookie(mut input: ServList, scope: &mut Stack) -> ServResult {
+    let mut arg = input.pop()?;
+	arg = arg.call(None, scope)?;
+
+    scope.insert_name("res.cookie", arg);
+    input.eval(scope)
+}
+
+fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
+    let mut arg = input.pop()?;
+	arg = arg.call(None, scope)?;
+
+    scope.insert_name("res.headers", arg);
+    input.eval(scope)
+}
+
+
+pub fn bind(scope: &mut Stack) {
+	scope.insert_name("req.query", ServValue::Func(ServFn::Core(query_all)));
+	scope.insert_name("cookies", ServValue::Func(ServFn::Core(get_cookies)));
+	scope.insert_name("cookie.set", ServValue::Func(ServFn::Meta(set_cookie)));
+	scope.insert_name("with.headers", ServValue::Func(ServFn::Meta(with_headers)));
 }

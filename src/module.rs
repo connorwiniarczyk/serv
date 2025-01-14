@@ -20,6 +20,23 @@ pub struct ServModule {
 }
 
 impl ServModule {
+    pub fn call(self, input: Option<ServValue>, scope: &mut Stack) -> ServResult {
+		if self.statements.len() == 0 { return Ok(ServValue::Module(self)) }
+
+        for (label, expr) in self.definitions {
+			scope.insert(label, ServValue::Func(ServFn::Expr(expr, false)));
+        }
+
+        let mut output = ServValue::None;
+        for mut expr in self.statements {
+            if let Some(ref i) = input {
+                expr.push_back(i.clone());
+            }
+            output = expr.eval(scope)?;
+        }
+
+		Ok(output)
+    }
 
     pub fn push_element(&mut self, input: Element) {
         let Element { pattern, action } = input;

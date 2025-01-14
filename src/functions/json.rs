@@ -46,7 +46,6 @@ impl<'a> Serializer for JsonSerializer<'a> {
 			ServValue::Ref(label) => self.write(self.scope.get(label)?, dest)?,
 			f @ ServValue::Func(_) => self.write(f.call(None, self.scope)?, dest)?,
 
-			ServValue::Raw(ref t)      => todo!("json serialize raw bytes {:?}", value),
 			ServValue::Module(t)   => todo!("json serialize modules"),
 			ServValue::None     => dest.write_str("0")?,
 			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
@@ -54,7 +53,7 @@ impl<'a> Serializer for JsonSerializer<'a> {
 			ServValue::Int(v)   => dest.write_str(&v.to_string())?,
 			ServValue::Text(t)  => {
     			dest.write_str("\"");
-    			dest.write_str(&t);
+    			dest.write_str(t.as_str().unwrap_or("RAW"));
     			dest.write_str("\"")?
 			},
 
@@ -176,7 +175,7 @@ impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
         let valid = [Text, Number, OpenObject, OpenList];
         let token = self.0.next_if(|t| valid.contains(&t.kind)).ok_or(())?;
         let output = match token.kind {
-            Text       => ServValue::Text(token.value),
+            Text       => ServValue::Text(token.value.into()),
             Number     => ServValue::Float(token.value.parse().unwrap()),
             OpenList   => self.parse_list()?,
             OpenObject => self.parse_object()?,

@@ -88,8 +88,7 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
     }
 
     pub fn get_request(&self) -> Option<&Parts> {
-        None
-        // self.request.as_ref().or_else(|| self.parent.and_then(|p| p.get_request()))
+        self.request.as_ref().or_else(|| self.parent.and_then(|p| p.get_request()))
     }
 }
 

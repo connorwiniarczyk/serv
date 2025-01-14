@@ -44,6 +44,7 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
 
 fn parse_word(parser: &mut Parser) -> Result<ServValue, ServError> {
     let token = parser.get(0)?;
+    // println!("{:?}", token);
     let output = match token.kind {
         TokenKind::Identifier   => ServValue::Ref(Label::Name(token.to_string())),
         TokenKind::ListEnd      => ServValue::Ref(Label::Name(token.to_string())),
@@ -54,10 +55,11 @@ fn parse_word(parser: &mut Parser) -> Result<ServValue, ServError> {
             parser.incr();
             ServValue::Module(parse_module(parser)?)
         },
-        TokenKind::OpenParenthesis => {
-            parser.incr();
-            ServValue::Func(ServFn::Expr(parse_expression(parser)?, false))
-        },
+        TokenKind::OpenParenthesis => panic!("unexpected open paren"),
+        // TokenKind::OpenParenthesis => {
+        //     parser.incr();
+        //     ServValue::Func(ServFn::Expr(parse_expression(parser)?, false))
+        // },
 
         k @ _ => return Err("unhandled token".into()),
     };
@@ -68,7 +70,6 @@ fn parse_word(parser: &mut Parser) -> Result<ServValue, ServError> {
 
 fn parse_expression(parser: &mut Parser) -> Result<ServList, ServError> {
     let mut output = ServList::new();
-    // let mut output: Vec<ServValue> = Vec::new();
     while let Ok(word) = parse_word(parser) {
         output.push_back(word);
     }
@@ -76,9 +77,6 @@ fn parse_expression(parser: &mut Parser) -> Result<ServList, ServError> {
     while let Ok(_) = parser.next_if_kind(Semicolon) {}
 
     Ok(output)
-
-   
-    // Ok(ServValue(output.into(), false))
 }
 
 fn get_pattern(mut input: ServList) -> Option<ServValue> {

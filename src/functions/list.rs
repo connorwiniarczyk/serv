@@ -71,9 +71,8 @@ fn pop(input: ServValue, scope: &Stack) -> ServResult {
 
 
 fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    // let output = match (arg.ignore_metadata(), input.ignore_metadata()) {
     let output = match (arg, input) {
-        (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
+        (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key.as_str()?).ok_or("key not found")?,
         (ServValue::Int(index),    ServValue::List(mut list)) => list.get(index.try_into().map_err(|e| "invalid index")?)?.clone(),
         (key, _) => return Err(ServError::expected_type("Int | Text", key)),
     };
@@ -100,7 +99,6 @@ fn generate_list(input: ServList, scope: &mut Stack) -> ServResult {
 }
 
 fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
-    // input = input.ignore_metadata();
     let ServValue::List(list) = input else {
         return Err(ServError::expected_type("List", input))
     };
@@ -114,7 +112,7 @@ fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
             for element in iter {
                 output.push_str(element.to_string().as_str());
             }
-            ServValue::Text(output)
+            output.into()
         },
         otherwise => return Err(ServError::expected_type("Int | Text", otherwise.clone())),
     };
@@ -129,7 +127,7 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("|"),     ServValue::Func(ServFn::Meta(generate_list)));
 	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
 	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
-	scope.insert(Label::name("."),     ServValue::Func(ServFn::ArgFn(get)));
+	scope.insert(Label::name(":"),     ServValue::Func(ServFn::ArgFn(get)));
 	scope.insert(Label::name("with"),  ServValue::Func(ServFn::Meta(with)));
 	scope.insert(Label::name("sum"),   ServValue::Func(ServFn::Core(sum)));
 

@@ -8,6 +8,8 @@ use crate::Label;
 use crate::ServError;
 use crate::ServResult;
 
+
+pub use crate::servstring::ServString;
 pub use crate::servlist::ServList;
 
 #[derive(Clone)]
@@ -20,6 +22,12 @@ pub enum ServFn {
 
     Route(String),
     Template (Template),
+}
+
+impl From<ServFn> for ServValue {
+    fn from(input: ServFn) -> Self{
+       Self::Func(input)
+    }
 }
 
 impl std::fmt::Debug for ServFn {
@@ -45,9 +53,7 @@ pub enum ServValue {
     Bool(bool),
     Int(i64),
     Float(f64),
-    Text(String),
-    Raw(Vec<u8>),
-
+    Text(ServString),
     List(ServList),
     Table(HashMap<String, ServValue>),
 
@@ -58,6 +64,7 @@ impl ServValue {
     pub fn call(&self, input: Option<ServValue>, scope: &Stack) -> ServResult {
        	match self {
            	Self::Ref(label) => scope.get(label.clone())?.call(input, scope),
+			Self::Module(m) => m.clone().call(input, &mut scope.make_child()),
 
            	Self::Func(ServFn::Core(f)) => f(input.unwrap_or_default(), scope),
            	Self::Func(ServFn::Expr(e, _)) => {
@@ -97,6 +104,13 @@ impl ServValue {
         	otherwise => true,
         }
     }
+
+    pub fn as_str(&self) -> Result<&str, ServError> {
+        match self {
+            ServValue::Text(t) => t.as_str(),
+            otherwise => Err(ServError::expected_type("string", self.clone())),
+        }
+    }
 }
 
 impl Default for ServValue {
@@ -117,6 +131,12 @@ impl From<ServList> for ServValue {
     }
 }
 
+impl From<String> for ServValue {
+    fn from(value: String) -> Self {
+        Self::Text(value.into())
+    }
+}
+
 type Buffer<'a> = &'a mut (dyn std::fmt::Write + 'a);
 
 pub trait Serializer {
@@ -131,15 +151,15 @@ impl<'a> Serializer for DefaultSerializer<'a> {
         match value {
 			ServValue::Ref(label) => self.write(self.0.get(label)?, dest)?,
 			f @ ServValue::Func(_) => self.write(f.call(None, self.0)?, dest)?,
-			ServValue::Text(t) => dest.write_str(&t)?,
 
-			ServValue::Raw(bytes) => {
-				if let Ok(t) = std::str::from_utf8(&bytes) {
-    				dest.write_str(&t)?;
+			ServValue::Text(t) => {
+    			if let Ok(inner) = t.as_str() {
+        			dest.write_str(inner)?;
     			} else {
         			dest.write_str("RAW")?;
     			}
 			},
+
 			otherwise => {
 				json::serializer(self.0).write(otherwise, dest)?
 			},
