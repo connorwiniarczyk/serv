@@ -1,5 +1,5 @@
-# items = json.from {{ "name": 1 }}
+a = @serv {
+    test = {hello}
+}
 
-readme = @file {readme.md}
-
-print readme
+print a.test

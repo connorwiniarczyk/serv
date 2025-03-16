@@ -7,6 +7,7 @@ use crate::Stack;
 use crate::Label;
 use crate::ServError;
 use crate::ServResult;
+use crate::functions::json;
 
 pub use crate::servstring::ServString;
 pub use crate::servlist::ServList;
@@ -36,7 +37,6 @@ impl std::fmt::Debug for ServFn {
             Self::Meta(_)     => f.write_str("Meta"),
             Self::ArgFn(_)    => f.write_str("ArgFn"),
             Self::Expr(_, _)  => f.write_str("Expr"),
-            // Self::Route(_)    => f.write_str("Route "),
             Self::Template(_) => f.write_str("Template "),
         }
     }
@@ -61,7 +61,7 @@ pub enum ServValue {
 impl ServValue {
     pub fn call(&self, input: Option<ServValue>, scope: &Stack) -> ServResult {
        	match self {
-           	Self::Ref(label) => scope.get(label.clone())?.call(input, scope),
+           	Self::Ref(label) => scope.search(label.clone())?.call(input, scope),
 			Self::Module(m) => m.clone().call(input, &mut scope.make_child()),
 
            	Self::Func(ServFn::Core(f)) => f(input.unwrap_or_default(), scope),
@@ -75,18 +75,34 @@ impl ServValue {
            	Self::Func(ServFn::Template(t)) => {
                	if let Some(v) = input {
                    	let mut child = scope.make_child();
-                   	child.insert_name("in", v.clone());
-                   	child.insert_name("x", v);
+                   	child.insert("in", v.clone());
+                   	child.insert("x", v);
                    	t.render(&child)
                	}
                	else {
                    	t.render(scope)
                	}
-           	},
-
+          	},
 
            	constant => Ok(constant.clone()),
        	}
+    }
+
+    pub fn get_member<'a>(&self, q: &mut impl Iterator<Item = &'a Label>, scope: &Stack) -> Option<ServValue> {
+        match self {
+            Self::Ref(l) => return scope.get(l.clone()).ok()?.get_member(q, scope),
+            f @ Self::Func(_) => return f.call(None, scope).ok()?.get_member(q, scope),
+            otherwise => (),
+        };
+
+        let Some(label) = q.next() else { return Some(self.clone()); };
+
+        match self {
+            Self::Module(m) => m.values.get(&label).and_then(|v| v.get_member(q, scope)),
+            Self::Ref(_) => unreachable!(),
+            Self::Func(_) => unreachable!(),
+            otherwise => None,
+        }
     }
 
     pub fn expect_int(&self) -> Result<i64, &'static str> {
@@ -167,7 +183,6 @@ impl<'a> Serializer for DefaultSerializer<'a> {
     }
 }
 
-use crate::functions::json;
 
 impl Display for ServValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {

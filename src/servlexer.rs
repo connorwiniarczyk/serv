@@ -55,7 +55,7 @@ fn tokenize_module(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
 }
 
 fn tokenize_expression(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
-    let identifiers: [char; 14] = [ '%', '.', '*', '&', '!', '+', '-', '|', ':', '<', '>', '?', '~', '[' ];
+    let identifiers: [char; 13] = [ '%', '*', '&', '!', '+', '-', '|', ':', '<', '>', '?', '~', '[' ];
 
     while let Some(c) = cursor.get(0) {
         match c {

@@ -57,12 +57,12 @@ pub fn get_module() -> ServModule {
 	output
 }
 
-pub fn bind(scope: &mut Stack) {
-	scope.insert_name("+",  ServFn::Core(incr).into());
-	scope.insert_name("-",  ServFn::Core(decr).into());
-	scope.insert_name("%",  ServFn::Core(math_expr).into());
-	scope.insert_name("eq", ServFn::ArgFn(equals).into());
+// pub fn bind(scope: &mut Stack) {
+// 	scope.insert_name("+",  ServFn::Core(incr).into());
+// 	scope.insert_name("-",  ServFn::Core(decr).into());
+// 	scope.insert_name("%",  ServFn::Core(math_expr).into());
+// 	scope.insert_name("eq", ServFn::ArgFn(equals).into());
 
-	scope.insert_name("true",  ServFn::Core(yes).into());
-	scope.insert_name("else",  ServFn::Core(yes).into());
-}
+// 	scope.insert_name("true",  ServFn::Core(yes).into());
+// 	scope.insert_name("else",  ServFn::Core(yes).into());
+// }

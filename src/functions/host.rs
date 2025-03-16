@@ -90,12 +90,3 @@ pub fn get_module() -> ServModule {
 
 	output
 }
-
-pub fn bind(scope: &mut crate::Stack) {
-	scope.insert(Label::name("file"),            ServValue::Func(ServFn::Core(read_file)));
-	scope.insert(Label::name("ls"),              ServValue::Func(ServFn::Core(read_dir)));
-	scope.insert(Label::name("exec"),            ServValue::Func(ServFn::Core(exec)));
-	scope.insert(Label::name("exec.pipe"),            ServValue::Func(ServFn::ArgFn(exec_pipe)));
-	scope.insert(Label::name("pipe"),            ServValue::Func(ServFn::ArgFn(exec_pipe)));
-
-}

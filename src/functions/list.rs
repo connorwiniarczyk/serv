@@ -47,7 +47,7 @@ fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
 fn with(mut expr: ServList, scope: &mut Stack) -> ServResult {
     let input = expr.eval(scope)?;
     match input {
-        ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert_name(key, value)),
+        ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert(key.as_str(), value)),
         ServValue::Module(t) => scope.insert_module(t.values),
         otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
     };
@@ -148,16 +148,4 @@ pub fn get_module() -> ServModule {
 	output.insert("sum",   ServFn::Core(sum).into());
 
 	output
-}
-
-pub fn bind(scope: &mut Stack) {
-	scope.insert(Label::name("map"), ServValue::Func(ServFn::ArgFn(map)));
-	scope.insert(Label::name("count"), ServValue::Func(ServFn::Core(count)));
-	scope.insert(Label::name("|"),     ServValue::Func(ServFn::Meta(generate_list)));
-	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
-	scope.insert(Label::name("<"),     ServValue::Func(ServFn::Meta(take)));
-	scope.insert(Label::name(":"),     ServValue::Func(ServFn::ArgFn(get)));
-	scope.insert(Label::name("with"),  ServValue::Func(ServFn::Meta(with)));
-	scope.insert(Label::name("sum"),   ServValue::Func(ServFn::Core(sum)));
-
 }

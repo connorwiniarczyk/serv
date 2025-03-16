@@ -133,11 +133,11 @@ impl Service<Request<IncomingBody>> for Serv {
     		let mut scope = root.make_child();
         	for (k, v) in matched.params.iter() {
             	let value = ServValue::Text(v.into());
-    			scope.insert(Label::name(k), value);
+    			scope.insert(k, value);
         	}
 
         	let body: bytes::Bytes = body.collect().await.unwrap().to_bytes();
-        	scope.insert(Label::name("req.body"), ServValue::Text(body.into()));
+        	scope.insert("req.body", ServValue::Text(body.into()));
         	scope.request = Some(parts);
 
     		let mut response = Response::builder();
@@ -167,7 +167,7 @@ fn get_port(scope: &mut Stack) -> Result<u16, ServError> {
     match scope.get("serv.port") {
         Ok(val) => Ok(val.call(None, &scope)?.expect_int()?.try_into().unwrap()),
         Err(e) => {
-            scope.insert_name("serv.port", 4000.into());
+            scope.insert("serv.port", 4000.into());
             Ok(4000)
         },
     }

@@ -87,8 +87,7 @@ fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
         return Err(ServError::expected_type("Module", arg))
     };
 
-    scope.insert_name("res.headers", arg);
-
+    scope.insert("res.headers", arg);
     input.eval(scope)
 }
 

@@ -74,8 +74,8 @@ fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServVal
 
 fn sql(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
     let mut child = s.make_child();
-    child.insert_name("in", input.clone());
-    child.insert_name("x", input);
+    child.insert("in", input.clone());
+    child.insert("x", input);
     let scope = &child;
 
     let path = get_database_location(scope)?;
@@ -119,11 +119,6 @@ fn sql(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
     }
 
     Ok(ServValue::List(output.into()))
-}
-
-pub fn bind(scope: &mut Stack) {
-	scope.insert(Label::name("sql"), ServValue::Func(ServFn::ArgFn(sql)));
-	scope.insert(Label::name("sql.exec"),  ServValue::Func(ServFn::Core(sql_exec)));
 }
 
 use crate::ServModule;

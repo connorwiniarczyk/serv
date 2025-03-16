@@ -46,7 +46,8 @@ impl<'a> Serializer for JsonSerializer<'a> {
 			ServValue::Ref(label) => self.write(self.scope.get(label)?, dest)?,
 			f @ ServValue::Func(_) => self.write(f.call(None, self.scope)?, dest)?,
 
-			ServValue::Module(t)   => todo!("json serialize modules"),
+			// ServValue::Module(t)   => todo!("json serialize modules"),
+			ServValue::Module(t)   => dest.write_str("module")?,
 			ServValue::None     => dest.write_str("0")?,
 			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
 			ServValue::Float(v) => dest.write_str(&v.to_string())?,
@@ -232,9 +233,4 @@ pub fn get_module() -> ServModule {
 	output.insert("json.from", ServFn::Core(json_from).into());
 
 	output
-}
-
-pub fn bind(scope: &mut Stack) {
-	scope.insert(Label::name("json"),      ServValue::Func(ServFn::Core(json_from)));
-	scope.insert(Label::name("json.from"), ServValue::Func(ServFn::Core(json_from)));
 }

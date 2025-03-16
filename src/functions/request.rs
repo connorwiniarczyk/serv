@@ -6,6 +6,8 @@ use crate::servparser;
 use crate::datatypes::servlist::ServList;
 use crate::{Label, ServFn};
 
+use crate::ServModule;
+
 use parsetool::cursor::Tokenizer;
 use std::collections::HashMap;
 
@@ -65,7 +67,7 @@ fn set_cookie(mut input: ServList, scope: &mut Stack) -> ServResult {
     let mut arg = input.pop()?;
 	arg = arg.call(None, scope)?;
 
-    scope.insert_name("res.cookie", arg);
+    scope.insert("res.cookie", arg);
     input.eval(scope)
 }
 
@@ -73,18 +75,10 @@ fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
     let mut arg = input.pop()?;
 	arg = arg.call(None, scope)?;
 
-    scope.insert_name("res.headers", arg);
+    scope.insert("res.headers", arg);
     input.eval(scope)
 }
 
-pub fn bind(scope: &mut Stack) {
-	scope.insert_name("req.query", ServValue::Func(ServFn::Core(query_all)));
-	scope.insert_name("cookies", ServValue::Func(ServFn::Core(get_cookies)));
-	scope.insert_name("cookie.set", ServValue::Func(ServFn::Meta(set_cookie)));
-	scope.insert_name("with.headers", ServValue::Func(ServFn::Meta(with_headers)));
-}
-
-use crate::ServModule;
 
 pub fn get_module() -> ServModule {
     let mut output = ServModule::empty();

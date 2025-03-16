@@ -29,6 +29,17 @@ impl ServModule {
         Self { values: HashMap::new(), statements: Vec::new() }
     }
 
+   //  pub fn get(&self, i: &mut impl Iterator<Item=Label>) -> Option<ServValue> {
+   //      let mut active = self;
+   //      while let Some(n) = i.next() {
+   //          let next = active.values.get(&n)?;
+			// match next {
+   //  			ServValue::Module(m)
+			// }
+   //      }
+   //      todo!();
+   //  }
+
     pub fn insert<L: Into<Label>>(&mut self, label: L, value: ServValue) {
         self.values.insert(label.into(), value);
     }

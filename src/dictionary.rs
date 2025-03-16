@@ -3,6 +3,8 @@ use std::fmt::Display;
 use matchit::Router;
 use crate::ServError;
 
+use std::collections::VecDeque;
+
 use hyper::body::{Body, Frame, Incoming as IncomingBody};
 use hyper::{ Request, Response };
 use hyper::http::request::Parts;
@@ -14,9 +16,25 @@ pub enum Label {
     Anonymous(u32),
 }
 
+struct LabelParts<'a>(&'a Label, u32);
+
+impl<'a> Iterator for LabelParts<'a> {
+    type Item = &'a Label;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.1 == 1 {
+            return None
+        } else {
+            self.1 += 1;
+            return Some(self.0);
+        }
+    }
+}
+
 impl Label {
-    pub fn name(input: &str) -> Self { Self::Name(input.to_string()) }
-    pub fn anonymous(input: u32) -> Self { Self::Anonymous(input) }
+    pub fn parts(&self) -> impl Iterator<Item = &Label> {
+        LabelParts(self, 0)
+    }
 }
 
 impl From<&str> for Label {
@@ -24,6 +42,7 @@ impl From<&str> for Label {
         Self::Name(input.to_string())
     }
 }
+
 
 #[derive(Clone)]
 pub struct StackDictionary<'parent, V> {
@@ -53,13 +72,9 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
         }
     }
 
-    pub fn insert(&mut self, key: Label, value: V) {
-        self.words.insert(key, value);
+    pub fn insert<L: Into<Label>>(&mut self, key: L, value: V) {
+        self.words.insert(key.into(), value);
     }
-
-    // pub fn insert_name(&mut self, key: &str, value: V) {
-    //     self.words.insert(Label::name(key), value);
-    // }
 
     pub fn insert_module(&mut self, value: HashMap<Label, V>) {
         self.words.extend(value);
@@ -75,14 +90,18 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
         let key: Label = l.into();
         let value = self.words.get(&key);
 
-        if let Some(v) = value { return Ok(v.clone()) };
+        if let Some(v) = value {
+            return Ok(v.clone());
+        };
 
-		let Some(parent) = self.parent else { return Err(ServError::MissingLabel(key)) };
+		let Some(parent) = self.parent else {
+    		return Err(ServError::MissingLabel(key));
+		};
 
 		return parent.get(key)
     }
 
-    pub fn get_unique_id(&mut self) -> u32 {
+    fn get_unique_id(&mut self) -> u32 {
 		let output = self.unique_id;
 		self.unique_id += 1;
 		return output

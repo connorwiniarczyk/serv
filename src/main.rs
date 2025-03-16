@@ -22,7 +22,24 @@ use matchit::Router;
 use dictionary::StackDictionary;
 
 type ServResult = Result<ServValue, ServError>;
+
 type Stack<'a> = StackDictionary<'a, ServValue>;
+
+impl Stack<'_> {
+    fn search(&self, input: Label) -> Result<ServValue, ServError> {
+        let Label::Name(text) = input else {
+            return self.get(input);
+        };
+
+        let fields: Vec<Label> = text.split(".").map(|x| Label::Name(x.to_owned())).collect();
+        let mut iter = fields.iter();
+
+        let first = iter.next().ok_or(ServError::new(500, "missing"))?;
+		let mut value = self.get(first.clone())?;
+
+		value.get_member(&mut iter, self).ok_or(ServError::new(500, "missing"))
+    }
+}
 
 
 /// A parser for serv files
@@ -57,7 +74,7 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError> {
 fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
     if scope.get("serv.port").is_err() {
         let port: i64 = args.port.into();
-        scope.insert_name("serv.port", port.into());
+        scope.insert("serv.port", port.into());
     }
 }
 
@@ -71,10 +88,6 @@ async fn main() {
     scope.insert_module(functions::standard_library().values);
     scope.insert_module(root_module.values.clone());
 
-    // for (label, expression) in root_module.definitions {
-    //     scope.insert(label, ServValue::Func(ServFn::Expr(expression, false)));
-    // }
-
     populate_defaults(&mut scope, &args);
 
     for expr in &root_module.statements {
@@ -84,7 +97,6 @@ async fn main() {
     let mut router = Router::new();
     for (route, list) in root_module.routes() {
         router.insert(route, list.clone());
-    	// router.insert(route, ServValue::Func(ServFn::Expr(expr, false)));
     }
 
     webserver::run_webserver(scope, router).await;
