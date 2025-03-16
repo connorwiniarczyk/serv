@@ -10,6 +10,7 @@ use hyper::http::request::Parts;
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Label {
     Name(String),
+    Route(String),
     Anonymous(u32),
 }
 
@@ -27,8 +28,8 @@ impl From<&str> for Label {
 #[derive(Clone)]
 pub struct StackDictionary<'parent, V> {
     unique_id: u32,
-	pub parent: Option<&'parent Self>,
-	pub words: HashMap<Label, V>,
+	parent: Option<&'parent Self>,
+	words: HashMap<Label, V>,
 
 	// metadata: Option<M>,
 	pub request: Option<Parts>,
@@ -40,10 +41,7 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
             unique_id: 0,
             words: HashMap::new(),
             parent: None,
-
-			// deprecated
             request: None,
-            // router: Some(Router::new()),
         }
     }
 
@@ -62,6 +60,10 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
 
     pub fn insert_name(&mut self, key: &str, value: V) {
         self.words.insert(Label::name(key), value);
+    }
+
+    pub fn insert_module(&mut self, value: HashMap<Label, V>) {
+        self.words.extend(value);
     }
 
     pub fn insert_anonymous(&mut self, value: V) -> Label {
@@ -97,6 +99,7 @@ impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match (self) {
             Self::Name(s) => f.write_str(s)?,
+            Self::Route(s) => f.write_str(s)?,
             Self::Anonymous(id) => write!(f, "anonymous function {}", id)?,
         };
 
@@ -112,16 +115,5 @@ mod tests {
 	fn test() {
     	let mut one: StackDictionary<String, Vec<String>> = StackDictionary::empty();
     	one.insert("hello".to_owned(), vec![])
-		// let mut test = StackDictionary { words: HashMap::new(), parent: None };
-		// test.insert("1", "2");
-
-		// abcd(&test);
-
-  //       println!("{:?}", test.get("hi"));
-
-		// let test2 = test.make_child();
-		// let test3 = test2.make_child();
-
-		// panic!("{:?}", test3.get("1"));
 	}
 }

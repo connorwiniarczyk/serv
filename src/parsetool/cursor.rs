@@ -36,6 +36,14 @@ impl<'input> Tokenizer<'input> {
         output
     }
 
+    pub fn emit_to<K>(&mut self, output: &mut Vec<Token<K>>, k: K) {
+        output.push(self.emit(k));
+    }
+
+    pub fn skip_token(&mut self) {
+        _ = self.emit(());
+    }
+
     pub fn get(&mut self, offset: usize) -> Option<char>{
         let index = self.index + offset;
         if index >= self.input.len() { return None };

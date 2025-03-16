@@ -1,14 +1,17 @@
 use crate::template::{Template, TemplateElement};
 use crate::{ ServValue, ServFn, Label };
-use crate::module::{ ServModule };
-use crate::module;
-use crate::value;
-use crate::value::ServList;
+use crate::datatypes::module::{ ServModule, Element };
+use crate::datatypes::module;
+use crate::datatypes::value;
+use crate::datatypes::value::ServList;
 
 use crate::servlexer::{TokenKind, TokenKind::*};
 use crate::servlexer;
+
 use parsetool::cursor::Token;
-use parsetool::parser::ServError;
+use parsetool::ParseError;
+
+use crate::error::ServError;
 
 type Parser<'a> = parsetool::parser::Parser<'a, TokenKind>;
 
@@ -26,7 +29,7 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
         	},
         	TokenKind::Dollar => elements.push({
             	parser.incr();
-            	TemplateElement::Expression(parse_word(parser)?)
+            	TemplateElement::Expression(parse_word(parser, &ServModule::empty())?)
         	}),
 
         	TokenKind::TemplateOpen => {
@@ -42,80 +45,120 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
 	Ok(Template { open, close, elements })
 }
 
-fn parse_word(parser: &mut Parser) -> Result<ServValue, ServError> {
+fn parse_word(parser: &mut Parser, m: &ServModule) -> Result<ServValue, ServError> {
     let token = parser.get(0)?;
-    // println!("{:?}", token);
     let output = match token.kind {
         TokenKind::Identifier   => ServValue::Ref(Label::Name(token.to_string())),
-        TokenKind::ListEnd      => ServValue::Ref(Label::Name(token.to_string())),
         TokenKind::IntLiteral   => ServValue::Int(token.to_string().parse::<i64>().unwrap().into()),
-        TokenKind::Route        => ServValue::Func(ServFn::Route(token.to_string())),
+        TokenKind::Route        => ServValue::Ref(Label::Route(token.to_string())),
         TokenKind::TemplateOpen => ServValue::Func(ServFn::Template(parse_template(parser)?.into())),
         TokenKind::ModuleOpen   => {
             parser.incr();
             ServValue::Module(parse_module(parser)?)
         },
-        TokenKind::OpenParenthesis => panic!("unexpected open paren"),
+        TokenKind::At => {
+            parser.incr();
+
+            let mut expr = ServList::new();
+            while let Ok(word) = parse_word(parser, m) {
+                expr.push_back(word);
+            }
+
+            // let mut expr = parse_expression(parser, m)?;
+            let mut scope = Stack::empty();
+
+        	scope.insert_module(crate::functions::standard_library().values);
+        	scope.insert_module(m.values.clone());
+        	let result = expr.eval(&mut scope)?;
+
+        	return Ok(result)
+
+        	// println!("{}", result);
+
+			// result
+        },
+        // TokenKind::OpenParenthesis => panic!("unexpected open paren"),
         // TokenKind::OpenParenthesis => {
         //     parser.incr();
         //     ServValue::Func(ServFn::Expr(parse_expression(parser)?, false))
         // },
 
-        k @ _ => return Err("unhandled token".into()),
+        k => return Err("unhandled token".into()),
     };
 
     parser.incr();
     Ok(output)
 }
 
-fn parse_expression(parser: &mut Parser) -> Result<ServList, ServError> {
+fn parse_expression(parser: &mut Parser, m: &ServModule) -> Result<ServList, ServError> {
     let mut output = ServList::new();
-    while let Ok(word) = parse_word(parser) {
+    while let Ok(word) = parse_word(parser, m) {
         output.push_back(word);
     }
 
-    while let Ok(_) = parser.next_if_kind(Semicolon) {}
+    while let Ok(_) = parser.next_if_kind(ModuleSeparator) {}
 
     Ok(output)
 }
 
-fn get_pattern(mut input: ServList) -> Option<ServValue> {
-    if input.len() == 0 { return None };
-    if input.len()  > 1 { return Some(ServValue::Func(ServFn::Expr(input, false))) };
+fn get_label(mut input: ServList) -> Result<Label, ServError> {
+    if input.len() == 0 { return Err(ServError::new(500, "missing label before declaration")) };
+    if input.len() >= 2 { return Err(ServError::new(500, "labels must be exactly 1 word")) };
 
-    match input.pop().unwrap() {
-        route @ ServValue::Func(ServFn::Route(_)) => Some(route),
-        label @ ServValue::Ref(_) => Some(label),
-        other => {
-            input.push(other);
-            Some(ServValue::Func(ServFn::Expr(input, false)))
-        },
-    }
-}
-
-fn parse_declaration(parser: &mut Parser) -> Result<module::Element, ServError> {
-    while let Ok(_) = parser.next_if_kind(Semicolon) {}
-
-    let lhs = parse_expression(parser)?;
-    let Ok(_) = parser.next_if_kind(Equals) else {
-        return Ok(module::Element { pattern: None, action: lhs })
-    };
-
-    let rhs = parse_expression(parser)?;
-
-    Ok(module::Element{ pattern: get_pattern(lhs), action: rhs })
-}
-
-fn parse_module(parser: &mut Parser) -> Result<ServModule, ServError> {
-	let mut output: Vec<module::Element> = Vec::new();
-
-	while parser.get(0).is_ok() {
-    	if parser.get(0)?.kind == ModuleClose { break; }
-    	if parser.get(0)?.kind == Comment { continue };
-    	output.push(parse_declaration(parser)?);
+	match input.pop().unwrap() {
+    	ServValue::Ref(label) => Ok(label),
+    	otherwise => Err(ServError::new(500, "definition did not start with a valid label")),
 	}
 
-	Ok(ServModule::from_elements(output.into_iter()))
+}
+
+fn parse_declaration(parser: &mut Parser, m: &ServModule) -> Result<(Option<Label>, ServList), ServError> {
+
+    // ignore multiple line breaks in a row
+    while let Ok(_) = parser.next_if_kind(ModuleSeparator) {}
+
+    let lhs = parse_expression(parser, &ServModule::empty())?;
+    let Ok(_) = parser.next_if_kind(Equals) else {
+        return Ok((None, lhs.into()))
+    };
+
+    let label = get_label(lhs)?;
+    let rhs = parse_expression(parser, m)?;
+    Ok((Some(label), rhs.into()))
+}
+
+use crate::Stack;
+
+fn parse_module(parser: &mut Parser) -> Result<ServModule, ServError> {
+    let mut output = ServModule::default();
+
+	while parser.get(0).is_ok() {
+    	if parser.get(0)?.kind == ModuleClose { break };
+    	if parser.get(0)?.kind == Comment { continue };
+
+    	// include statements need to be executed at parsetime
+    	if parser.get(0)?.kind == Include {
+        	parser.incr();
+        	let (label, mut expr) = parse_declaration(parser, &output)?;
+        	if label.is_some() { return Err(ServError::new(500, "")) };
+
+        	let mut scope = Stack::empty();
+        	scope.insert_module(crate::functions::standard_library().values);
+        	scope.insert_module(output.values.clone());
+
+        	let result = expr.eval(&mut scope)?;
+        	let ServValue::Module(m) = result else {
+            	return Err(ServError::new(500, "include statements require a module type"));
+        	};
+
+        	output.values.extend(m.values);
+    	}
+
+    	let (label, value) = parse_declaration(parser, &output)?;
+    	output.insert_declaration(label, value);
+	}
+
+	Ok(output)
 }
 
 pub fn parse_template_from_text(input: &str, brackets: bool) -> Result<Template, ServError> {
@@ -140,7 +183,7 @@ pub fn parse_expression_from_text(input: &str) -> Result<ServValue, ServError> {
 
 pub fn parse_root_from_text(input: &str) -> Result<ServModule, ServError> {
     let chars: Vec<char> = input.chars().collect();
-    let tokens = servlexer::tokenize_serv(&chars);
+    let tokens = servlexer::tokenize(&chars);
     let mut parser = Parser::new(&tokens);
     let ast = parse_module(&mut parser)?;
 

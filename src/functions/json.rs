@@ -220,7 +220,18 @@ fn parse_json_from_str(input: &str) -> ServValue {
 }
 
 fn json_from(input: ServValue, scope: &Stack) -> ServResult {
+    // println!("{:?}", input.clone().to_string());
     Ok(parse_json_from_str(&input.to_string()))
+}
+
+use crate::ServModule;
+
+pub fn get_module() -> ServModule {
+    let mut output = ServModule::empty();
+	output.insert("json",      ServFn::Core(json_from).into());
+	output.insert("json.from", ServFn::Core(json_from).into());
+
+	output
 }
 
 pub fn bind(scope: &mut Stack) {

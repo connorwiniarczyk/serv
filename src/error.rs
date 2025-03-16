@@ -32,6 +32,12 @@ impl std::fmt::Display for ServError {
     }
 }
 
+impl From<std::str::Utf8Error> for ServError {
+    fn from(input: std::str::Utf8Error) -> Self {
+        todo!();
+    }
+}
+
 impl From<&str> for ServError {
     fn from(input: &str) -> Self {
         Self::new(500, input)
@@ -47,5 +53,11 @@ impl From<std::io::Error> for ServError {
 impl From<std::fmt::Error> for ServError {
     fn from(input: std::fmt::Error) -> Self {
         Self::Fmt(input)
+    }
+}
+
+impl From<parsetool::ParseError> for ServError {
+    fn from(input: parsetool::ParseError) -> Self {
+        Self::new(500, &input.to_string())
     }
 }

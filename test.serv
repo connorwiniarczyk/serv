@@ -1,1 +1,5 @@
-/ => {hello world}
+# items = json.from {{ "name": 1 }}
+
+readme = @file {readme.md}
+
+print readme

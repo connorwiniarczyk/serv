@@ -80,6 +80,17 @@ fn read_dir(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::List(output))
 }
 
+pub fn get_module() -> ServModule {
+    let mut output = ServModule::empty();
+	output.insert("file",       ServFn::Core(read_file).into());
+	output.insert("ls",         ServFn::Core(read_dir).into());
+	output.insert("exec",       ServFn::Core(exec).into());
+	output.insert("exec.pipe",  ServFn::ArgFn(exec_pipe).into());
+	output.insert("pipe",       ServFn::ArgFn(exec_pipe).into());
+
+	output
+}
+
 pub fn bind(scope: &mut crate::Stack) {
 	scope.insert(Label::name("file"),            ServValue::Func(ServFn::Core(read_file)));
 	scope.insert(Label::name("ls"),              ServValue::Func(ServFn::Core(read_dir)));

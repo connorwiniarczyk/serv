@@ -8,7 +8,6 @@ use crate::Label;
 use crate::ServError;
 use crate::ServResult;
 
-
 pub use crate::servstring::ServString;
 pub use crate::servlist::ServList;
 
@@ -20,7 +19,6 @@ pub enum ServFn {
     ArgFn    (fn(ServValue, ServValue, &Stack) -> ServResult),
     Expr     (ServList, bool),
 
-    Route(String),
     Template (Template),
 }
 
@@ -38,7 +36,7 @@ impl std::fmt::Debug for ServFn {
             Self::Meta(_)     => f.write_str("Meta"),
             Self::ArgFn(_)    => f.write_str("ArgFn"),
             Self::Expr(_, _)  => f.write_str("Expr"),
-            Self::Route(_)    => f.write_str("Route "),
+            // Self::Route(_)    => f.write_str("Route "),
             Self::Template(_) => f.write_str("Template "),
         }
     }
@@ -78,7 +76,7 @@ impl ServValue {
                	if let Some(v) = input {
                    	let mut child = scope.make_child();
                    	child.insert_name("in", v.clone());
-                   	child.insert_name(":", v);
+                   	child.insert_name("x", v);
                    	t.render(&child)
                	}
                	else {

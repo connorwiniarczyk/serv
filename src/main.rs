@@ -1,19 +1,19 @@
 #![allow(unused)]
 
+mod datatypes;
+
+use datatypes::*;
+
 mod servlexer;
 mod servparser;
-mod module;
-mod servlist;
 
 mod error;
 mod functions;
-mod template;
-mod value;
-mod servstring;
 mod dictionary;
 mod webserver;
 
-use module::ServModule;
+use datatypes::module::ServModule;
+
 use error::ServError;
 use value::{ ServValue, ServFn };
 use dictionary::Label;
@@ -47,7 +47,7 @@ struct CliArgs {
 
 }
 
-fn get_input(args: &mut CliArgs) -> Result<String, ServError>{
+fn get_input(args: &mut CliArgs) -> Result<String, ServError> {
     if let Some(output) = args.code.take() { return Ok(output) }
 
     let path = args.path.take().unwrap_or("main.serv".into());
@@ -68,21 +68,22 @@ async fn main() {
     let root_module = servparser::parse_root_from_text(&input).unwrap();
     let mut scope = Stack::empty();
 
-	functions::bind_standard_library(&mut scope);
+    scope.insert_module(functions::standard_library().values);
+    scope.insert_module(root_module.values.clone());
 
-    for (label, expression) in root_module.definitions {
-        scope.insert(label, ServValue::Func(ServFn::Expr(expression, false)));
-    }
+    // for (label, expression) in root_module.definitions {
+    //     scope.insert(label, ServValue::Func(ServFn::Expr(expression, false)));
+    // }
 
     populate_defaults(&mut scope, &args);
 
-    for mut expr in root_module.statements {
-        expr.eval(&mut scope).expect("failed expression");
+    for expr in &root_module.statements {
+        expr.clone().eval(&mut scope).expect("failed expression");
     }
 
     let mut router = Router::new();
-    for (route, list) in root_module.routes {
-        router.insert(route, list.as_expr());
+    for (route, list) in root_module.routes() {
+        router.insert(route, list.clone());
     	// router.insert(route, ServValue::Func(ServFn::Expr(expr, false)));
     }
 

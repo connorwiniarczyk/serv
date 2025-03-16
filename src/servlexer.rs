@@ -3,222 +3,196 @@ use parsetool::cursor::{Tokenizer, Token};
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum TokenKind {
     Identifier,
-    IntLiteral,
     Route,
+    Equals,
+
+    IntLiteral,
+
     TemplateOpen,
     TemplateClose,
     TemplateText,
     TemplateVariable,
+    Dollar,
 
     ModuleOpen,
     ModuleClose,
-
-    Semicolon,
+    ModuleSeparator,
 
     Comment,
-
-	OpenParenthesis,
-	CloseParenthesis,
-	ListEnd,
-
-    WhiteSpace,
+    Include,
     At,
-    Equals,
-    Dollar,
-    NewLine,
 }
 
-struct Cursor<'input> {
-    input: Tokenizer<'input>,
-    output: Vec<Token<TokenKind>>,
+fn tokenize_module(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
+    while let Some(c) = cursor.get(0) {
+        match c {
+            ';' | ',' | '\n' => {
+                cursor.incr(1);
+                cursor.emit_to(output, TokenKind::ModuleSeparator)
+            },
+
+            '#'  => {
+                cursor.incr(1);
+                cursor.incr_while(|x| x != '\n' && x != '#');
+                cursor.skip_token();
+            },
+
+            '=' => {
+                let i = if cursor.get(1) == Some('>') {2} else {1};
+                cursor.incr(i);
+                cursor.emit_to(output, TokenKind::Equals);
+            },
+
+            ')' => {
+                cursor.incr(1);
+                cursor.emit_to(output, TokenKind::ModuleClose);
+                return;
+            },
+
+            otherwise => tokenize_expression(cursor, output),
+        }
+    }
 }
 
-impl<'i> Cursor<'i> {
-    fn new(input: &'i [char]) -> Self {
-        Self {
-            input: Tokenizer::new(input),
-            output: Vec::new(),
-        }
-    }
+fn tokenize_expression(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
+    let identifiers: [char; 14] = [ '%', '.', '*', '&', '!', '+', '-', '|', ':', '<', '>', '?', '~', '[' ];
 
-    fn push_token(&mut self, kind: TokenKind) {
-        self.output.push(self.input.emit(kind));
-    }
-
-    fn skip_token(&mut self) {
-        _ = self.input.emit(());
-    }
-
-    fn tokenize_root(&mut self) {
-        while let Some(c) = self.input.get(0) {
-            match c {
-                '/' => {
-                    self.input.incr_while(|x| !x.is_whitespace());
-                    self.push_token(TokenKind::Route);
-                },
-
-                ';' | '\n' => {
-                    self.input.incr(1);
-                    self.push_token(TokenKind::Semicolon)
-                },
-
-                '#'  => {
-                    self.input.incr(1);
-                    self.input.incr_while(|x| x != '\n' && x != '#');
-                    self.skip_token();
-                },
-
-                '=' => {
-                    let i = if self.input.get(1) == Some('>') {2} else {1};
-                    self.input.incr(i);
-                    self.push_token(TokenKind::Equals);
-                },
-
-                ')' => {
-                    self.input.incr(1);
-                    self.push_token(TokenKind::ModuleClose);
-                    return;
-                },
-
-                '}' => {
-                    self.input.incr(1);
-                    self.push_token(TokenKind::ModuleClose);
-                    return;
-                },
-
-                _ => self.tokenize_expression(),
-            }
-        }
-    }
-
-    fn tokenize_expression(&mut self) {
-        while let Some(c) = self.input.get(0) {
-            match c {
-                '$'  => {self.input.incr(1); self.push_token(TokenKind::Dollar)},
-                '%'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '.'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '*'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '&'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '!'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '+'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '-'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '|'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-
-                ':'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '<'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '>'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '?'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                '~'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-
-                '@' if self.input.get(1) == Some('{')  => {
-                    self.input.incr(2);
-                    self.push_token(TokenKind::ModuleOpen);
-                    self.tokenize_root();
-                },
-
-                '@'  => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
+    while let Some(c) = cursor.get(0) {
+        match c {
+            '@'  => { cursor.incr(1); cursor.emit_to(output, TokenKind::At) },
 
 
-                '[' => {self.input.incr(1); self.push_token(TokenKind::Identifier)},
-                ']' => {self.input.incr(1); self.push_token(TokenKind::ListEnd)},
+            '/' => {
+                cursor.incr_while(|x| !x.is_whitespace());
+                cursor.emit_to(output, TokenKind::Route);
+            },
 
-                '(' => {
-                    self.input.incr(1);
-                    self.push_token(TokenKind::ModuleOpen);
-                    self.tokenize_root();
-                },
-
-                // ')' => return,
-              
-                '\t' | ' ' => {
-                    self.input.incr_while(|x| x == '\t' || x == ' ');
-                    self.skip_token();
-                },
+            '(' => {
+                cursor.incr(1);
+                cursor.emit_to(output, TokenKind::ModuleOpen);
+                tokenize_module(cursor, output);
+            },
+          
+            '\t' | ' ' => {
+                cursor.incr_while(|x| x == '\t' || x == ' ');
+                cursor.skip_token();
+            },
+        
+            '{' => tokenize_template(cursor, output, true),
             
-                '{' | '"' => self.tokenize_template(true),
-                
-                c @ _ if c.is_alphabetic() => {
-                    self.input.incr_while( |x| x.is_alphanumeric() || x == '_' || x == '.');
-                    self.push_token(TokenKind::Identifier);
-                },
-                
-                c @ _ if c.is_digit(10) => {
-                    self.input.incr_while(|x| x.is_digit(10));
-                    self.push_token(TokenKind::IntLiteral);
-                },
+            c if identifiers.contains(&c) => { cursor.incr(1); cursor.emit_to(output, TokenKind::Identifier) },
 
-                _ => return,
+            '"' => {
+				cursor.incr(1);
+				cursor.skip_token();
+				cursor.incr_while(|x| x != '"');
+				cursor.emit_to(output, TokenKind::Identifier);
+				cursor.incr(1);
+				cursor.skip_token();
+            },
+
+            c if c.is_alphabetic() => {
+                cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.');
+
+				// include needs to be special since it is executed at parsetime
+                let mut ident = cursor.emit(TokenKind::Identifier);
+                if ident.value == "include" { ident.kind = TokenKind::Include };
+                output.push(ident);
+            },
+            
+            c if c.is_digit(10) => {
+                cursor.incr_while(|x| x.is_digit(10));
+                cursor.emit_to(output, TokenKind::IntLiteral);
+            },
+
+            otherwise => return,
+        }
+	}
+}
+
+fn tokenize_template(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>, brackets: bool) {
+    if brackets {
+        assert_eq!(cursor.get(0), Some('{'));
+        cursor.incr(1);
+    }
+
+    cursor.emit_to(output, TokenKind::TemplateOpen);
+    let special_characters = ['{', '\\', '$', '}'];
+    let close_test = if brackets { Some('}') } else { None };
+
+    while cursor.get(0) != close_test {
+        let c = cursor.get(0).unwrap();
+        match c {
+            '{'  => tokenize_template(cursor, output, true),
+            '$'  => tokenize_dollar(cursor, output),
+            '\\' => tokenize_escape_sequence(cursor, output),
+
+            c  => {
+                cursor.incr_while(|x| !special_characters.contains(&x));
+                cursor.emit_to(output, TokenKind::TemplateText);
             }
-    	}
-    }
-
-    fn tokenize_template(&mut self, brackets: bool) {
-        if brackets {
-            assert_eq!(self.input.get(0), Some('{'));
-            self.input.incr(1);
-        }
-
-        self.push_token(TokenKind::TemplateOpen);
-        let special_characters = ['{', '\\', '$', '}'];
-        let close_test = if brackets { Some('}') } else { None };
-
-        while self.input.get(0) != close_test {
-            let c = self.input.get(0).unwrap();
-            match c {
-                '{'  => self.tokenize_template(true),
-                '$'  => self.tokenize_dollar(),
-                '\\' => self.tokenize_escape_sequence(),
-
-                _  => {
-                    self.input.incr_while(|x| !special_characters.contains(&x));
-                    self.push_token(TokenKind::TemplateText);
-                }
-            }
-        }
-
-        if brackets { self.input.incr(1); }
-        self.push_token(TokenKind::TemplateClose);
-    }
-
-
-    fn tokenize_dollar(&mut self) {
-        assert_eq!(self.input.get(0), Some('$'));
-
-		// treat '$$' as escaped '$'
-        if self.input.get(1) == Some('$') {
-            self.input.incr(1);
-            self.skip_token();
-            self.input.incr(1);
-            self.push_token(TokenKind::TemplateText);
-            return;
-        }
-
-        self.input.incr(1);
-        self.push_token(TokenKind::Dollar);
-
-		// if we see a parentheses, tokenize a whole expression
-        if self.input.get(0) == Some('(') {
-            self.input.incr(1);
-            self.push_token(TokenKind::ModuleOpen);
-            // self.tokenize_expression();
-            self.tokenize_root();
-        } else {
-			self.input.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.' || x == ':');
-			self.push_token(TokenKind::Identifier);
         }
     }
 
-    fn tokenize_escape_sequence(&mut self) {todo!("tell connor to implement escape sequences")}
+    if brackets { cursor.incr(1); }
+
+    cursor.emit_to(output, TokenKind::TemplateClose);
 }
 
-pub fn tokenize_serv<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
-    let mut cursor = Cursor::new(input);
-    cursor.tokenize_root();
-    std::mem::take(&mut cursor.output)
+
+fn tokenize_dollar(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
+    assert_eq!(cursor.get(0), Some('$'));
+
+	// treat '$$' as escaped '$'
+    if cursor.get(1) == Some('$') {
+        cursor.incr(1);
+        cursor.skip_token();
+        cursor.incr(1);
+        cursor.emit_to(output, TokenKind::TemplateText);
+        return;
+    }
+
+    cursor.incr(1);
+    cursor.emit_to(output, TokenKind::Dollar);
+
+	// if we see a parentheses, tokenize a whole expression
+    if cursor.get(0) == Some('(') {
+        cursor.incr(1);
+        cursor.emit_to(output, TokenKind::ModuleOpen);
+        tokenize_module(cursor, output);
+    }
+
+    else if cursor.get(0) == Some('"') {
+    	cursor.incr(1);
+    	cursor.skip_token();
+    	cursor.incr_while(|x| x != '"');
+    	cursor.emit_to(output, TokenKind::Identifier);
+    	cursor.incr(1);
+    	cursor.skip_token();
+    }
+
+    else {
+		cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.' || x == ':');
+		cursor.emit_to(output, TokenKind::Identifier);
+    }
 }
 
-pub fn tokenize_template<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
-    let mut cursor = Cursor::new(input);
-    cursor.tokenize_template(false);
-    std::mem::take(&mut cursor.output)
+fn tokenize_escape_sequence(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
+    todo!("tell connor to implement escape sequences");
 }
+
+pub fn tokenize<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
+    let mut cursor = Tokenizer::new(input);
+    let mut output = Vec::new();
+
+    tokenize_module(&mut cursor, &mut output);
+    output
+}
+
+// pub fn tokenize_template<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
+    // todo!();
+
+    // let mut cursor = Cursor::new(input);
+    // cursor.tokenize_template(false);
+    // std::mem::take(&mut cursor.output)
+// }

@@ -3,7 +3,7 @@ use crate::ServResult;
 use crate::ServError;
 use crate::Stack;
 use crate::servparser;
-use crate::servlist::ServList;
+use crate::datatypes::servlist::ServList;
 use crate::{Label, ServFn};
 
 use parsetool::cursor::Tokenizer;
@@ -82,4 +82,17 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert_name("cookies", ServValue::Func(ServFn::Core(get_cookies)));
 	scope.insert_name("cookie.set", ServValue::Func(ServFn::Meta(set_cookie)));
 	scope.insert_name("with.headers", ServValue::Func(ServFn::Meta(with_headers)));
+}
+
+use crate::ServModule;
+
+pub fn get_module() -> ServModule {
+    let mut output = ServModule::empty();
+
+	output.insert("req.query",    ServFn::Core(query_all).into());
+	output.insert("cookies",      ServFn::Core(get_cookies).into());
+	output.insert("cookie.set",   ServFn::Meta(set_cookie).into());
+	output.insert("with.headers", ServFn::Meta(with_headers).into());
+
+	output
 }

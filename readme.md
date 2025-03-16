@@ -1,5 +1,13 @@
 # SERV
 
+Serv is a tool for writing web servers. There are already a lot of
+tools for writing web servers, but this one is mine. It is optimized
+for what I've come to think of as the "medium complexity" case, where
+a static file server isn't powerful enough, but most modern web frameworks
+feel like overkill. Serv makes it trivial, often a single line of code,
+to serve a static website, render templates, query an SQL server, manipulate
+json, and perform basic math and logic.
+
 Serv is a swiss army knife for writing web servers and APIs, designed
 to make the developer experience as simple and enjoyable as possible.
 It is an entirely new language and runtime, which virtually eliminates

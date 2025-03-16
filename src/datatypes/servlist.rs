@@ -25,7 +25,7 @@ impl ServList {
         self.0.push_back(input);
     }
 
-    pub fn get(&self, index: usize) -> Result<&ServValue, crate::ServError>{
+    pub fn get(&self, index: usize) -> Result<&ServValue, crate::ServError> {
         self.0.get(index).ok_or(crate::ServError::new(500, "not found"))
     }
 

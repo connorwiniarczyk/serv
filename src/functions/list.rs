@@ -5,9 +5,26 @@ use crate::Stack;
 use crate::servparser;
 use crate::{Label, ServFn};
 use crate::value::ServList;
+use crate::ServModule;
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
+
+fn list(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let ServValue::Module(m) = arg else {
+        return Err(ServError::expected_type("Module", arg))
+    };
+
+    let mut output = ServList::new();
+    let mut child = scope.make_child();
+    child.insert_module(m.values);
+
+    for s in m.statements {
+		output.push_back(s.as_expr().call(Some(input.clone()), &child)?);
+    }
+
+    Ok(output.into())
+}
 
 fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
     let arg = input.pop()?;
@@ -31,12 +48,7 @@ fn with(mut expr: ServList, scope: &mut Stack) -> ServResult {
     let input = expr.eval(scope)?;
     match input {
         ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert_name(key, value)),
-        ServValue::Module(t) => {
-            for (key, mut expr) in t.definitions.into_iter() {
-                let value = expr.eval(scope)?;
-                scope.insert(key, value);
-            }
-        },
+        ServValue::Module(t) => scope.insert_module(t.values),
         otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
     };
 
@@ -73,6 +85,8 @@ fn pop(input: ServValue, scope: &Stack) -> ServResult {
 fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let output = match (arg, input) {
         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key.as_str()?).ok_or("key not found")?,
+        (ServValue::Ref(Label::Name(ref key)), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
+        (ServValue::Ref(label), ServValue::Module(mut map)) => map.values.remove(&label).ok_or("key not found")?,
         (ServValue::Int(index),    ServValue::List(mut list)) => list.get(index.try_into().map_err(|e| "invalid index")?)?.clone(),
         (key, _) => return Err(ServError::expected_type("Int | Text", key)),
     };
@@ -120,9 +134,24 @@ fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
 	Ok(output)
 }
 
+pub fn get_module() -> ServModule {
+    let mut output = ServModule::empty();
+
+	output.insert("map",   ServFn::ArgFn(map).into());
+	output.insert("list",  ServFn::ArgFn(list).into());
+	output.insert("count", ServFn::Core(count).into());
+	output.insert("|",     ServFn::Meta(generate_list).into());
+	output.insert("pop",   ServFn::Meta(take).into());
+	output.insert("<",     ServFn::Meta(take).into());
+	output.insert(":",     ServFn::ArgFn(get).into());
+	output.insert("with",  ServFn::Meta(with).into());
+	output.insert("sum",   ServFn::Core(sum).into());
+
+	output
+}
+
 pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("map"), ServValue::Func(ServFn::ArgFn(map)));
-
 	scope.insert(Label::name("count"), ServValue::Func(ServFn::Core(count)));
 	scope.insert(Label::name("|"),     ServValue::Func(ServFn::Meta(generate_list)));
 	scope.insert(Label::name("pop"),   ServValue::Func(ServFn::Meta(take)));
@@ -132,67 +161,3 @@ pub fn bind(scope: &mut Stack) {
 	scope.insert(Label::name("sum"),   ServValue::Func(ServFn::Core(sum)));
 
 }
-
-// pub fn join(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-//     let intersperse = words.take_next(scope)?.to_string();
-//     let ServValue::List(list) = words.eval(input, scope)?.ignore_metadata() else { return Err("sum needs to operate on a list") };
-//     let t: Vec<String> = list.into_iter().map(|x| x.to_string()).collect();
-
-//     Ok(ServValue::Text(t.join(&intersperse)))
-// }
-
-
-// pub fn quote(mut input: ServValue, scope: &Scope) -> ServResult {
-//     Ok(input)
-// }
-
-// pub fn deref(input: ServValue, scope: &Scope) -> ServResult {
-//     match input {
-//         ServValue::List(i) => ServValue::Expr(i).eval(None, scope),
-//         ServValue::Expr(i) => ServValue::Expr(i).eval(None, scope),
-//         ServValue::ServFn(ref label) => scope.get(label).unwrap().call(ServValue::None, scope),
-//         ref otherwise => Ok(input),
-//     }
-// }
-
-
-
-// // pub fn map(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-// //     let next = words.next().ok_or("not enough arguments")?;
-// //     let arg = scope.get(&next).ok_or("not found")?;
-// //     let rest = words.eval(input, scope)?;
-
-// // 	let mapped = match rest {
-// //     	ServValue::List(list) => ServValue::List(list.into_iter().map(|a| arg.call(a, scope).unwrap()).collect()),
-// //     	_ => todo!(),
-// // 	};
-
-// // 	Ok(mapped)
-// // }
-
-// pub fn fold(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-//     let next = words.next().ok_or("not enough arguments")?;
-//     let arg = scope.get(&next).ok_or("not found")?;
-//     let rest = words.eval(input, scope)?;
-
-//     let mut acc = ServValue::None;
-
-//     let ServValue::List(items) = rest else { return Err("not a list") };
-
-//     for (index, item) in items.into_iter().enumerate() {
-//         let mut child_scope = scope.make_child();
-//         child_scope.insert_name("acc",   ServFunction::Literal(acc.clone()));
-//         child_scope.insert_name("index", ServFunction::Literal(ServValue::Int(index.try_into().unwrap())));
-//         acc = arg.call(item, &child_scope)?;
-//     }
-
-// 	Ok(acc)
-// }
-
-
-// pub fn split(words: &mut Words, input: ServValue, scope: &Scope) -> ServResult {
-//     let arg = words.take_next(scope)?.to_string();
-//     let rest = words.eval(input, scope)?.to_string();
-
-//     Ok(ServValue::List(rest.split(&arg).map(|x| ServValue::Text(x.to_owned())).collect()))
-// }

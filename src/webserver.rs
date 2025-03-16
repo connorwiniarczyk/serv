@@ -33,7 +33,6 @@ impl ServBody {
         match input {
 			ServValue::Ref(label) => ServBody::generate(scope.get(label).unwrap(), scope),
 			f @ ServValue::Func(_) => ServBody::generate(f.call(None, scope).unwrap(), scope),
-			// ServValue::Raw(t) => Self(Some(t.into())),
 			otherwise => {
     			let mut output = String::new();
 				crate::value::DefaultSerializer(scope).write(otherwise, &mut output).unwrap();
@@ -71,6 +70,43 @@ fn get_mime_type<'a>(value: &'a ServValue, scope: &'a Stack) -> Option<String> {
     None
 }
 
+fn response_from_value(input: ServValue, scope: &mut Stack) -> Response<ServBody> {
+    let mut response = Response::builder();
+	response = response.status(200);
+
+	if let Some(mime) = get_mime_type(&input, &scope) {
+    	response = response.header("Content-Type", mime);
+	}
+
+	// if let Ok(ServValue::Module(m)) = scope.get("res.headers") {
+ //    	for (mut p, mut a) in m.equalities {
+ //        	let mut child = scope.make_child();
+ //        	let key   = p.eval(scope).unwrap().to_string();
+ //        	let value = a.eval(scope).unwrap().to_string();
+ //        	response = response.header(&key, &value);
+ //    	}
+	// }
+
+	// if let Ok(ServValue::Module(m)) = scope.get("res.cookie") {
+ //    	for (mut p, mut a) in m.equalities {
+ //        	let mut child = scope.make_child();
+ //        	let key   = p.eval(scope).unwrap().to_string();
+ //        	let value = a.eval(scope).unwrap();
+ //        	let cookie_text = format!("{}={};path=/;SameSite=Strict", key, value );
+ //        	response = response.header("Set-Cookie", &cookie_text);
+ //    	}
+	// }
+
+	response.body(ServBody::generate(input, scope)).unwrap()
+}
+
+fn response_from_error(input: ServError, scope: &mut Stack) -> Response<ServBody> {
+    let mut response = Response::builder();
+	response = response.status(500);
+
+	response.body(ServBody::generate(input.to_string().into(), scope)).unwrap()
+}
+
 #[derive(Clone)]
 struct Serv(Arc<Stack<'static>>, Arc<Router<ServValue>>);
 
@@ -106,38 +142,21 @@ impl Service<Request<IncomingBody>> for Serv {
 
     		let mut response = Response::builder();
 
-        	let mut result = match matched.value {
+        	let result = match matched.value {
             	ServValue::Func(ServFn::Expr(e, _)) => e.clone().eval(&mut scope),
             	value => value.call(None, &scope),
-        	}.unwrap();
+        	};
 
-        	response = response.status(200);
-
-        	if let Some(mime) = get_mime_type(&result, &scope) {
-            	response = response.header("Content-Type", mime);
+        	match result {
+				Ok(value)  => Ok(response_from_value(value, &mut scope)),
+				Err(error) => Ok(response_from_error(error, &mut scope)),
         	}
 
-        	if let Ok(ServValue::Module(m)) = scope.get("res.headers") {
-            	for (mut p, mut a) in m.equalities {
-                	let mut child = scope.make_child();
-                	let key   = p.eval(&mut scope).unwrap().to_string();
-                	let value = a.eval(&mut scope).unwrap().to_string();
-                	response = response.header(&key, &value);
-            	}
-        	}
 
-        	if let Ok(ServValue::Module(m)) = scope.get("res.cookie") {
-            	for (mut p, mut a) in m.equalities {
-                	let mut child = scope.make_child();
-                	let key   = p.eval(&mut scope).unwrap().to_string();
-                	let value = a.eval(&mut scope).unwrap().to_string();
-                	let cookie_text = format!("{}={};path=/;SameSite=Strict", key, value );
-                	response = response.header("Set-Cookie", &cookie_text);
-            	}
-        	}
+			// Ok(response_from_value(result, &scope))
 
-    		let response_sender = response.body(ServBody::generate(result, &scope)).unwrap();
-    		Ok(response_sender)
+    		// let response_sender = response.body(ServBody::generate(result, &scope)).unwrap();
+    		// Ok(response_sender)
     	};
 
     	Box::pin(output)
