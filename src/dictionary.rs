@@ -31,7 +31,6 @@ pub struct StackDictionary<'parent, V> {
 	parent: Option<&'parent Self>,
 	words: HashMap<Label, V>,
 
-	// metadata: Option<M>,
 	pub request: Option<Parts>,
 }
 
@@ -58,9 +57,9 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
         self.words.insert(key, value);
     }
 
-    pub fn insert_name(&mut self, key: &str, value: V) {
-        self.words.insert(Label::name(key), value);
-    }
+    // pub fn insert_name(&mut self, key: &str, value: V) {
+    //     self.words.insert(Label::name(key), value);
+    // }
 
     pub fn insert_module(&mut self, value: HashMap<Label, V>) {
         self.words.extend(value);
