@@ -3,6 +3,7 @@ pub mod servlist;
 pub mod servstring;
 pub mod template;
 pub mod value;
+pub mod reference;
 
 pub use module::*;
 pub use servlist::*;

@@ -31,8 +31,8 @@ pub struct ServBody(Option<VecDeque<u8>>);
 impl ServBody {
     pub fn generate(input: ServValue, scope: &Stack) -> Self {
         match input {
-			ServValue::Ref(label) => ServBody::generate(scope.get(label).unwrap(), scope),
-			f @ ServValue::Func(_) => ServBody::generate(f.call(None, scope).unwrap(), scope),
+			ServValue::Ref(ref addr) => ServBody::generate(crate::engine::deref(addr, scope).unwrap(), scope),
+			ServValue::Func(_) => ServBody::generate(crate::engine::resolve(input, None, scope).unwrap(), scope),
 			otherwise => {
     			let mut output = String::new();
 				crate::value::DefaultSerializer(scope).write(otherwise, &mut output).unwrap();

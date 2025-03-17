@@ -1,11 +1,11 @@
 #![allow(unused)]
 
 mod datatypes;
-
 use datatypes::*;
 
 mod servlexer;
 mod servparser;
+mod engine;
 
 mod error;
 mod functions;
@@ -13,9 +13,10 @@ mod dictionary;
 mod webserver;
 
 use datatypes::module::ServModule;
+use value::{ ServValue, ServFn };
+use datatypes::reference::Address;
 
 use error::ServError;
-use value::{ ServValue, ServFn };
 use dictionary::Label;
 use clap::Parser;
 use matchit::Router;
@@ -25,21 +26,21 @@ type ServResult = Result<ServValue, ServError>;
 
 type Stack<'a> = StackDictionary<'a, ServValue>;
 
-impl Stack<'_> {
-    fn search(&self, input: Label) -> Result<ServValue, ServError> {
-        let Label::Name(text) = input else {
-            return self.get(input);
-        };
+// impl Stack<'_> {
+//     fn search(&self, input: Label) -> Result<ServValue, ServError> {
+//         let Label::Name(text) = input else {
+//             return self.get(input);
+//         };
 
-        let fields: Vec<Label> = text.split(".").map(|x| Label::Name(x.to_owned())).collect();
-        let mut iter = fields.iter();
+//         let fields: Vec<Label> = text.split(".").map(|x| Label::Name(x.to_owned())).collect();
+//         let mut iter = fields.iter();
 
-        let first = iter.next().ok_or(ServError::new(500, "missing"))?;
-		let mut value = self.get(first.clone())?;
+//         let first = iter.next().ok_or(ServError::new(500, "missing"))?;
+// 		let mut value = self.get(first.clone())?;
 
-		value.get_member(&mut iter, self).ok_or(ServError::new(500, "missing"))
-    }
-}
+// 		value.get_member(&mut iter, self).ok_or(ServError::new(500, "missing"))
+//     }
+// }
 
 
 /// A parser for serv files
@@ -91,7 +92,8 @@ async fn main() {
     populate_defaults(&mut scope, &args);
 
     for expr in &root_module.statements {
-        expr.clone().eval(&mut scope).expect("failed expression");
+        engine::resolve(expr.clone().as_expr(), None, &scope);
+        // expr.clone().eval(&mut scope).expect("failed expression");
     }
 
     let mut router = Router::new();

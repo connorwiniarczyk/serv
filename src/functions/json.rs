@@ -43,10 +43,30 @@ impl<'a> JsonSerializer<'a> {
 impl<'a> Serializer for JsonSerializer<'a> {
     fn write<'b>(&mut self, value: ServValue, dest: Buffer<'b>) -> Result<(), ServError> {
         match value {
-			ServValue::Ref(label) => self.write(self.scope.get(label)?, dest)?,
-			f @ ServValue::Func(_) => self.write(f.call(None, self.scope)?, dest)?,
+			ServValue::Ref(addr) => {
+    			for label in addr.iter().peekable() {
+        			dest.write_str(label.as_str())?;
+    			}
+			}
+			ServValue::Func(_) => self.write(crate::engine::resolve(value, None, self.scope)?, dest)?,
 
-			// ServValue::Module(t)   => todo!("json serialize modules"),
+			ServValue::Module(t)   => {
+    			dest.write_str("module:");
+    			self.indent += 1;
+    			self.line_break(dest);
+
+    			let mut iter = t.values.into_iter().peekable();
+    			while let Some((key, value)) = iter.next() {
+        			dest.write_str(key.as_str());
+        			dest.write_str("=");
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			self.line_break(dest);
+        			}
+    			}
+    			self.indent -= 1;
+    			self.line_break(dest);
+			},
 			ServValue::Module(t)   => dest.write_str("module")?,
 			ServValue::None     => dest.write_str("0")?,
 			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,

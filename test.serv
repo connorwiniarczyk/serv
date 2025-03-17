@@ -1,5 +1,1 @@
-a = @serv {
-    test = {hello}
-}
-
-print a.test
+print {hello world}

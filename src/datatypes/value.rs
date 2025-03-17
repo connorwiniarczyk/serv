@@ -5,6 +5,8 @@ use std::fmt::Display;
 use crate::template::Template;
 use crate::Stack;
 use crate::Label;
+use crate::ServModule;
+use crate::dictionary::Address;
 use crate::ServError;
 use crate::ServResult;
 use crate::functions::json;
@@ -14,7 +16,7 @@ pub use crate::servlist::ServList;
 
 #[derive(Clone)]
 pub enum ServFn {
-    Ident,
+    // Ident,
     Core     (fn(ServValue, &Stack) -> ServResult),
     Meta     (fn(ServList, &mut Stack) -> ServResult),
     ArgFn    (fn(ServValue, ServValue, &Stack) -> ServResult),
@@ -32,7 +34,7 @@ impl From<ServFn> for ServValue {
 impl std::fmt::Debug for ServFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Self::Ident       => f.write_str("Ident"),
+            // Self::Ident       => f.write_str("Ident"),
             Self::Core(_)     => f.write_str("Core"),
             Self::Meta(_)     => f.write_str("Meta"),
             Self::ArgFn(_)    => f.write_str("ArgFn"),
@@ -44,7 +46,8 @@ impl std::fmt::Debug for ServFn {
 
 #[derive(Clone, Debug)]
 pub enum ServValue {
-    Ref(Label),
+    Ref(Address),
+    // Ref(Label),
     Func(ServFn),
 
     None,
@@ -60,49 +63,7 @@ pub enum ServValue {
 
 impl ServValue {
     pub fn call(&self, input: Option<ServValue>, scope: &Stack) -> ServResult {
-       	match self {
-           	Self::Ref(label) => scope.search(label.clone())?.call(input, scope),
-			Self::Module(m) => m.clone().call(input, &mut scope.make_child()),
-
-           	Self::Func(ServFn::Core(f)) => f(input.unwrap_or_default(), scope),
-           	Self::Func(ServFn::Expr(e, _)) => {
-               	let mut child = scope.make_child();
-               	let mut expr = e.clone();
-               	if let Some(v) = input { expr.push_back(v) };
-               	expr.eval(&mut child)
-           	},
-           	Self::Func(ServFn::Ident) => Ok(input.unwrap_or_default()),
-           	Self::Func(ServFn::Template(t)) => {
-               	if let Some(v) = input {
-                   	let mut child = scope.make_child();
-                   	child.insert("in", v.clone());
-                   	child.insert("x", v);
-                   	t.render(&child)
-               	}
-               	else {
-                   	t.render(scope)
-               	}
-          	},
-
-           	constant => Ok(constant.clone()),
-       	}
-    }
-
-    pub fn get_member<'a>(&self, q: &mut impl Iterator<Item = &'a Label>, scope: &Stack) -> Option<ServValue> {
-        match self {
-            Self::Ref(l) => return scope.get(l.clone()).ok()?.get_member(q, scope),
-            f @ Self::Func(_) => return f.call(None, scope).ok()?.get_member(q, scope),
-            otherwise => (),
-        };
-
-        let Some(label) = q.next() else { return Some(self.clone()); };
-
-        match self {
-            Self::Module(m) => m.values.get(&label).and_then(|v| v.get_member(q, scope)),
-            Self::Ref(_) => unreachable!(),
-            Self::Func(_) => unreachable!(),
-            otherwise => None,
-        }
+        crate::engine::resolve(self.clone(), input, scope)
     }
 
     pub fn expect_int(&self) -> Result<i64, &'static str> {
@@ -145,6 +106,12 @@ impl From<ServList> for ServValue {
     }
 }
 
+impl From<ServModule> for ServValue {
+    fn from(value: ServModule) -> Self {
+        Self::Module(value)
+    }
+}
+
 impl From<String> for ServValue {
     fn from(value: String) -> Self {
         Self::Text(value.into())
@@ -163,7 +130,7 @@ pub struct DefaultSerializer<'s>(pub &'s Stack<'s>);
 impl<'a> Serializer for DefaultSerializer<'a> {
     fn write<'b>(&mut self, value: ServValue, dest: Buffer<'b>) -> Result<(), ServError> {
         match value {
-			ServValue::Ref(label) => self.write(self.0.get(label)?, dest)?,
+			// ServValue::Ref(label) => self.write(self.0.get(label)?, dest)?,
 			f @ ServValue::Func(_) => self.write(f.call(None, self.0)?, dest)?,
 
 			ServValue::Text(t) => {

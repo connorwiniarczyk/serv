@@ -1,9 +1,10 @@
 use crate::template::{Template, TemplateElement};
 use crate::{ ServValue, ServFn, Label };
-use crate::datatypes::module::{ ServModule, Element };
+use crate::datatypes::module::{ ServModule };
 use crate::datatypes::module;
 use crate::datatypes::value;
 use crate::datatypes::value::ServList;
+use crate::dictionary::Address;
 
 use crate::servlexer::{TokenKind, TokenKind::*};
 use crate::servlexer;
@@ -48,9 +49,9 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
 fn parse_word(parser: &mut Parser, m: &ServModule) -> Result<ServValue, ServError> {
     let token = parser.get(0)?;
     let output = match token.kind {
-        TokenKind::Identifier   => ServValue::Ref(Label::Name(token.to_string())),
+        TokenKind::Identifier   => ServValue::Ref(token.to_string().as_str().into()),
+        TokenKind::Route        => ServValue::Ref(Label::Route(token.to_string()).into()),
         TokenKind::IntLiteral   => ServValue::Int(token.to_string().parse::<i64>().unwrap().into()),
-        TokenKind::Route        => ServValue::Ref(Label::Route(token.to_string())),
         TokenKind::TemplateOpen => ServValue::Func(ServFn::Template(parse_template(parser)?.into())),
         TokenKind::ModuleOpen   => {
             parser.incr();
@@ -64,26 +65,15 @@ fn parse_word(parser: &mut Parser, m: &ServModule) -> Result<ServValue, ServErro
                 expr.push_back(word);
             }
 
-            // let mut expr = parse_expression(parser, m)?;
             let mut scope = Stack::empty();
-
         	scope.insert_module(crate::functions::standard_library().values);
         	scope.insert_module(m.values.clone());
         	let result = expr.eval(&mut scope)?;
 
         	return Ok(result)
-
-        	// println!("{}", result);
-
-			// result
         },
-        // TokenKind::OpenParenthesis => panic!("unexpected open paren"),
-        // TokenKind::OpenParenthesis => {
-        //     parser.incr();
-        //     ServValue::Func(ServFn::Expr(parse_expression(parser)?, false))
-        // },
 
-        k => return Err("unhandled token".into()),
+        other => return Err("unhandled token".into()),
     };
 
     parser.incr();
@@ -101,7 +91,7 @@ fn parse_expression(parser: &mut Parser, m: &ServModule) -> Result<ServList, Ser
     Ok(output)
 }
 
-fn get_label(mut input: ServList) -> Result<Label, ServError> {
+fn get_label(mut input: ServList) -> Result<Address, ServError> {
     if input.len() == 0 { return Err(ServError::new(500, "missing label before declaration")) };
     if input.len() >= 2 { return Err(ServError::new(500, "labels must be exactly 1 word")) };
 
@@ -112,7 +102,7 @@ fn get_label(mut input: ServList) -> Result<Label, ServError> {
 
 }
 
-fn parse_declaration(parser: &mut Parser, m: &ServModule) -> Result<(Option<Label>, ServList), ServError> {
+fn parse_declaration(parser: &mut Parser, m: &ServModule) -> Result<(Option<Address>, ServList), ServError> {
 
     // ignore multiple line breaks in a row
     while let Ok(_) = parser.next_if_kind(ModuleSeparator) {}

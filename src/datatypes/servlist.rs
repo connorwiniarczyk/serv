@@ -44,10 +44,8 @@ impl ServList {
     pub fn eval(&mut self, scope: &mut crate::Stack) -> ServResult {
         let Ok(mut next) = self.pop() else { return Ok(ServValue::None) };
 
-        if let ServValue::Ref(ref label) = next {
-            if let Ok(value) = scope.get(label.clone()) {
-                next = value;
-            }
+        if let ServValue::Ref(ref addr) = next {
+            next = crate::engine::deref(addr, scope)?;
         }
 
         match next {

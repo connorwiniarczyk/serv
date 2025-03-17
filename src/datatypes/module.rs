@@ -4,19 +4,14 @@ use crate::Label;
 use crate::ServFn;
 use crate::ServResult;
 use crate::value::ServList;
+use crate::ServError;
+
+use std::iter::Peekable;
+use std::collections::hash_map::Entry;
+
+use crate::dictionary::Address;
 
 use std::collections::HashMap;
-
-use matchit::Router;
-
-#[derive(Clone, Debug)]
-pub struct Element {
-    pub pattern: Option<ServValue>,
-    pub action: ServList,
-}
-
-struct ElementId(usize);
-
 
 #[derive(Clone, Debug, Default)]
 pub struct ServModule {
@@ -26,8 +21,15 @@ pub struct ServModule {
 
 impl ServModule {
     pub fn empty() -> Self {
-        Self { values: HashMap::new(), statements: Vec::new() }
+        Self {
+            values: HashMap::new(),
+            statements: Vec::new(),
+        }
     }
+
+  //   pub fn deep_insert<'a, I: Iterator<Item = &'a Label>>(&mut self, key: &'a mut Peekable<I>, value: ServValue) {
+		// todo!();
+  //   }
 
    //  pub fn get(&self, i: &mut impl Iterator<Item=Label>) -> Option<ServValue> {
    //      let mut active = self;
@@ -40,8 +42,45 @@ impl ServModule {
    //      todo!();
    //  }
 
-    pub fn insert<L: Into<Label>>(&mut self, label: L, value: ServValue) {
-        self.values.insert(label.into(), value);
+
+ //    fn get_internal<'a>(&self, a: &mut impl Iterator<Item=&'a Label>) -> Option<&ServValue> {
+ //        todo!();
+ //    }
+
+	// pub fn get<K: Into<Address>>(&self, key: K) -> Option<&ServValue> {
+ //    	let mut iter = key.into().iter();
+ //    	let value = self.values.get(iter.next()?)?;
+ //    	return value.get_member(&mut iter)
+	// }
+
+	fn get_entry_if_module(&mut self, key: &Label) -> Entry<Label, ServValue> {
+		todo!();
+	}
+
+    fn insert_internal<'a, I: Iterator<Item=&'a Label>>(&mut self, iter: &mut Peekable<I>, value: ServValue) -> Result<(), ServError> {
+        let next = iter.next().unwrap();
+        if iter.peek().is_none() {
+			self.values.insert(next.clone(), value);
+			return Ok(())
+        }
+
+        let dest = self.values.entry(next.clone()).or_insert(Self::empty().into());
+        let ServValue::Module(m) = dest else {
+            return Err(ServError::new(500, "tried to insert into something that was not a module"));
+        };
+
+        m.insert_internal(iter, value)?;
+		Ok(())
+    }
+
+    pub fn insert<K: Into<Address>>(&mut self, k: K, value: ServValue) -> Result<(), ServError> {
+        self.insert_internal(&mut k.into().iter().peekable(), value)
+    }
+
+    pub fn insert_declaration(&mut self, key: Option<Address>, value: ServList) {
+        if key.is_none() { return self.statements.push(value) };
+
+        self.insert(key.unwrap(), value.as_expr());
     }
 
     pub fn routes(&self) -> impl Iterator<Item=(&str, &ServValue)> {
@@ -56,15 +95,6 @@ impl ServModule {
         })
     }
 
-    pub fn insert_declaration(&mut self, label: Option<Label>, value: ServList) {
-        if label.is_some() {
-            self.values.insert(label.unwrap(), value.as_expr());
-        }
-
-        else {
-            self.statements.push(value);
-        }
-    }
 
     pub fn call(self, input: Option<ServValue>, scope: &mut Stack) -> ServResult {
 		if self.statements.len() == 0 { return Ok(ServValue::Module(self)) }
@@ -73,10 +103,6 @@ impl ServModule {
         let mut output = ServValue::None;
         for mut expr in self.statements {
             output = expr.as_expr().call(input.clone(), scope)?;
-            // if let Some(ref i) = input {
-            //     expr.push_back(i.clone());
-            // }
-            // output = expr.eval(scope)?;
         }
 
 		Ok(output)
