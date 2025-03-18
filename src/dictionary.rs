@@ -2,8 +2,14 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use matchit::Router;
 use crate::ServError;
+use crate::ServModule;
+
+use crate::datatypes::ServValue;
+
+use std::iter::Peekable;
 
 use std::collections::VecDeque;
+use std::collections::hash_map::Entry;
 
 use hyper::body::{Body, Frame, Incoming as IncomingBody};
 use hyper::{ Request, Response };
@@ -40,9 +46,6 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
         }
     }
 
-    pub fn insert<L: Into<Label>>(&mut self, key: L, value: V) {
-        self.words.insert(key.into(), value);
-    }
 
     pub fn insert_module(&mut self, value: HashMap<Label, V>) {
         self.words.extend(value);
@@ -80,14 +83,65 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
     }
 }
 
+pub type Stack<'a> = StackDictionary<'a, ServValue>;
 
-impl Display for Label {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match (self) {
-            Self::Name(s) => f.write_str(s)?,
-            Self::Route(s) => f.write_str(s)?,
-            // Self::Anonymous(id) => write!(f, "anonymous function {}", id)?,
-        };
+impl Stack<'_> {
+
+    // pub fn get<A: Into<Address>>(&self, a: A) -> Result<ServValue, ServError> {
+        // crate::engine::deref(&a.into(), self)
+        // let addr = a.into();
+        // let mut iter = addr.iter().peekable();
+
+        // let first = iter.next().ok_or(ServError::InsertWithEmptyAddress)?;
+        // let value = self.get_label(first.clone())?;
+
+        // if iter.peek().is_none() {
+        //     return Ok(value)
+        // }
+
+        // if let ServValue::Module(m) = value {
+        //     return m.get_internal(iter);
+        // }
+
+        // todo!();
+  //       let key: Label = l.into();
+  //       let value = self.words.get(&key);
+
+  //       if let Some(v) = value {
+  //           return Ok(v.clone());
+  //       };
+
+		// let Some(parent) = self.parent else {
+  //   		return Err(ServError::MissingLabel(key));
+		// };
+
+		// return parent.get(key)
+    // }
+
+    pub fn insert<L: Into<Address>>(&mut self, key: L, value: ServValue) -> Result<(), ServError> {
+        let addr = key.into();
+
+        if addr.len() == 0 {
+			return Err(ServError::InsertWithEmptyAddress)
+        }
+
+        if addr.len() == 1 {
+            let label = addr.iter().next().unwrap().clone();
+            let v = self.words.entry(label).or_default();
+            *v = value;
+            return Ok(())
+        }
+
+        else {
+            let mut iter = addr.iter().peekable();
+            let key = iter.next().unwrap();
+
+            let dest = self.words.entry(key.clone()).or_insert(ServModule::empty().into());
+            match dest {
+                ServValue::Module(m) => m.insert_internal(&mut iter, value)?,
+                other => return Err(ServError::InsertIntoInvalidType),
+            }
+        }
 
         Ok(())
     }

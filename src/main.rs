@@ -22,9 +22,10 @@ use clap::Parser;
 use matchit::Router;
 use dictionary::StackDictionary;
 
+use dictionary::Stack;
+
 type ServResult = Result<ServValue, ServError>;
 
-type Stack<'a> = StackDictionary<'a, ServValue>;
 
 // impl Stack<'_> {
 //     fn search(&self, input: Label) -> Result<ServValue, ServError> {
@@ -93,7 +94,6 @@ async fn main() {
 
     for expr in &root_module.statements {
         engine::resolve(expr.clone().as_expr(), None, &scope);
-        // expr.clone().eval(&mut scope).expect("failed expression");
     }
 
     let mut router = Router::new();

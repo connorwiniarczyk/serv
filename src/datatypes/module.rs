@@ -57,7 +57,7 @@ impl ServModule {
 		todo!();
 	}
 
-    fn insert_internal<'a, I: Iterator<Item=&'a Label>>(&mut self, iter: &mut Peekable<I>, value: ServValue) -> Result<(), ServError> {
+    pub fn insert_internal<'a, I: Iterator<Item=&'a Label>>(&mut self, iter: &mut Peekable<I>, value: ServValue) -> Result<(), ServError> {
         let next = iter.next().unwrap();
         if iter.peek().is_none() {
 			self.values.insert(next.clone(), value);

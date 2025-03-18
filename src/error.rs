@@ -7,6 +7,8 @@ pub enum ServError {
     Fmt(std::fmt::Error),
     MissingLabel(crate::dictionary::Label),
     UnexpectedType(String, ServValue),
+    InsertWithEmptyAddress,
+    InsertIntoInvalidType,
 
 }
 
@@ -28,6 +30,9 @@ impl std::fmt::Display for ServError {
             Self::Fmt(err) => write!(f, "fmt error: {}", err),
             Self::MissingLabel(label) => write!(f, "missing label {}", label),
             Self::UnexpectedType(expected, actual) => write!(f, "expected type {}, found {}", expected, actual),
+            Self::InsertWithEmptyAddress => f.write_str("empty address"),
+
+            other => write!(f, "{:?}", self),
         }
     }
 }

@@ -1,3 +1,6 @@
+use std::fmt::Display;
+
+
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Label {
     Name(String),
@@ -23,8 +26,6 @@ impl From<&str> for Label {
     }
 }
 
-// impl Display
-
 // Iterator around address
 struct AddressIter<'a>(&'a Address, usize);
 
@@ -48,6 +49,10 @@ impl Address {
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         AddressIter(self, 0)
     }
+
+    pub fn len(&self) -> usize {
+        return self.0.len()
+    }
 }
 
 impl From<&str> for Address {
@@ -67,11 +72,14 @@ impl From<Label> for Address {
     }
 }
 
+impl Display for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match (self) {
+            Self::Name(s) => f.write_str(s)?,
+            Self::Route(s) => f.write_str(s)?,
+            // Self::Anonymous(id) => write!(f, "anonymous function {}", id)?,
+        };
 
-
-// impl Label {
-//     pub fn parts(&self) -> impl Iterator<Item = &Label> {
-//         LabelParts(self, 0)
-//     }
-// }
-
+        Ok(())
+    }
+}

@@ -28,15 +28,15 @@ fn list(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
 
 fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
     let arg = input.pop()?;
-   	let ServValue::Ref(name @ Label::Name(_)) = arg else { panic!("'<' expects a ref") };
+   	let ServValue::Ref(addr) = arg else { panic!("'<' expects a ref") };
    	let rest = input.eval(scope)?;
    	let out = match rest {
        	ServValue::List(mut l) => {
-           	scope.insert(name, l.pop()?);
+           	scope.insert(addr, l.pop()?);
            	ServValue::List(l)
        	},
        	element => {
-           	scope.insert(name, element);
+           	scope.insert(addr, element);
            	ServValue::None
        	},
    	};
@@ -47,12 +47,37 @@ fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
 fn with(mut expr: ServList, scope: &mut Stack) -> ServResult {
     let input = expr.eval(scope)?;
     match input {
-        ServValue::Table(t)  => t.into_iter().for_each(|(ref key, value)| scope.insert(key.as_str(), value)),
+        ServValue::Table(t)  => {
+            for (key, value) in t.into_iter() {
+                scope.insert(key.as_str(), value)?;
+            }
+        }
         ServValue::Module(t) => scope.insert_module(t.values),
         otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
     };
 
     Ok(ServValue::None)
+}
+
+fn using(mut expr: ServList, scope: &mut Stack) -> ServResult {
+    let arg = crate::engine::resolve(expr.pop()?, None, scope)?;
+    // let
+
+
+    // let input = expr.eval(scope)?;
+    match arg {
+        ServValue::Table(t)  => {
+            for (key, value) in t.into_iter() {
+                scope.insert(key.as_str(), value)?;
+            }
+        }
+        ServValue::Module(t) => scope.insert_module(t.values),
+        otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
+    };
+
+	expr.eval(scope)
+
+    // Ok(ServValue::None)
 }
 
 fn count(input: ServValue, scope: &Stack) -> ServResult {
@@ -85,9 +110,10 @@ fn pop(input: ServValue, scope: &Stack) -> ServResult {
 fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let output = match (arg, input) {
         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key.as_str()?).ok_or("key not found")?,
-        (ServValue::Ref(Label::Name(ref key)), ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
-        (ServValue::Ref(label), ServValue::Module(mut map)) => map.values.remove(&label).ok_or("key not found")?,
+        // (ServValue::Ref(addr),     ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
+        // (ServValue::Ref(label),    ServValue::Module(mut map)) => map.values.remove(&label).ok_or("key not found")?,
         (ServValue::Int(index),    ServValue::List(mut list)) => list.get(index.try_into().map_err(|e| "invalid index")?)?.clone(),
+
         (key, _) => return Err(ServError::expected_type("Int | Text", key)),
     };
 
@@ -145,6 +171,7 @@ pub fn get_module() -> ServModule {
 	output.insert("<",     ServFn::Meta(take).into());
 	output.insert(":",     ServFn::ArgFn(get).into());
 	output.insert("with",  ServFn::Meta(with).into());
+	output.insert("using", ServFn::Meta(using).into());
 	output.insert("sum",   ServFn::Core(sum).into());
 
 	output

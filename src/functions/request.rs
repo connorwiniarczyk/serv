@@ -73,9 +73,12 @@ fn set_cookie(mut input: ServList, scope: &mut Stack) -> ServResult {
 
 fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
     let mut arg = input.pop()?;
-	arg = arg.call(None, scope)?;
+    arg = crate::engine::resolve(arg, None, scope)?;
+    println!("{:?}", arg);
+	// arg = arg.call(None, scope)?;
 
     scope.insert("res.headers", arg);
+    // println!("{:#?}", scope.get("res.headers"));
     input.eval(scope)
 }
 

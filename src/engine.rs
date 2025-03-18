@@ -34,11 +34,13 @@ pub fn resolve(func: ServValue, input: Option<ServValue>, scope: &Stack) -> Resu
 
 // fn deref_internal<'a, 'b, I: Iterator<Item = &'a Label>>(mut value: &'b ServValue, q: &mut Peekable<I>, scope: &'b Stack) -> Result<&'b ServValue, ServError> {
 fn deref_internal<'a, I: Iterator<Item = &'a Label>>(mut value: ServValue, q: &mut Peekable<I>, scope: &Stack) -> Result<ServValue, ServError> {
+    // println!("{:?}", value);
     match value {
         ServValue::Ref(ref addr) => deref_internal(deref(addr, scope)?, q, scope),
         ServValue::Func(_) if q.peek().is_some() => deref_internal(resolve(value, None, scope)?, q, scope),
 
         ServValue::Module(ref m) => {
+            // println!("{:?}", m);
             let Some(next) = q.next() else {
 				return Ok(value)
             };

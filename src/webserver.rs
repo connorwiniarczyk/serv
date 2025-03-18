@@ -78,14 +78,16 @@ fn response_from_value(input: ServValue, scope: &mut Stack) -> Response<ServBody
     	response = response.header("Content-Type", mime);
 	}
 
-	// if let Ok(ServValue::Module(m)) = scope.get("res.headers") {
- //    	for (mut p, mut a) in m.equalities {
- //        	let mut child = scope.make_child();
- //        	let key   = p.eval(scope).unwrap().to_string();
- //        	let value = a.eval(scope).unwrap().to_string();
- //        	response = response.header(&key, &value);
- //    	}
-	// }
+	if let Ok(ServValue::Module(m)) = crate::engine::deref(&"res.headers".into(), scope) {
+    	// println!("{:?}", m);
+    	for (mut p, mut a) in m.values {
+        	let mut child = scope.make_child();
+        	// let key   = p.eval(scope).unwrap().to_string();
+        	let key   = p.to_string();
+        	let value = a.call(None, scope).unwrap().to_string();
+        	response = response.header(&key, &value);
+    	}
+	}
 
 	// if let Ok(ServValue::Module(m)) = scope.get("res.cookie") {
  //    	for (mut p, mut a) in m.equalities {
@@ -154,7 +156,6 @@ impl Service<Request<IncomingBody>> for Serv {
 
 
 			// Ok(response_from_value(result, &scope))
-
     		// let response_sender = response.body(ServBody::generate(result, &scope)).unwrap();
     		// Ok(response_sender)
     	};

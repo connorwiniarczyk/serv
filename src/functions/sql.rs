@@ -54,10 +54,11 @@ fn sql_exec(input: ServValue, scope: &Stack) -> ServResult {
 
 fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServValue, scope: &Stack) -> Result<(), ServError> {
     match param {
-        ServValue::Ref(label) => {
-            let value = scope.get(label)?;
-            sqlite_bind_param(statement, i, value, scope);
-        },
+        ServValue::Ref(ref addr) => sqlite_bind_param(statement, i, crate::engine::deref(addr, scope)?, scope)?,
+        // ServValue::Ref(label) => {
+        //     let value = scope.get(label)?;
+        //     sqlite_bind_param(statement, i, value, scope);
+        // },
         ServValue::Int(v)    => statement.bind((i, v)).unwrap(),
         ServValue::Text(t)   => statement.bind((i, t.as_str()?)).unwrap(),
         ServValue::Float(v)  => statement.bind((i, v)).unwrap(),
@@ -81,8 +82,8 @@ fn sql(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
     let path = get_database_location(scope)?;
     let connection = sqlite::open(&path).unwrap();
 
-	if let ServValue::Ref(label) = arg {
-    	arg = scope.get(label).unwrap();
+	while let ServValue::Ref(addr) = arg {
+    	arg = crate::engine::deref(&addr, scope)?;
 	}
 
 	let ServValue::Func(ServFn::Template(t)) = arg else {panic!()};
