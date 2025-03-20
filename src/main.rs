@@ -26,24 +26,6 @@ use dictionary::Stack;
 
 type ServResult = Result<ServValue, ServError>;
 
-
-// impl Stack<'_> {
-//     fn search(&self, input: Label) -> Result<ServValue, ServError> {
-//         let Label::Name(text) = input else {
-//             return self.get(input);
-//         };
-
-//         let fields: Vec<Label> = text.split(".").map(|x| Label::Name(x.to_owned())).collect();
-//         let mut iter = fields.iter();
-
-//         let first = iter.next().ok_or(ServError::new(500, "missing"))?;
-// 		let mut value = self.get(first.clone())?;
-
-// 		value.get_member(&mut iter, self).ok_or(ServError::new(500, "missing"))
-//     }
-// }
-
-
 /// A parser for serv files
 #[derive(Parser, Debug)]
 #[command(version, about, long_about)]
@@ -84,16 +66,17 @@ fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
 async fn main() {
     let mut args = CliArgs::parse();
     let input = get_input(&mut args).unwrap();
-    let root_module = servparser::parse_root_from_text(&input).unwrap();
-    let mut scope = Stack::empty();
 
+    let mut scope = Stack::empty();
     scope.insert_module(functions::standard_library().values);
+
+    let root_module = servparser::parse_root_from_text(&input, &mut scope).unwrap();
     scope.insert_module(root_module.values.clone());
 
     populate_defaults(&mut scope, &args);
 
     for expr in &root_module.statements {
-        engine::resolve(expr.clone().as_expr(), None, &scope);
+        engine::eval(expr.clone(), &mut scope);
     }
 
     let mut router = Router::new();

@@ -44,7 +44,7 @@ impl ServList {
     pub fn eval(&mut self, scope: &mut crate::Stack) -> ServResult {
         let Ok(mut next) = self.pop() else { return Ok(ServValue::None) };
 
-        if let ServValue::Ref(ref addr) = next {
+        while let ServValue::Ref(ref addr) = next {
             next = crate::engine::deref(addr, scope)?;
         }
 
@@ -64,7 +64,10 @@ impl ServList {
                 f(arg, rest, scope)
             },
 
-            f => f.call(Some(self.eval(scope)?), scope),
+            f => {
+                let rest = self.eval(scope)?;
+                crate::engine::resolve(f, Some(rest), scope)
+            }
         }
     }
 }

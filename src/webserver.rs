@@ -144,8 +144,12 @@ impl Service<Request<IncomingBody>> for Serv {
 
     		let mut response = Response::builder();
 
+			// println!("{:?}", matched.value);
         	let result = match matched.value {
-            	ServValue::Func(ServFn::Expr(e, _)) => e.clone().eval(&mut scope),
+            	ServValue::Func(ServFn::Expr(e, _)) => {
+                	// println!("{:?}", e);
+                	e.clone().eval(&mut scope)
+            	},
             	value => value.call(None, &scope),
         	};
 

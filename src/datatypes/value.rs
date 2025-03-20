@@ -14,6 +14,8 @@ use crate::functions::json;
 pub use crate::servstring::ServString;
 pub use crate::servlist::ServList;
 
+use crate::dictionary::DatabaseConnection;
+
 #[derive(Clone)]
 pub enum ServFn {
     // Ident,

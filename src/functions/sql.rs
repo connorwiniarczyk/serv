@@ -4,12 +4,19 @@ use crate::Stack;
 use crate::servparser;
 use crate::{Label, ServFn};
 use crate::ServError;
+use crate::ServModule;
+use crate::ServList;
+
 
 use crate::template::{Template, TemplateElement, Renderer};
 use crate::template;
 
 use std::collections::VecDeque;
 use std::collections::HashMap;
+
+use std::sync::Arc;
+
+use crate::dictionary::DatabaseConnection;
 
 struct SqliteRenderer(Vec<ServValue>);
 
@@ -35,19 +42,19 @@ impl template::Renderer for SqliteRenderer {
 }
 
 
-fn get_database_location(scope: &Stack) -> Result<String, ServError> {
-    let value = scope.get("sql.database")?.call(None, scope)?;
+// fn get_database_location(scope: &Stack) -> Result<String, ServError> {
+//     // let value = scope.get("sqlite.database")?.call(None, scope)?;
+//     let value = crate::engine::deref(&"sqlite.database".into(), scope)?.call(None, scope)?;
 
-    if let ServValue::Text(output) = value {
-        Ok(output.as_str()?.to_string())
-    } else {
-    	Err(ServError::expected_type("string", value))
-    }
-}
+//     if let ServValue::Text(output) = value {
+//         Ok(output.as_str()?.to_string())
+//     } else {
+//     	Err(ServError::expected_type("string", value))
+//     }
+// }
 
-fn sql_exec(input: ServValue, scope: &Stack) -> ServResult {
-    let path = get_database_location(scope).unwrap_or("serv.sqlite".to_string());
-    let connection = sqlite::open(&path).unwrap();
+fn sqlite_exec(input: ServValue, scope: &Stack) -> ServResult {
+    let DatabaseConnection::Sqlite(connection) = scope.get_database_connection().expect("not connected to a database");
     connection.execute(input.to_string()).unwrap();
     Ok(ServValue::None)
 }
@@ -55,10 +62,6 @@ fn sql_exec(input: ServValue, scope: &Stack) -> ServResult {
 fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServValue, scope: &Stack) -> Result<(), ServError> {
     match param {
         ServValue::Ref(ref addr) => sqlite_bind_param(statement, i, crate::engine::deref(addr, scope)?, scope)?,
-        // ServValue::Ref(label) => {
-        //     let value = scope.get(label)?;
-        //     sqlite_bind_param(statement, i, value, scope);
-        // },
         ServValue::Int(v)    => statement.bind((i, v)).unwrap(),
         ServValue::Text(t)   => statement.bind((i, t.as_str()?)).unwrap(),
         ServValue::Float(v)  => statement.bind((i, v)).unwrap(),
@@ -73,14 +76,16 @@ fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServVal
     Ok(())
 }
 
-fn sql(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
+fn sqlite_query(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
+    let DatabaseConnection::Sqlite(connection) = s.get_database_connection().unwrap();
+
     let mut child = s.make_child();
     child.insert("in", input.clone());
     child.insert("x", input);
     let scope = &child;
 
-    let path = get_database_location(scope)?;
-    let connection = sqlite::open(&path).unwrap();
+    // let path = get_database_location(scope)?;
+    // let connection = sqlite::open(&path).unwrap();
 
 	while let ServValue::Ref(addr) = arg {
     	arg = crate::engine::deref(&addr, scope)?;
@@ -122,12 +127,25 @@ fn sql(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
     Ok(ServValue::List(output.into()))
 }
 
-use crate::ServModule;
+use crate::engine;
+
+fn sqlite_connect(mut input: ServList, ctx: &mut Stack) -> ServResult {
+    let location = engine::eval(input, ctx)?.to_string();
+    let connection = sqlite::Connection::open_thread_safe(location.as_str()).unwrap();
+
+    ctx.connection = Some(DatabaseConnection::Sqlite(connection));
+    Ok(ServValue::None)
+
+ //    let mut output = ServModule::empty();
+	// output.insert("query", ServFn::ArgFn(sqlite_query).into());
+	// output.insert("run",   ServFn::Core(sqlite_exec).into());
+	// Ok(output.into())
+}
 
 pub fn get_module() -> ServModule {
     let mut output = ServModule::empty();
-	output.insert("sql",       ServFn::ArgFn(sql).into());
-	output.insert("sql.exec",  ServFn::Core(sql_exec).into());
-
+	output.insert("sqlite.connect", ServFn::Meta(sqlite_connect).into());
+	output.insert("sqlite.query",   ServFn::ArgFn(sqlite_query).into());
+	output.insert("sqlite.run",     ServFn::Core(sqlite_exec).into());
 	output
 }

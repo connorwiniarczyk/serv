@@ -172,6 +172,7 @@ pub fn get_module() -> ServModule {
 	output.insert(":",     ServFn::ArgFn(get).into());
 	output.insert("with",  ServFn::Meta(with).into());
 	output.insert("using", ServFn::Meta(using).into());
+	output.insert("let",   ServFn::Meta(using).into());
 	output.insert("sum",   ServFn::Core(sum).into());
 
 	output

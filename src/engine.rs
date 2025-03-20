@@ -1,6 +1,36 @@
 use std::iter::Peekable;
 
-use crate::{ServValue, ServError, Stack, Address, Label, ServFn};
+use crate::{ServValue, ServError, Stack, Address, Label, ServFn, ServList};
+
+pub fn eval(mut phrase: ServList, ctx: &mut Stack) -> Result<ServValue, ServError> {
+    let Ok(mut next) = phrase.pop() else { return Ok(ServValue::None) };
+
+    while let ServValue::Ref(ref addr) = next {
+        next = deref(addr, ctx)?;
+    }
+
+    match next {
+		ServValue::Func(ServFn::Expr(e, _)) => {
+			phrase = e.concat(phrase);
+			eval(phrase, ctx)
+		},
+
+        ServValue::Func(ServFn::Meta(f)) => {
+            f(phrase, ctx)
+        },
+
+        ServValue::Func(ServFn::ArgFn(f)) => {
+            let arg = phrase.pop()?;
+            let rest = eval(phrase, ctx)?;
+            f(arg, rest, ctx)
+        },
+
+        f => {
+            let rest = eval(phrase, ctx)?;
+            resolve(f, Some(rest), ctx)
+        }
+    }
+}
 
 pub fn resolve(func: ServValue, input: Option<ServValue>, scope: &Stack) -> Result<ServValue, ServError> {
    	match func {
@@ -32,15 +62,12 @@ pub fn resolve(func: ServValue, input: Option<ServValue>, scope: &Stack) -> Resu
    	}
 }
 
-// fn deref_internal<'a, 'b, I: Iterator<Item = &'a Label>>(mut value: &'b ServValue, q: &mut Peekable<I>, scope: &'b Stack) -> Result<&'b ServValue, ServError> {
 fn deref_internal<'a, I: Iterator<Item = &'a Label>>(mut value: ServValue, q: &mut Peekable<I>, scope: &Stack) -> Result<ServValue, ServError> {
-    // println!("{:?}", value);
     match value {
         ServValue::Ref(ref addr) => deref_internal(deref(addr, scope)?, q, scope),
         ServValue::Func(_) if q.peek().is_some() => deref_internal(resolve(value, None, scope)?, q, scope),
 
         ServValue::Module(ref m) => {
-            // println!("{:?}", m);
             let Some(next) = q.next() else {
 				return Ok(value)
             };

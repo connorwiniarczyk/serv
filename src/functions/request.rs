@@ -89,7 +89,7 @@ pub fn get_module() -> ServModule {
 	output.insert("req.query",    ServFn::Core(query_all).into());
 	output.insert("cookies",      ServFn::Core(get_cookies).into());
 	output.insert("cookie.set",   ServFn::Meta(set_cookie).into());
-	output.insert("with.headers", ServFn::Meta(with_headers).into());
+	// output.insert("with.headers", ServFn::Meta(with_headers).into());
 
 	output
 }

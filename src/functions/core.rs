@@ -152,7 +152,7 @@ fn switch(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
 
 
 fn parse_module(input: ServValue, scope: &Stack) -> ServResult {
-    let module = servparser::parse_root_from_text(&input.to_string()).unwrap();
+    let module = servparser::parse_root_from_text(&input.to_string(), &mut scope.make_child()).unwrap();
     Ok(ServValue::Module(module))
 }
 
@@ -181,7 +181,7 @@ pub fn get_module() -> ServModule {
 	output.insert("*",           ServFn::Core(apply).into());
 	output.insert("uppercase",   ServFn::Core(uppercase).into());
 	output.insert("markdown",    ServFn::Core(markdown).into());
-	output.insert("with.header", ServFn::Meta(with_headers).into());
+	// output.insert("with.header", ServFn::Meta(with_headers).into());
 	output.insert("~",           ServFn::Core(as_template).into());
 	output.insert("serv",        ServFn::Core(parse_module).into());
     output

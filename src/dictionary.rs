@@ -17,13 +17,16 @@ use hyper::http::request::Parts;
 
 pub use crate::datatypes::reference::{Label, Address};
 
+pub enum DatabaseConnection {
+    Sqlite(sqlite::ConnectionThreadSafe),
+}
 
-#[derive(Clone)]
 pub struct StackDictionary<'parent, V> {
     unique_id: u32,
 	parent: Option<&'parent Self>,
-	words: HashMap<Label, V>,
 
+	pub connection: Option<DatabaseConnection>,
+	pub words: HashMap<Label, V>,
 	pub request: Option<Parts>,
 }
 
@@ -34,6 +37,8 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
             words: HashMap::new(),
             parent: None,
             request: None,
+
+            connection: None,
         }
     }
 
@@ -43,6 +48,7 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
             words: HashMap::new(),
             parent: Some(self),
             request: None,
+            connection: None,
         }
     }
 
@@ -72,51 +78,18 @@ impl<'parent, V: Clone> StackDictionary<'parent, V> {
 		return parent.get(key)
     }
 
-  //   fn get_unique_id(&mut self) -> u32 {
-		// let output = self.unique_id;
-		// self.unique_id += 1;
-		// return output
-  //   }
-
     pub fn get_request(&self) -> Option<&Parts> {
         self.request.as_ref().or_else(|| self.parent.and_then(|p| p.get_request()))
+    }
+
+    pub fn get_database_connection(&self) -> Option<&DatabaseConnection> {
+        self.connection.as_ref().or_else(|| self.parent.and_then(|p| p.get_database_connection()))
     }
 }
 
 pub type Stack<'a> = StackDictionary<'a, ServValue>;
 
 impl Stack<'_> {
-
-    // pub fn get<A: Into<Address>>(&self, a: A) -> Result<ServValue, ServError> {
-        // crate::engine::deref(&a.into(), self)
-        // let addr = a.into();
-        // let mut iter = addr.iter().peekable();
-
-        // let first = iter.next().ok_or(ServError::InsertWithEmptyAddress)?;
-        // let value = self.get_label(first.clone())?;
-
-        // if iter.peek().is_none() {
-        //     return Ok(value)
-        // }
-
-        // if let ServValue::Module(m) = value {
-        //     return m.get_internal(iter);
-        // }
-
-        // todo!();
-  //       let key: Label = l.into();
-  //       let value = self.words.get(&key);
-
-  //       if let Some(v) = value {
-  //           return Ok(v.clone());
-  //       };
-
-		// let Some(parent) = self.parent else {
-  //   		return Err(ServError::MissingLabel(key));
-		// };
-
-		// return parent.get(key)
-    // }
 
     pub fn insert<L: Into<Address>>(&mut self, key: L, value: ServValue) -> Result<(), ServError> {
         let addr = key.into();
