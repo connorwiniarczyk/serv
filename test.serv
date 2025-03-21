@@ -1,6 +1,1 @@
-
-sqlite.connect {:memory:}
-sqlite.run { create table if not exists users (id integer primary key, name text); }
-sqlite.run { insert into users (name) values ("user"); }
-
-print sqlite.query {select * from users where name=$in} {user; drop table users;}
+/ => print req

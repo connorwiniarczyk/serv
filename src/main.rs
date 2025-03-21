@@ -43,7 +43,7 @@ struct CliArgs {
 	#[arg(short, long)]
 	code: Option<String>,
 
-	/// The file to parse
+	/// The files to parse
     path: Option<String>,
 
 }

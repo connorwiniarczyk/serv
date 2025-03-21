@@ -10,6 +10,8 @@ use tokio_rustls::rustls;
 use crate::{ServFn, ServModule};
 use crate::ServError;
 
+use crate::engine;
+
 use matchit::Router;
 
 use hyper_util::rt::{TokioExecutor, TokioIo};
@@ -59,7 +61,7 @@ use http_body_util::BodyExt;
 use crate::value::Serializer;
 
 fn get_mime_type<'a>(value: &'a ServValue, scope: &'a Stack) -> Option<String> {
-    if let Ok(v) = scope.get("res.mime") {
+    if let Ok(v) = engine::deref(&"res.mime".into(), scope) {
 		return Some(v.call(None, scope).ok()?.to_string());
     }
 
@@ -89,15 +91,15 @@ fn response_from_value(input: ServValue, scope: &mut Stack) -> Response<ServBody
     	}
 	}
 
-	// if let Ok(ServValue::Module(m)) = scope.get("res.cookie") {
- //    	for (mut p, mut a) in m.equalities {
- //        	let mut child = scope.make_child();
- //        	let key   = p.eval(scope).unwrap().to_string();
- //        	let value = a.eval(scope).unwrap();
- //        	let cookie_text = format!("{}={};path=/;SameSite=Strict", key, value );
- //        	response = response.header("Set-Cookie", &cookie_text);
- //    	}
-	// }
+	if let Ok(ServValue::Module(m)) = engine::deref(&"res.cookie".into(), scope) {
+    	for (mut p, mut a) in m.values {
+        	let mut child = scope.make_child();
+        	let key   = p.to_string();
+        	let value = engine::resolve(a, None, scope).unwrap();
+        	let cookie_text = format!("{}={};path=/;SameSite=Strict", key, value );
+        	response = response.header("Set-Cookie", &cookie_text);
+    	}
+	}
 
 	response.body(ServBody::generate(input, scope)).unwrap()
 }
@@ -143,11 +145,8 @@ impl Service<Request<IncomingBody>> for Serv {
         	scope.request = Some(parts);
 
     		let mut response = Response::builder();
-
-			// println!("{:?}", matched.value);
         	let result = match matched.value {
             	ServValue::Func(ServFn::Expr(e, _)) => {
-                	// println!("{:?}", e);
                 	e.clone().eval(&mut scope)
             	},
             	value => value.call(None, &scope),
@@ -157,11 +156,6 @@ impl Service<Request<IncomingBody>> for Serv {
 				Ok(value)  => Ok(response_from_value(value, &mut scope)),
 				Err(error) => Ok(response_from_error(error, &mut scope)),
         	}
-
-
-			// Ok(response_from_value(result, &scope))
-    		// let response_sender = response.body(ServBody::generate(result, &scope)).unwrap();
-    		// Ok(response_sender)
     	};
 
     	Box::pin(output)
