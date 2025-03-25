@@ -76,7 +76,7 @@ async fn main() {
     populate_defaults(&mut scope, &args);
 
     for expr in &root_module.statements {
-        engine::eval(expr.clone(), &mut scope);
+        engine::eval(expr.clone(), &mut scope).unwrap();
     }
 
     let mut router = Router::new();

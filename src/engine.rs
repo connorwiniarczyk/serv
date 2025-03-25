@@ -72,7 +72,7 @@ fn deref_internal<'a, I: Iterator<Item = &'a Label>>(mut value: ServValue, q: &m
 				return Ok(value)
             };
 
-            let child = m.values.get(next).unwrap();
+            let child = m.values.get(next).ok_or(ServError::new(500, "?"))?;
             deref_internal(child.clone(), q, scope)
         },
 

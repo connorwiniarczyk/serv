@@ -46,20 +46,73 @@ impl std::fmt::Debug for ServFn {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum ServType {
+    None,
+    Ref,
+    Func,
+    Bool,
+    Int,
+    Float,
+    Text,
+    List,
+    Table,
+    Module,
+}
+
+impl From<&ServValue> for ServType {
+    fn from(input: &ServValue) -> Self {
+        match input {
+			ServValue::None      => Self::None,
+			ServValue::Ref(_)    => Self::Ref,
+			ServValue::Func(_)   => Self::Func,
+			ServValue::Bool(_)   => Self::Bool,
+			ServValue::Int(_)    => Self::Int,
+			ServValue::Float(_)  => Self::Float,
+			ServValue::Text(_)   => Self::Text,
+			ServValue::List(_)   => Self::List,
+			ServValue::Table(_)  => Self::Table,
+			ServValue::Module(_) => Self::Module,
+        }
+    }
+}
+
+impl From<ServValue> for ServType {
+    fn from(input: ServValue) -> Self {
+        ServType::from(&input)
+    }
+}
+
+impl Display for ServType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::None   => f.write_str("NONE"),
+            Self::Ref    => f.write_str("REF"),
+            Self::Func   => f.write_str("FUNC"),
+            Self::Bool   => f.write_str("BOOL"),
+            Self::Int    => f.write_str("INT"),
+            Self::Float  => f.write_str("FLOAT"),
+            Self::Text   => f.write_str("TEXT"),
+            Self::List   => f.write_str("LIST"),
+            Self::Table  => f.write_str("TABLE"),
+            Self::Module => f.write_str("MODULE"),
+        };
+
+		Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ServValue {
-    Ref(Address),
-    // Ref(Label),
-    Func(ServFn),
-
     None,
+    Ref(Address),
+    Func(ServFn),
     Bool(bool),
     Int(i64),
     Float(f64),
     Text(ServString),
     List(ServList),
     Table(HashMap<String, ServValue>),
-
     Module(crate::ServModule),
 }
 
@@ -73,6 +126,22 @@ impl ServValue {
         Ok(i.clone())
     }
 
+    pub fn expect_module(self) -> Result<ServModule, ServError> {
+        let ServValue::Module(m) = self else {
+			return Err(ServError::expected_type(ServType::Module, self));
+        };
+
+		Ok(m)
+    }
+
+    pub fn expect_ref(self) -> Result<Address, ServError> {
+        let ServValue::Ref(addr) = self else {
+			return Err(ServError::expected_type(ServType::Ref, self));
+        };
+
+		Ok(addr)
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
         	ServValue::None        => false,
@@ -83,10 +152,11 @@ impl ServValue {
     }
 
     pub fn as_str(&self) -> Result<&str, ServError> {
-        match self {
-            ServValue::Text(t) => t.as_str(),
-            otherwise => Err(ServError::expected_type("string", self.clone())),
-        }
+        let ServValue::Text(t) = self else {
+			return Err(ServError::expected_type(ServType::Text, self));
+        };
+
+		t.as_str()
     }
 }
 
@@ -117,6 +187,12 @@ impl From<ServModule> for ServValue {
 impl From<String> for ServValue {
     fn from(value: String) -> Self {
         Self::Text(value.into())
+    }
+}
+
+impl From<ServString> for ServValue {
+    fn from(value: ServString) -> Self {
+        Self::Text(value)
     }
 }
 

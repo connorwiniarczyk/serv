@@ -30,3 +30,4 @@ matchit = "0.8"
 
 evalexpr = "11.3.0"
 markdown = "1.0.0-alpha.16"
+lipsum = "0.9.1"

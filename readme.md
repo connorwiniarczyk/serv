@@ -3,33 +3,21 @@
 Serv is a tool for writing web servers. There are already a lot of
 tools for writing web servers, but this one is mine. It is optimized
 for what I've come to think of as the "medium complexity" case, where
-a static file server isn't powerful enough, but most modern web frameworks
-feel like overkill. Serv makes it trivial, often a single line of code,
-to serve a static website, render templates, query an SQL server, manipulate
+a static file server isn't powerful enough, but a modern web framework
+would feel like overkill. Serv makes it trivial, often a single line of code,
+to serve static files, render templates, query an SQL server, manipulate
 json, and perform basic math and logic.
 
-Serv is a swiss army knife for writing web servers and APIs, designed
-to make the developer experience as simple and enjoyable as possible.
-It is an entirely new language and runtime, which virtually eliminates
-the need for boilerplate code and makes many of the most common web
-tasks, such as reading a file, rendering a template, and querying a
-database, trivial one liners.
-
-Serv was heavily inspired by this lecture by Brian Kernighan:
-In it, he references languages like Awk and talks about the
-practice of crafting languages around a particular domain,
-such that problems inside that domain are easy to express.
-This is becoming increasingly rare, particularly in the web domain
-where most tools are implemented as libraries on top of existing
-languages like javascript or python. Doing so lowers the barrier to
-entry, but loses some of the power that a truly custom language can
-provide. Serv aims to continue this tradition by becoming a
-sort of "Awk for web programming", not necessarily the most
-efficient, or easiest to learn, but once understood, the most
-natural way to solve most problems in its domain.
-
-[https://www.youtube.com/watch?v=Sg4U4r_AgJU&pp=ygUfYnJpYW4ga2VybmlnaGFuIGxhbmd1YWdlIGRlc2lnbg%3D%3D](https://www.youtube.com/watch?v=Sg4U4r_AgJU&pp=ygUfYnJpYW4ga2VybmlnaGFuIGxhbmd1YWdlIGRlc2lnbg%3D%3D)
-
+Unlike similar tools, Serv is not implemented as a library on top of
+an existing language. Instead, it is its own entirely custom language
+built from the ground up with web programming in mind. It provides a
+standard library of "words" that represent some of the most common tasks
+a web server might want to do, such as reading from a file, querying
+a database, evaluating a mathematical expression, etc. and lets you
+freely combine them into "phrases" to produce more complex behavior.
+Phrases can be mapped directly onto routes to define the behavior of the
+web server, or onto new words in order to define increasingly abstract
+behavior.
 
 Here are some examples of Serv in action:
 
@@ -51,25 +39,20 @@ Here are some examples of Serv in action:
 /index => markdown file {www/index.md}
 
 # Define your own functions:
-square = %{ $: * $: }
+square = %{ $x * $x }
 /api/square/{x} => square x
 
 # Write API endpoints directly in SQL
 # serv automatically sanitizes your input, and converts the output to JSON
-sql.database  = {my_database.sqlite}
-/api/{user}/posts => sql { SELECT (title, content) FROM posts WHERE user = $user; }
+sqlite.connect = {:memory:}
+/api/{user}/posts => sqlite.query { SELECT (title, content) FROM posts WHERE user = $user; }
 
 # Compute the Fibonnaci sequence
-fib = switch {
-	(eq 0) => 1
-	(eq 1) => 1
-	(else) => sum | (fib-) (fib--)
-}
-
-/fib/{length} => map fib count length
+fib = ? (1, 1, sum list (fib-, fib--))
+print map fib count 10
 ```
 
-## Installation and Usage
+## Getting Started
 
 Serv can be installed using the rust toolchain and cargo:
 
@@ -79,9 +62,9 @@ cargo install --git https://github.com/connorwiniarczyk/serv.git
 
 Run serv in any directory with a main.serv file, or specify
 a file manually. Serv will run on port 4000 by default,
-or you can specify a port by defining the `@serv.port` function.
+or you can specify a port by defining the `serv.port` function.
 
-Serv will use TLS encryption if the `@serv.tlskey` and `@serv.tlscert`
+Serv will use TLS encryption if the `serv.tlskey` and `serv.tlscert`
 functions are defined.
 
 ```python
@@ -101,7 +84,7 @@ listening on port 443
 
 ## Syntax
 
-Serv is a *concatinative* functional language with a prefix call notation.
+Serv is a concatinative functional language with a prefix call notation.
 Every expression is composed of a sequence of functions, and every function
 operates on everything that comes after it in the expression. Typically, an
 expression is evaluated by taking the leftmost function out of the expression,
@@ -147,31 +130,22 @@ Strings in serv are functions as well, and are denoted with curly brackets `{}`.
 are allowed to span multiple lines and can contain most special characters, even additional
 balanced pairs of curly brackets, without needing to be escaped. If a string contains
 a `$` followed by an expression, that expression will be evaluated and its result inserted into
-the string at that location. 
+the string at that location.
 
-## Functions
 
-This is a non-exhaustive list, I'm adding more
-constantly
+## Musings about Domain Specific Languages
 
-| Word      | Effect                            |
-|:----------|:----------------------------------|
-| hello     | the string "Hello World"          |
-| uppercase | convert the input to uppercase    |
-| %         | compute a mathematical expression |
-| !         | drop the next word                |
-| +         | increase the value by 1           |
-| -         | decrease the value by 1           |
-| file      | read the contents of the file to a string     |
-| file.raw  | read the contents of the file to a byte array    |
-| exec      | execute a program on the host machine and return the result    |
-| exec.pipe | same as exec, but the second argument is piped into stdin of the child program |
-| markdown  | render a markdown string as HTML |
-| sql       | execute the sql query           |
-| sql.exec  | execute the sql query, but ignore the result          |
-| ls        | generate a list of files at a given path           |
-| count     | generate a list of counting numbers of size n |
-| map       | map a function onto a list |
-| fold      | reduce a list by calling a function on each element |
-| using     | define additional words to be used in the rest of the expression |
-| switch    | take an index and a list of functions, apply the function at that index to the input |
+Serv was heavily inspired by this lecture by Brian Kernighan:
+In it, he references languages like Awk and talks about the
+practice of crafting languages around a particular domain,
+such that problems inside that domain are easy to express.
+This is becoming increasingly rare, particularly in the web domain
+where most tools are implemented as libraries on top of existing
+languages like javascript or python. Doing so lowers the barrier to
+entry, but loses some of the power that a truly custom language can
+provide. Serv aims to continue this tradition by becoming a
+sort of "Awk for web programming", not necessarily the most
+efficient, or easiest to learn, but once understood, the most
+natural way to solve most problems in its domain.
+
+[https://www.youtube.com/watch?v=Sg4U4r_AgJU&pp=ygUfYnJpYW4ga2VybmlnaGFuIGxhbmd1YWdlIGRlc2lnbg%3D%3D](https://www.youtube.com/watch?v=Sg4U4r_AgJU&pp=ygUfYnJpYW4ga2VybmlnaGFuIGxhbmd1YWdlIGRlc2lnbg%3D%3D)

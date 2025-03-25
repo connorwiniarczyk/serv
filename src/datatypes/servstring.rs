@@ -26,6 +26,12 @@ impl From<&str> for Data {
 	}
 }
 
+impl From<&[u8]> for Data {
+	fn from(input: &[u8]) -> Data {
+		Self::Bytes(Bytes::copy_from_slice(input))
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct ServString {
     pub mime: Option<&'static str>,
@@ -40,7 +46,7 @@ impl ServString {
         }
     }
 
-    pub fn from_bytes<T: Into<Bytes>>(input: T) -> Self {
+   pub fn from_bytes<T: Into<Bytes>>(input: T) -> Self {
         let data: Bytes = input.into();
         if let Ok(text) = std::str::from_utf8(&data) {
             Self { mime: None, data: text.into() }

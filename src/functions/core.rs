@@ -2,13 +2,15 @@ use crate::{ ServValue, ServResult, Label };
 use crate::Stack;
 use crate::servparser;
 use crate::error::ServError;
+use crate::ServString;
 
 use crate::ServModule;
 
 use crate::value::{ ServFn, ServList };
 
+
 fn serv_try(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-	let ServValue::Module(m) = arg else { return Err(ServError::expected_type("module", input)) };
+    let m = arg.expect_module()?;
 
 	let mut child = scope.make_child();
 	child.insert_module(m.values);
@@ -37,22 +39,6 @@ fn uppercase(input: ServValue, scope: &Stack) -> ServResult {
     Ok(input.to_string().to_uppercase().into())
 }
 
-fn markdown(input: ServValue, scope: &Stack) -> ServResult {
-    let compile_options = markdown::CompileOptions {
-        allow_dangerous_html: true,
-        allow_dangerous_protocol: true,
-        gfm_tagfilter: false,
-        ..markdown::CompileOptions::default()
-    };
-
-    let options = markdown::Options {
-        compile: compile_options,
-        ..markdown::Options::gfm()
-    };
-
-    let output = markdown::to_html_with_options(input.to_string().as_str(), &options).unwrap();
-    Ok(ServValue::Text(output.into()))
-}
 
 
 fn drop(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
@@ -63,7 +49,7 @@ fn using(mut input: ServList, scope: &mut Stack) -> ServResult {
     let mut arg = input.next().ok_or("using expects an arg")?;
     arg = arg.call(None, scope)?;
 
-	let ServValue::Module(m) = arg else { return Err(ServError::expected_type("module", arg))};
+	let m = arg.expect_module()?; // arg else { return Err(ServError::expected_type("module", arg))};
 
 	scope.insert_module(m.values);
 	input.eval(scope)
@@ -75,19 +61,17 @@ fn as_template(input: ServValue, scope: &Stack) -> ServResult {
 }
 
 pub fn apply(input: ServValue, scope: &Stack) -> ServResult {
-    let ServValue::Module(m) = input else { return Err(ServError::expected_type("Module", input)) };
+    let m = input.expect_module()?;
+    // let ServValue::Module(m) = input else { return Err(ServError::expected_type("Module", input)) };
     m.call(None, &mut scope.make_child())
 }
 
 fn with_headers(mut input: ServList, scope: &mut Stack) -> ServResult {
     let mut arg = input.pop()?;
 	arg = arg.call(None, scope)?;
+	let m = arg.expect_module()?;
 
-    let ServValue::Module(m) = &arg else {
-        return Err(ServError::expected_type("Module", arg))
-    };
-
-    scope.insert("res.headers", arg);
+    scope.insert("res.headers", ServValue::Module(m));
     input.eval(scope)
 }
 
@@ -106,9 +90,7 @@ fn quote(input: ServList, scope: &mut Stack) -> ServResult {
 }
 
 fn choose(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    let ServValue::Module(m) = arg else {
-        return Err(ServError::expected_type("module", arg));
-    };
+    let m = arg.expect_module()?;
 
     let mut child = scope.make_child();
     let mut index = input.clone();
@@ -131,24 +113,21 @@ fn choose(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     };
 
     path.as_expr().call(Some(input), &mut child)
-
-    // path.push_back(input);
-    // path.eval(&mut child)
 }
 
-fn switch(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-	arg = arg.call(None, scope)?;
-    let ServValue::Module(m) = arg else { return Err(ServError::expected_type("Module", arg)) };
-  //   for (p, a) in m.equalities {
-  //       let pattern: ServValue = p.into();
-  //       let action: ServValue = a.into();
-		// if pattern.call(Some(input.clone()), scope).unwrap().is_truthy() {
-  //   		return Ok(action.call(Some(input), scope).unwrap())
-		// }
-  //   }
+// fn switch(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+// 	arg = arg.call(None, scope)?;
+//     let ServValue::Module(m) = arg else { return Err(ServError::expected_type("Module", arg)) };
+//   //   for (p, a) in m.equalities {
+//   //       let pattern: ServValue = p.into();
+//   //       let action: ServValue = a.into();
+// 		// if pattern.call(Some(input.clone()), scope).unwrap().is_truthy() {
+//   //   		return Ok(action.call(Some(input), scope).unwrap())
+// 		// }
+//   //   }
 
-    Ok(ServValue::None)
-}
+//     Ok(ServValue::None)
+// }
 
 
 fn parse_module(input: ServValue, scope: &Stack) -> ServResult {
@@ -177,13 +156,9 @@ pub fn get_module() -> ServModule {
 	output.insert("let",         ServFn::Meta(using).into());
 	output.insert("!",           ServFn::ArgFn(drop).into());
 	output.insert("?",           ServFn::ArgFn(choose).into());
-	output.insert("switch",      ServFn::ArgFn(switch).into());
 	output.insert("*",           ServFn::Core(apply).into());
 	output.insert("uppercase",   ServFn::Core(uppercase).into());
-	output.insert("markdown",    ServFn::Core(markdown).into());
-	// output.insert("with.header", ServFn::Meta(with_headers).into());
 	output.insert("~",           ServFn::Core(as_template).into());
 	output.insert("serv",        ServFn::Core(parse_module).into());
     output
-
 }

@@ -20,12 +20,14 @@ mod sql;
 mod request;
 mod math;
 mod core;
+mod string;
 
 pub mod json;
 
 pub fn standard_library() -> ServModule {
     let mut output = ServModule::empty();
     output.values.extend(core::get_module().values);
+    output.values.extend(string::get_module().values);
     output.values.extend(math::get_module().values);
     output.values.extend(list::get_module().values);
     output.values.extend(request::get_module().values);

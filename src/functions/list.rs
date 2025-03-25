@@ -1,4 +1,5 @@
 use crate::ServValue;
+use crate::ServType;
 use crate::ServResult;
 use crate::ServError;
 use crate::Stack;
@@ -7,13 +8,13 @@ use crate::{Label, ServFn};
 use crate::value::ServList;
 use crate::ServModule;
 
+use crate::engine;
+
 use std::collections::VecDeque;
 use std::collections::HashMap;
 
 fn list(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
-    let ServValue::Module(m) = arg else {
-        return Err(ServError::expected_type("Module", arg))
-    };
+    let m = arg.expect_module()?;
 
     let mut output = ServList::new();
     let mut child = scope.make_child();
@@ -27,8 +28,10 @@ fn list(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
 }
 
 fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
-    let arg = input.pop()?;
-   	let ServValue::Ref(addr) = arg else { panic!("'<' expects a ref") };
+    let addr = input.pop()?.expect_ref()?;
+
+   	// let ServValue::Ref(addr) = arg else { panic!("'<' expects a ref") };
+
    	let rest = input.eval(scope)?;
    	let out = match rest {
        	ServValue::List(mut l) => {
@@ -53,18 +56,15 @@ fn with(mut expr: ServList, scope: &mut Stack) -> ServResult {
             }
         }
         ServValue::Module(t) => scope.insert_module(t.values),
-        otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
+        otherwise => return Err(ServError::expected_type(ServType::Module, otherwise)),
     };
 
     Ok(ServValue::None)
 }
 
 fn using(mut expr: ServList, scope: &mut Stack) -> ServResult {
-    let arg = crate::engine::resolve(expr.pop()?, None, scope)?;
-    // let
+    let arg = engine::resolve(expr.pop()?, None, scope)?;
 
-
-    // let input = expr.eval(scope)?;
     match arg {
         ServValue::Table(t)  => {
             for (key, value) in t.into_iter() {
@@ -72,7 +72,7 @@ fn using(mut expr: ServList, scope: &mut Stack) -> ServResult {
             }
         }
         ServValue::Module(t) => scope.insert_module(t.values),
-        otherwise => return Err(ServError::expected_type("Table | Module", otherwise)),
+        otherwise => return Err(ServError::expected_type(ServType::Module, otherwise)),
     };
 
 	expr.eval(scope)
@@ -110,11 +110,9 @@ fn pop(input: ServValue, scope: &Stack) -> ServResult {
 fn get(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let output = match (arg, input) {
         (ServValue::Text(ref key), ServValue::Table(mut map)) => map.remove(key.as_str()?).ok_or("key not found")?,
-        // (ServValue::Ref(addr),     ServValue::Table(mut map)) => map.remove(key).ok_or("key not found")?,
-        // (ServValue::Ref(label),    ServValue::Module(mut map)) => map.values.remove(&label).ok_or("key not found")?,
         (ServValue::Int(index),    ServValue::List(mut list)) => list.get(index.try_into().map_err(|e| "invalid index")?)?.clone(),
 
-        (key, _) => return Err(ServError::expected_type("Int | Text", key)),
+        (key, _) => return Err(ServError::expected_type(ServType::Text, key)),
     };
 
 	Ok(output)
@@ -140,7 +138,7 @@ fn generate_list(input: ServList, scope: &mut Stack) -> ServResult {
 
 fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
     let ServValue::List(list) = input else {
-        return Err(ServError::expected_type("List", input))
+        return Err(ServError::expected_type(ServType::List, input))
     };
 
     let mut iter = list.filter(|x| !matches!(x, ServValue::None)).peekable();
@@ -154,7 +152,7 @@ fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
             }
             output.into()
         },
-        otherwise => return Err(ServError::expected_type("Int | Text", otherwise.clone())),
+        otherwise => return Err(ServError::expected_type(ServType::Int, otherwise.clone())),
     };
 
 	Ok(output)

@@ -62,6 +62,10 @@ fn sqlite_exec(input: ServValue, scope: &Stack) -> ServResult {
 fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServValue, scope: &Stack) -> Result<(), ServError> {
     match param {
         ServValue::Ref(ref addr) => sqlite_bind_param(statement, i, crate::engine::deref(addr, scope)?, scope)?,
+        ServValue::Func(_)   => {
+            let result = engine::resolve(param, None, scope)?;
+            sqlite_bind_param(statement, i, result, scope)?
+        },
         ServValue::Int(v)    => statement.bind((i, v)).unwrap(),
         ServValue::Text(t)   => statement.bind((i, t.as_str()?)).unwrap(),
         ServValue::Float(v)  => statement.bind((i, v)).unwrap(),
@@ -70,7 +74,7 @@ fn sqlite_bind_param(statement: &mut sqlite::Statement, i: usize, param: ServVal
         ServValue::List(v)   => todo!(),
         ServValue::Table(v)  => todo!(),
 
-        otherwise => todo!(),
+        ref otherwise => panic!("{:?}", param),
     };
 
     Ok(())
@@ -83,9 +87,6 @@ fn sqlite_query(mut arg: ServValue, input: ServValue, s: &Stack) -> ServResult {
     child.insert("in", input.clone());
     child.insert("x", input);
     let scope = &child;
-
-    // let path = get_database_location(scope)?;
-    // let connection = sqlite::open(&path).unwrap();
 
 	while let ServValue::Ref(addr) = arg {
     	arg = crate::engine::deref(&addr, scope)?;

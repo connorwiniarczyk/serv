@@ -1,4 +1,5 @@
 use crate::ServValue;
+use crate::ServType;
 
 #[derive(Debug)]
 pub enum ServError {
@@ -6,7 +7,8 @@ pub enum ServError {
     Io(std::io::Error),
     Fmt(std::fmt::Error),
     MissingLabel(crate::dictionary::Label),
-    UnexpectedType(String, ServValue),
+
+    UnexpectedType(ServType, ServType),
     InsertWithEmptyAddress,
     InsertIntoInvalidType,
 
@@ -17,8 +19,8 @@ impl ServError {
     	Self::General(code, message.into())
 	}
 
-	pub fn expected_type(expected: &str, actual: ServValue) -> Self {
-    	Self::UnexpectedType(expected.into(), actual)
+	pub fn expected_type<T: Into<ServType>>(expected: ServType, actual: T) -> Self {
+    	Self::UnexpectedType(expected, actual.into())
 	}
 }
 
@@ -29,6 +31,7 @@ impl std::fmt::Display for ServError {
             Self::Io(err) => write!(f, "io error: {}", err),
             Self::Fmt(err) => write!(f, "fmt error: {}", err),
             Self::MissingLabel(label) => write!(f, "missing label {}", label),
+
             Self::UnexpectedType(expected, actual) => write!(f, "expected type {}, found {}", expected, actual),
             Self::InsertWithEmptyAddress => f.write_str("empty address"),
 
