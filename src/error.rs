@@ -5,6 +5,7 @@ use crate::ServType;
 pub enum ServError {
     General(u16, String),
     Io(std::io::Error),
+    Utf8(std::str::Utf8Error),
     Fmt(std::fmt::Error),
     MissingLabel(crate::dictionary::Label),
 
@@ -42,7 +43,7 @@ impl std::fmt::Display for ServError {
 
 impl From<std::str::Utf8Error> for ServError {
     fn from(input: std::str::Utf8Error) -> Self {
-        todo!();
+        Self::Utf8(input)
     }
 }
 

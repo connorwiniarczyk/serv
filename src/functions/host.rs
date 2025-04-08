@@ -61,6 +61,7 @@ fn read_file(input: ServValue, scope: &Stack) -> ServResult {
             "css"     => Some("text/css"),
             "json"    => Some("application/json"),
             "svg"     => Some("image/svg+xml"),
+            "wasm"    => Some("application/wasm"),
             otherwise => None,
         }
     }

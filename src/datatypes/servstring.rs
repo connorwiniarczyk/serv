@@ -39,10 +39,23 @@ pub struct ServString {
 }
 
 impl ServString {
+    pub fn is_str(&self) -> bool {
+        match &self.data {
+			Data::Text(_)  => true,
+			Data::Bytes(_) => false,
+        }
+    }
     pub fn as_str(&self) -> Result<&str, ServError> {
         match &self.data {
 			Data::Text(ref s) => Ok(s),
 			Data::Bytes(b) => Ok(std::str::from_utf8(b)?),
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        match &self.data {
+			Data::Text(ref s) => s.as_bytes(),
+			Data::Bytes(b) => b,
         }
     }
 

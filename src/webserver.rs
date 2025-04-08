@@ -35,6 +35,8 @@ impl ServBody {
         match input {
 			ServValue::Ref(ref addr) => ServBody::generate(crate::engine::deref(addr, scope).unwrap(), scope),
 			ServValue::Func(_) => ServBody::generate(crate::engine::resolve(input, None, scope).unwrap(), scope),
+
+			ServValue::Text(s) if !s.is_str() => Self(Some(s.as_bytes().into_iter().map(|x| x.clone()).collect())),
 			otherwise => {
     			let mut output = String::new();
 				crate::value::DefaultSerializer(scope).write(otherwise, &mut output).unwrap();
