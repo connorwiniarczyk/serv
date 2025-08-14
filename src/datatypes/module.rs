@@ -53,9 +53,9 @@ impl ServModule {
  //    	return value.get_member(&mut iter)
 	// }
 
-	fn get_entry_if_module(&mut self, key: &Label) -> Entry<Label, ServValue> {
-		todo!();
-	}
+	// fn get_entry_if_module(&mut self, key: &Label) -> Entry<Label, ServValue> {
+	// 	todo!();
+	// }
 
     pub fn insert_internal<'a, I: Iterator<Item=&'a Label>>(&mut self, iter: &mut Peekable<I>, value: ServValue) -> Result<(), ServError> {
         let next = iter.next().unwrap();

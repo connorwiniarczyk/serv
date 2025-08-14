@@ -6,6 +6,7 @@ use crate::datatypes::value;
 use crate::datatypes::value::ServList;
 use crate::dictionary::Address;
 use crate::engine;
+use crate::Stack;
 
 use crate::servlexer::{TokenKind, TokenKind::*};
 use crate::servlexer;
@@ -47,6 +48,15 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
 	Ok(Template { open, close, elements })
 }
 
+fn constant(parser: &mut Parser, ctx: &mut Stack) -> Result<ServValue, ServError> {
+    let mut expr = ServList::new();
+    while let Ok(word) = parse_word(parser, ctx) {
+        expr.push_back(word);
+    }
+
+	return engine::eval(expr, ctx)
+}
+
 fn parse_word(parser: &mut Parser, ctx: &mut Stack) -> Result<ServValue, ServError> {
     let token = parser.get(0)?;
     let output = match token.kind {
@@ -60,14 +70,25 @@ fn parse_word(parser: &mut Parser, ctx: &mut Stack) -> Result<ServValue, ServErr
         },
         TokenKind::At => {
             parser.incr();
-
-            let mut expr = ServList::new();
-            while let Ok(word) = parse_word(parser, ctx) {
-                expr.push_back(word);
+            let func = parser.get(0).unwrap();
+            if func.kind != TokenKind::Identifier {
+                return Err("invalid parser function".into());
             }
 
-        	let result = engine::eval(expr, ctx)?;
-        	return Ok(result)
+			match func.to_string().as_str() {
+    			"const" => { parser.incr(); constant(parser, ctx) },
+    			_ => Err("invalid parser func".into()),
+			}?
+
+         //    let mut expr = ServList::new();
+         //    while let Ok(word) = parse_word(parser, ctx) {
+         //        expr.push_back(word);
+         //    }
+
+        	// let result = engine::eval(expr, ctx)?;
+        	// return Ok(result)
+
+        	// todo!();
         },
 
         other => return Err("unhandled token".into()),
@@ -114,7 +135,10 @@ fn parse_declaration(parser: &mut Parser, ctx: &mut Stack) -> Result<(Option<Add
     Ok((Some(label), rhs.into()))
 }
 
-use crate::Stack;
+
+fn include(parser: &mut Parser, ctx: &mut Stack) -> Result<(), ServError> {
+    todo!();
+}
 
 fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, ServError> {
     let mut output = ServModule::default();

@@ -36,6 +36,8 @@ impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
             dest.write_str(&input.open);
         }
 
+        let mut ctx = self.scope.make_child();
+
         for elem in input.elements.iter() {
             match elem {
                 TemplateElement::Text(t)     => dest.write_str(t).unwrap(),
@@ -47,8 +49,11 @@ impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
 
                 TemplateElement::Expression(t) if self.resolve_expressions => {
                     let input = self.scope.get("in").ok();
-                    let value = t.call(input, self.scope).unwrap();
-                    dest.write_str(&value.to_string());
+                    let value = t.call(input, &ctx).unwrap();
+                    match value {
+                        ServValue::Module(m) => {ctx.insert_module(m.values)},
+                        value => { dest.write_str(&value.to_string()); },
+                    };
                 },
 
                 TemplateElement::Expression(t) => {
