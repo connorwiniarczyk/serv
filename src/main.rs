@@ -1,12 +1,13 @@
 #![allow(unused)]
 
+mod parser;
+
 mod datatypes;
 use datatypes::*;
-
-mod servlexer;
-mod servparser;
+// mod servlexer;
+// mod servparser;
+// mod parsetool;
 mod engine;
-
 mod error;
 mod functions;
 mod dictionary;
@@ -15,13 +16,11 @@ mod webserver;
 use datatypes::module::ServModule;
 use value::{ ServValue, ServFn };
 use datatypes::reference::Address;
-
 use error::ServError;
 use dictionary::Label;
 use clap::Parser;
 use matchit::Router;
 use dictionary::StackDictionary;
-
 use dictionary::Stack;
 
 type ServResult = Result<ServValue, ServError>;
@@ -70,7 +69,7 @@ async fn main() {
     let mut scope = Stack::empty();
     scope.insert_module(functions::standard_library().values);
 
-    let root_module = servparser::parse_root_from_text(&input, &mut scope).unwrap();
+    let root_module = parser::parse_root_from_text(&input, &mut scope).unwrap();
     scope.insert_module(root_module.values.clone());
 
     populate_defaults(&mut scope, &args);

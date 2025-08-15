@@ -1,6 +1,8 @@
 use crate::{ ServValue, ServResult, Label };
 use crate::Stack;
-use crate::servparser;
+
+use crate::parser;
+
 use crate::error::ServError;
 use crate::ServString;
 
@@ -56,7 +58,7 @@ fn using(mut input: ServList, scope: &mut Stack) -> ServResult {
 }
 
 fn as_template(input: ServValue, scope: &Stack) -> ServResult {
-    let template = crate::servparser::parse_template_from_text(&input.to_string(), false).unwrap();
+    let template = parser::parse_template_from_text(&input.to_string(), false).unwrap();
     template.render(&scope)
 }
 
@@ -131,7 +133,7 @@ fn choose(mut arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
 
 
 fn parse_module(input: ServValue, scope: &Stack) -> ServResult {
-    let module = servparser::parse_root_from_text(&input.to_string(), &mut scope.make_child()).unwrap();
+    let module = parser::parse_root_from_text(&input.to_string(), &mut scope.make_child()).unwrap();
     Ok(ServValue::Module(module))
 }
 

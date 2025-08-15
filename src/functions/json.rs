@@ -1,6 +1,5 @@
 use crate::value::ServList;
 
-use parsetool::cursor::{ Tokenizer, Token };
 use crate::{Stack, ServResult, Label, ServValue, ServFn };
 
 use std::iter::Peekable;
@@ -11,6 +10,9 @@ use std::collections::HashMap;
 
 use crate::value::Serializer;
 use crate::ServError;
+
+use crate::parser::cursor::{ Tokenizer, Token };
+use crate::parser::cursor;
 
 type Buffer<'b> = &'b mut (dyn std::fmt::Write + 'b);
 

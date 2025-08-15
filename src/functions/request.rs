@@ -2,13 +2,17 @@ use crate::ServValue;
 use crate::ServResult;
 use crate::ServError;
 use crate::Stack;
-use crate::servparser;
+
+use crate::parser;
+use crate::parser::cursor::Tokenizer;
+
+// use crate::servparser;
+
 use crate::datatypes::servlist::ServList;
 use crate::{Label, ServFn};
 
 use crate::ServModule;
 
-use parsetool::cursor::Tokenizer;
 use std::collections::HashMap;
 
 fn parse_query_string(input: &str) -> ServValue {

@@ -2,11 +2,13 @@ use crate::value::ServValue;
 use crate::{ Stack, ServResult, ServFn };
 use std::fmt::Display;
 use crate::value::Serializer;
+use crate::ServError;
 
 type Buffer<'a> = dyn std::fmt::Write + 'a;
 
 pub trait Renderer {
-    fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>);
+    fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>) -> Result<(), ServError>;
+    // fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>);
 }
 
 #[derive(Clone)]
@@ -31,7 +33,7 @@ impl<'a> DefaultRenderer<'a, json::JsonSerializer<'a>> {
 }
 
 impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
-    fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>) {
+    fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>) -> Result<(), ServError> {
         if self.include_brackets {
             dest.write_str(&input.open);
         }
@@ -67,6 +69,8 @@ impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
         if self.include_brackets {
             dest.write_str(&input.close);
         }
+
+        Ok(())
     }
 }
 
@@ -76,7 +80,7 @@ pub struct LiteralRenderer {
 }
 
 impl Renderer for LiteralRenderer {
-    fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>) {
+    fn render<'b>(&mut self, input: &Template, dest: &'b mut Buffer<'b>) -> Result<(), ServError> {
         if self.include_brackets {
             dest.write_str(&input.open);
         }
@@ -100,6 +104,8 @@ impl Renderer for LiteralRenderer {
         if self.include_brackets {
             dest.write_str(&input.close);
         }
+
+        Ok(())
     }
 }
 

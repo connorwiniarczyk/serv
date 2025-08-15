@@ -1,5 +1,8 @@
 # SERV
 
+
+Serv is an experimental concatinative language for writing websites.
+
 Serv is a tool for writing web servers. There are already a lot of
 tools for writing web servers, but this one is mine. It is optimized
 for what I've come to think of as the "medium complexity" case, where

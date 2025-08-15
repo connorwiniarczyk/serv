@@ -1,11 +1,12 @@
 use crate::ServValue;
 use crate::ServResult;
 use crate::Stack;
-use crate::servparser;
 use crate::{Label, ServFn};
 use crate::ServError;
 use crate::ServModule;
 use crate::ServList;
+
+// use crate::servparser;
 
 
 use crate::template::{Template, TemplateElement, Renderer};
@@ -23,7 +24,7 @@ struct SqliteRenderer(Vec<ServValue>);
 type Buffer<'a> = &'a mut (dyn std::fmt::Write + 'a);
 
 impl template::Renderer for SqliteRenderer {
-    fn render<'buf>(&mut self, input: &template::Template, dest: Buffer<'buf>) {
+    fn render<'buf>(&mut self, input: &template::Template, dest: Buffer<'buf>) -> Result<(), ServError> {
         for element in &input.elements {
             match element {
                 TemplateElement::Text(t) => dest.write_str(t),
@@ -38,6 +39,8 @@ impl template::Renderer for SqliteRenderer {
                 },
             };
         }
+
+        Ok(())
     }
 }
 

@@ -1,8 +1,14 @@
 use crate::ServValue;
 use crate::ServType;
 
+// use crate::parsetool;
+
+use crate::parser::ParseError;
+
 #[derive(Debug)]
 pub enum ServError {
+    Empty,
+    Todo,
     General(u16, String),
     Io(std::io::Error),
     Utf8(std::str::Utf8Error),
@@ -65,8 +71,9 @@ impl From<std::fmt::Error> for ServError {
     }
 }
 
-impl From<parsetool::ParseError> for ServError {
-    fn from(input: parsetool::ParseError) -> Self {
-        Self::new(500, &input.to_string())
+impl From<ParseError> for ServError {
+    fn from(input: ParseError) -> Self {
+        Self::Todo
+        // Self::new(500, &input.to_string())
     }
 }

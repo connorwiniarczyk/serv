@@ -1,5 +1,5 @@
-use crate::cursor::Token;
-use crate::ParseError;
+use super::cursor::Token;
+use super::ParseError;
 
 // #[derive(Debug)]
 // pub struct ParseError;
@@ -10,12 +10,12 @@ use crate::ParseError;
 //     }
 // }
 
-pub struct Parser<'input, K> {
+pub struct Walker<'input, K> {
     input: &'input [Token<K>],
     index: isize,
 }
 
-impl<'input, K> Parser<'input, K> where K: Copy + Clone + PartialEq {
+impl<'input, K> Walker<'input, K> where K: Copy + Clone + PartialEq {
     fn len(&self) -> isize {
         self.input.len().try_into().unwrap()
     }

@@ -1,4 +1,4 @@
-print {
-    $(x = 1)
-	$x
-}
+
+x = {name}
+
+print {hello $x}

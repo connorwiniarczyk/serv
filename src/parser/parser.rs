@@ -8,15 +8,14 @@ use crate::dictionary::Address;
 use crate::engine;
 use crate::Stack;
 
-use crate::servlexer::{TokenKind, TokenKind::*};
-use crate::servlexer;
-
-use parsetool::cursor::Token;
-use parsetool::ParseError;
+use super::tokenizer::{TokenKind, TokenKind::*};
+use super::tokenizer;
+use super::cursor::Token;
+use super::ParseError;
 
 use crate::error::ServError;
 
-type Parser<'a> = parsetool::parser::Parser<'a, TokenKind>;
+pub type Parser<'a> = super::walker::Walker<'a, TokenKind>;
 
 fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
     let open = parser.expect(TokenKind::TemplateOpen)?.to_string();
@@ -120,7 +119,7 @@ fn get_label(mut input: ServList) -> Result<Address, ServError> {
 
 }
 
-fn parse_declaration(parser: &mut Parser, ctx: &mut Stack) -> Result<(Option<Address>, ServList), ServError> {
+pub fn parse_declaration(parser: &mut Parser, ctx: &mut Stack) -> Result<(Option<Address>, ServList), ServError> {
 
     // ignore multiple line breaks in a row
     while let Ok(_) = parser.next_if_kind(ModuleSeparator) {}
@@ -140,7 +139,7 @@ fn include(parser: &mut Parser, ctx: &mut Stack) -> Result<(), ServError> {
     todo!();
 }
 
-fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, ServError> {
+pub fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, ServError> {
     let mut output = ServModule::default();
 
 	while parser.get(0).is_ok() {
@@ -151,7 +150,10 @@ fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, Serv
     	if parser.get(0)?.kind == Include {
         	parser.incr();
         	let (label, mut expr) = parse_declaration(parser, ctx)?;
-        	if label.is_some() { return Err(ServError::new(500, "")) };
+        	if label.is_some() {
+            	return Err(ServError::Empty)
+            	// return Err(ServError::new(500, ""))
+        	};
 
         	let result = expr.eval(ctx)?;
         	let ServValue::Module(m) = result else {
@@ -166,33 +168,4 @@ fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, Serv
 	}
 
 	Ok(output)
-}
-
-pub fn parse_template_from_text(input: &str, brackets: bool) -> Result<Template, ServError> {
-    todo!();
-    // let chars: Vec<char> = input.chars().collect();
-    // let tokens = servlexer::tokenize_template(&chars);
-    // let mut parser = Parser::new(&tokens);
-    // let ast = parse_template(&mut parser)?;
-
-    // Ok(ast)
-}
-
-pub fn parse_expression_from_text(input: &str) -> Result<ServValue, ServError> {
-    todo!();
-    // let chars: Vec<char> = input.chars().collect();
-    // let tokens = servlexer::tokenize_serv(&chars);
-    // let mut parser = Parser::new(&tokens);
-    // let ast = parse_expression(&mut parser)?;
-
-    // Ok(ast)
-}
-
-pub fn parse_root_from_text(input: &str, ctx: &mut Stack) -> Result<ServModule, ServError> {
-    let chars: Vec<char> = input.chars().collect();
-    let tokens = servlexer::tokenize(&chars);
-    let mut parser = Parser::new(&tokens);
-    let ast = parse_module(&mut parser, ctx)?;
-
-    Ok(ast)
 }

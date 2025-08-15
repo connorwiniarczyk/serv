@@ -1,5 +1,6 @@
-use parsetool::cursor::{Tokenizer, Token};
+use super::cursor::{ Tokenizer, Token };
 
+/// The Valid tokens of a Serv file
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum TokenKind {
     Identifier,
@@ -8,6 +9,8 @@ pub enum TokenKind {
 
     IntLiteral,
 
+	TemplateLineBreak,
+	TemplateIndent,
     TemplateOpen,
     TemplateClose,
     TemplateText,
@@ -126,6 +129,11 @@ fn tokenize_template(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>,
             '{'  => tokenize_template(cursor, output, true),
             '$'  => tokenize_dollar(cursor, output),
             '\\' => tokenize_escape_sequence(cursor, output),
+
+            '\n' => {
+                cursor.incr(1);
+                cursor.emit_to(output, TokenKind::TemplateLineBreak);
+            },
 
             c  => {
                 cursor.incr_while(|x| !special_characters.contains(&x));
