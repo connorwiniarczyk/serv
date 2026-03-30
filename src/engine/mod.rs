@@ -67,6 +67,11 @@ pub fn resolve(func: ServValue, input: Option<ServValue>, scope: &Stack) -> Resu
    	}
 }
 
+pub fn resolve_key(key: &str, scope: &Stack) -> Result<ServValue, ServError> {
+    let addr = Address::from(key);
+    resolve(ServValue::Ref(addr), None, scope)
+}
+
 fn deref_internal<'a, I: Iterator<Item = &'a Label>>(mut value: ServValue, q: &mut Peekable<I>, scope: &Stack) -> Result<ServValue, ServError> {
     match value {
         ServValue::Ref(ref addr) => deref_internal(deref(addr, scope)?, q, scope),

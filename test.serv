@@ -1,4 +1,3 @@
+serv.test = 1000 
 
-x = {name}
-
-print {hello $x}
+/ => serv.test

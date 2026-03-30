@@ -165,8 +165,10 @@ impl Service<Request<IncomingBody>> for Serv {
 }
 
 fn get_port(scope: &mut Stack) -> Result<u16, ServError> {
-    match scope.get("serv.port") {
-        Ok(val) => Ok(val.call(None, &scope)?.expect_int()?.try_into().unwrap()),
+    match engine::resolve_key("serv.port", scope) {
+        Ok(val) => {
+            Ok(val.call(None, &scope)?.expect_int()?.try_into().unwrap())
+        },
         Err(e) => {
             scope.insert("serv.port", 4000.into());
             Ok(4000)
@@ -175,13 +177,17 @@ fn get_port(scope: &mut Stack) -> Result<u16, ServError> {
 }
 
 fn get_tls_info(scope: &Stack<'static>) -> Option<Arc<rustls::ServerConfig>> {
-    let key = scope.get("serv.tlskey").ok()?.call(None, scope).expect("Failed running serv.tlskey").to_string();
+    // let key = scope.get("serv.tlskey").ok()?.call(None, scope).expect("Failed running serv.tlskey").to_string();
+    let key = engine::resolve_key("serv.tlskey", scope).ok()?.to_string();
+
     let mut reader = BufReader::new(key.as_bytes());
     let key = rustls_pemfile::private_key(&mut reader)
         .expect("failed to parse private key")
         .expect("failed to find private key");
 
-    let cert = scope.get("serv.tlscert").ok()?.call(None, scope).expect("Failed running serv.tlscert").to_string();
+    // let cert = scope.get("serv.tlscert").ok()?.call(None, scope).expect("Failed running serv.tlscert").to_string();
+    let cert = engine::resolve_key("serv.tlscert", scope).ok()?.to_string();
+
     let mut reader_cert = BufReader::new(cert.as_bytes());
     let certs = rustls_pemfile::certs(&mut reader_cert)
         .map(|cert| cert.expect("failed to parse cert"))

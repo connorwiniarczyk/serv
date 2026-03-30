@@ -54,7 +54,9 @@ fn get_input(args: &mut CliArgs) -> Result<String, ServError> {
 }
 
 fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
-    if scope.get("serv.port").is_err() {
+
+    // if scope.get("serv.port").is_err() {
+    if engine::resolve_key("serv.port", scope).is_err() {
         let port: i64 = args.port.into();
         scope.insert("serv.port", port.into());
     }
@@ -66,11 +68,9 @@ async fn main() {
     let input = get_input(&mut args).unwrap();
 
     let mut scope = Stack::empty();
-    scope.insert_module(functions::standard_library().values);
 
     let root_module = parser::parse_root_from_text(&input, &mut scope).unwrap();
     scope.insert_module(root_module.values.clone());
-
     populate_defaults(&mut scope, &args);
 
     for expr in &root_module.statements {
