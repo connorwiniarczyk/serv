@@ -1,0 +1,132 @@
+use std::collections::HashMap;
+use std::fmt::Display;
+use matchit::Router;
+use crate::ServError;
+use crate::ServModule;
+
+use crate::datatypes::ServValue;
+
+use std::iter::Peekable;
+
+use std::collections::VecDeque;
+use std::collections::hash_map::Entry;
+
+use hyper::body::{Body, Frame, Incoming as IncomingBody};
+use hyper::{ Request, Response };
+use hyper::http::request::Parts;
+
+pub use crate::datatypes::reference::{Label, Address};
+
+pub enum DatabaseConnection {
+    Sqlite(sqlite::ConnectionThreadSafe),
+}
+
+pub struct StackDictionary<'parent, V> {
+    unique_id: u32,
+	parent: Option<&'parent Self>,
+
+	pub connection: Option<DatabaseConnection>,
+	pub words: HashMap<Label, V>,
+	pub request: Option<Parts>,
+}
+
+impl<'parent, V: Clone> StackDictionary<'parent, V> {
+    pub fn empty() -> Self {
+        Self {
+            unique_id: 0,
+            words: HashMap::new(),
+            parent: None,
+            request: None,
+
+            connection: None,
+        }
+    }
+
+    pub fn make_child(&'parent self) -> Self {
+        Self {
+            unique_id: self.unique_id,
+            words: HashMap::new(),
+            parent: Some(self),
+            request: None,
+            connection: None,
+        }
+    }
+
+
+    pub fn insert_module(&mut self, value: HashMap<Label, V>) {
+        self.words.extend(value);
+    }
+
+    // fn insert_anonymous(&mut self, value: V) -> Label {
+    //     let id = self.get_unique_id();
+    //     self.words.insert(Label::Anonymous(id), value);
+    //     Label::Anonymous(id)
+    // }
+
+    pub fn get<L: Into<Label>>(&self, l: L) -> Result<V, ServError> {
+        let key: Label = l.into();
+        let value = self.words.get(&key);
+
+        if let Some(v) = value {
+            return Ok(v.clone());
+        };
+
+		let Some(parent) = self.parent else {
+    		return Err(ServError::MissingLabel(key));
+		};
+
+		return parent.get(key)
+    }
+
+    pub fn get_request(&self) -> Option<&Parts> {
+        self.request.as_ref().or_else(|| self.parent.and_then(|p| p.get_request()))
+    }
+
+    pub fn get_database_connection(&self) -> Option<&DatabaseConnection> {
+        self.connection.as_ref().or_else(|| self.parent.and_then(|p| p.get_database_connection()))
+    }
+}
+
+pub type Stack<'a> = StackDictionary<'a, ServValue>;
+
+impl Stack<'_> {
+
+    pub fn insert<L: Into<Address>>(&mut self, key: L, value: ServValue) -> Result<(), ServError> {
+        let addr = key.into();
+
+        if addr.len() == 0 {
+			return Err(ServError::InsertWithEmptyAddress)
+        }
+
+        if addr.len() == 1 {
+            let label = addr.iter().next().unwrap().clone();
+            let v = self.words.entry(label).or_default();
+            *v = value;
+            return Ok(())
+        }
+
+        else {
+            let mut iter = addr.iter().peekable();
+            let key = iter.next().unwrap();
+
+            let dest = self.words.entry(key.clone()).or_insert(ServModule::empty().into());
+            match dest {
+                ServValue::Module(m) => m.insert_internal(&mut iter, value)?,
+                other => return Err(ServError::InsertIntoInvalidType),
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+	#[test]
+	fn test() {
+    	let mut one: StackDictionary<String, Vec<String>> = StackDictionary::empty();
+    	one.insert("hello".to_owned(), vec![])
+	}
+}

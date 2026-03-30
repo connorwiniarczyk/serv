@@ -4,8 +4,8 @@ version = "0.5.0"
 edition = "2021"
 
 [lib]
-name = "parsetool"
-path = "src/parsetool/lib.rs"
+name = "serv"
+path = "src/lib.rs"
 
 
 [dependencies]
@@ -30,3 +30,4 @@ matchit = "0.8"
 
 evalexpr = "11.3.0"
 markdown = "1.0.0-alpha.16"
+lipsum = "0.9.1"

@@ -1,11 +1,131 @@
-use parsetool::cursor::{ Tokenizer, Token };
+use crate::value::ServList;
+
 use crate::{Stack, ServResult, Label, ServValue, ServFn };
 
 use std::iter::Peekable;
 struct Parser<I>(Peekable<I>) where I: Iterator<Item = JsonToken>;
 
-use crate::VecDeque;
+use std::collections::VecDeque;
 use std::collections::HashMap;
+
+use crate::value::Serializer;
+use crate::ServError;
+
+use crate::parser::cursor::{ Tokenizer, Token };
+use crate::parser::cursor;
+
+type Buffer<'b> = &'b mut (dyn std::fmt::Write + 'b);
+
+#[derive(Clone)]
+pub struct JsonSerializer<'scope> {
+    tab: &'static str,
+    indent: isize,
+    scope: &'scope Stack<'scope>,
+}
+
+pub fn serializer<'scope>(scope: &'scope Stack<'scope>) -> JsonSerializer<'scope> {
+    JsonSerializer::new(scope)
+}
+
+impl<'a> JsonSerializer<'a> {
+    pub fn new(scope: &'a Stack<'a>) -> Self {
+        Self {
+            indent: 0,
+            tab: "  ",
+            scope
+        }
+    }
+
+    fn line_break<'b>(&self, dest: Buffer<'b>) {
+		dest.write_char('\n');
+		for _ in 0..self.indent { dest.write_str(self.tab); }
+    }
+}
+
+impl<'a> Serializer for JsonSerializer<'a> {
+    fn write<'b>(&mut self, value: ServValue, dest: Buffer<'b>) -> Result<(), ServError> {
+        match value {
+			ServValue::Ref(addr) => {
+    			for label in addr.iter().peekable() {
+        			dest.write_str(label.as_str())?;
+    			}
+			}
+			ServValue::Func(_) => self.write(crate::engine::resolve(value, None, self.scope)?, dest)?,
+
+			ServValue::Module(t)   => {
+    			dest.write_str("module:");
+    			self.indent += 1;
+    			self.line_break(dest);
+
+    			let mut iter = t.values.into_iter().peekable();
+    			while let Some((key, value)) = iter.next() {
+        			dest.write_str(key.as_str());
+        			dest.write_str("=");
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			self.line_break(dest);
+        			}
+    			}
+    			self.indent -= 1;
+    			self.line_break(dest);
+			},
+			ServValue::Module(t)   => dest.write_str("module")?,
+			ServValue::None     => dest.write_str("0")?,
+			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
+			ServValue::Float(v) => dest.write_str(&v.to_string())?,
+			ServValue::Int(v)   => dest.write_str(&v.to_string())?,
+			ServValue::Text(t)  => {
+    			dest.write_str("\"");
+    			dest.write_str(t.as_str().unwrap_or("RAW"));
+    			dest.write_str("\"")?
+			},
+
+			ServValue::List(list) => {
+    			dest.write_str("[");
+    			self.indent += 1;
+    			self.line_break(dest);
+
+    			let mut iter = list.peekable();
+    			while let Some(value) = iter.next() {
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			dest.write_char(',');
+            			self.line_break(dest);
+        			}
+    			}
+
+    			self.indent -= 1;
+    			self.line_break(dest);
+    			dest.write_str("]")?
+
+			},
+
+			ServValue::Table(table) => {
+    			dest.write_str("{");
+    			self.indent += 1;
+    			self.line_break(dest);
+
+    			let mut iter = table.into_iter().peekable();
+    			while let Some((key, value)) = iter.next() {
+        			dest.write_str("\"");
+        			dest.write_str(&key);
+        			dest.write_str("\"");
+        			dest.write_str(": ");
+        			self.write(value, dest)?;
+        			if iter.peek().is_some() {
+            			dest.write_str(",");
+            			self.line_break(dest);
+        			}
+    			}
+    			self.indent -= 1;
+    			self.line_break(dest);
+    			dest.write_str("}")?
+			},
+        };
+
+        Ok(())
+    }
+}
 
 #[derive (PartialEq, Clone, Copy, Debug)]
 enum TokenKind {
@@ -78,7 +198,7 @@ impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
         let valid = [Text, Number, OpenObject, OpenList];
         let token = self.0.next_if(|t| valid.contains(&t.kind)).ok_or(())?;
         let output = match token.kind {
-            Text       => ServValue::Text(token.value),
+            Text       => ServValue::Text(token.value.into()),
             Number     => ServValue::Float(token.value.parse().unwrap()),
             OpenList   => self.parse_list()?,
             OpenObject => self.parse_object()?,
@@ -103,7 +223,7 @@ impl<I> Parser<I> where I: Iterator<Item = JsonToken> {
     }
 
     fn parse_list(&mut self) -> Result<ServValue, ()> {
-        let mut output: VecDeque<ServValue> = VecDeque::new();
+        let mut output = ServList::new();
         while self.0.peek().expect("end of input while parsing list").kind != CloseList {
             output.push_back(self.parse_value()?);
             let _comma = self.0.next_if(|t| t.kind == Comma);
@@ -123,10 +243,16 @@ fn parse_json_from_str(input: &str) -> ServValue {
 }
 
 fn json_from(input: ServValue, scope: &Stack) -> ServResult {
+    // println!("{:?}", input.clone().to_string());
     Ok(parse_json_from_str(&input.to_string()))
 }
 
-pub fn bind(scope: &mut Stack) {
-	scope.insert(Label::name("json"),      ServValue::Func(ServFn::Core(json_from)));
-	scope.insert(Label::name("json.from"), ServValue::Func(ServFn::Core(json_from)));
+use crate::ServModule;
+
+pub fn get_module() -> ServModule {
+    let mut output = ServModule::empty();
+	output.insert("json",      ServFn::Core(json_from).into());
+	output.insert("json.from", ServFn::Core(json_from).into());
+
+	output
 }

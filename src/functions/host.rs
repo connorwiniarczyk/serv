@@ -4,6 +4,8 @@ use std::process::{Command, Stdio};
 use std::io::Write;
 use std::io::{BufWriter};
 use std::collections::VecDeque;
+use crate::value::ServList;
+use crate::servstring::ServString;
 
 fn exec(input: ServValue, scope: &Stack) -> ServResult {
     let text = input.to_string();
@@ -19,62 +21,73 @@ fn exec(input: ServValue, scope: &Stack) -> ServResult {
         .stderr(Stdio::null())
         .spawn().map_err(|_| "could not spawn")?.wait_with_output().unwrap();
 
-    Ok(ServValue::Raw(result.stdout))
-    // Ok(ServValue::Text(std::str::from_utf8(&result.stdout).unwrap().to_owned()))
+	Ok(ServString::from_bytes(result.stdout).as_value())
 }
 
 fn exec_pipe(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     let cmd = arg.call(None, scope)?.to_string();
     let mut args = cmd.split_whitespace();
     let mut command = Command::new(args.next().ok_or("bad input")?);
-    for arg in args {
-        command.arg(arg);
-    }
+    for arg in args { command.arg(arg); }
 
-    let mut command = Command::new(arg.to_string())
+    let mut result = command
         .stderr(Stdio::null())
         .stdout(Stdio::piped())
         .stdin(Stdio::piped())
         .spawn()
         .unwrap();
 
-    command.stdin.as_mut().unwrap().write_all(input.to_string().as_bytes());
-    let output = command.wait_with_output().unwrap();
+    result.stdin.as_mut().unwrap().write_all(input.to_string().as_bytes());
+    let output = result.wait_with_output().unwrap();
 
-    Ok(ServValue::Text(std::str::from_utf8(&output.stdout).unwrap().to_owned()))
+	Ok(ServString::from_bytes(output.stdout).as_value())
 }
 
+use std::path::Path;
+
+fn get_path(input: &Path) -> Option<&str> {
+    input.extension()?.to_str()
+}
 
 fn read_file(input: ServValue, scope: &Stack) -> ServResult {
-    let path = input.to_string();
-    let contents = std::fs::read_to_string(path).map_err(|e| "failed to open file")?;
-    Ok(ServValue::Text(contents))
-}
+    let path = std::path::Path::new(input.as_str()?);
+    let contents = std::fs::read(path)?;
 
-fn read_file_raw(input: ServValue, scope: &Stack) -> ServResult {
-    let path = input.to_string();
-    let contents = std::fs::read(path).map_err(|e| "failed to open file")?;
-    Ok(ServValue::Raw(contents))
+    let mut data = ServString::from_bytes(contents);
+    if let Some(ext) = get_path(&path) {
+        data.mime = match ext {
+            "html"    => Some("text/html"),
+            "js"      => Some("text/javascript"),
+            "css"     => Some("text/css"),
+            "json"    => Some("application/json"),
+            "svg"     => Some("image/svg+xml"),
+            "wasm"    => Some("application/wasm"),
+            otherwise => None,
+        }
+    }
+
+	Ok(data.as_value())
 }
 
 fn read_dir(input: ServValue, scope: &Stack) -> ServResult {
     let paths = std::fs::read_dir(input.to_string()).map_err(|_| "invalid path")?;
-    let mut output = VecDeque::new();
+    let mut output = ServList::new();
     for path in paths {
-        if let Ok(p) = path { output.push_back(ServValue::Text(p.path().display().to_string())); }
+        let Ok(p) = path else { continue };
+
+        let text = p.path().display().to_string();
+        output.push_back(text.into());
     }
     Ok(ServValue::List(output))
 }
 
-pub fn bind(scope: &mut crate::Stack) {
-	scope.insert(Label::name("read"),            ServValue::Func(ServFn::Core(read_file)));
-	scope.insert(Label::name("read.raw"),        ServValue::Func(ServFn::Core(read_file_raw)));
-	scope.insert(Label::name("file.utf8"),       ServValue::Func(ServFn::Core(read_file)));
-	scope.insert(Label::name("file.raw"),        ServValue::Func(ServFn::Core(read_file_raw)));
-	scope.insert(Label::name("file"),            ServValue::Func(ServFn::Core(read_file_raw)));
-	scope.insert(Label::name("ls"),              ServValue::Func(ServFn::Core(read_dir)));
-	scope.insert(Label::name("exec"),            ServValue::Func(ServFn::Core(exec)));
-	scope.insert(Label::name("exec.pipe"),            ServValue::Func(ServFn::ArgFn(exec_pipe)));
-	scope.insert(Label::name("pipe"),            ServValue::Func(ServFn::ArgFn(exec_pipe)));
+pub fn get_module() -> ServModule {
+    let mut output = ServModule::empty();
+	output.insert("file",       ServFn::Core(read_file).into());
+	output.insert("ls",         ServFn::Core(read_dir).into());
+	output.insert("exec",       ServFn::Core(exec).into());
+	output.insert("exec.pipe",  ServFn::ArgFn(exec_pipe).into());
+	output.insert("pipe",       ServFn::ArgFn(exec_pipe).into());
 
+	output
 }
