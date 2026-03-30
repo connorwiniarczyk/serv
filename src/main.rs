@@ -2,26 +2,25 @@
 
 mod parser;
 
-mod datatypes;
-use datatypes::*;
-// mod servlexer;
-// mod servparser;
-// mod parsetool;
+
 mod engine;
 mod error;
 mod functions;
-mod dictionary;
 mod webserver;
 
-use datatypes::module::ServModule;
-use value::{ ServValue, ServFn };
+pub use engine::datatypes;
+
+use engine::datatypes::*;
+use engine::datatypes::module::ServModule;
+use engine::value::{ ServValue, ServFn };
+use engine::dictionary::StackDictionary;
+use engine::dictionary::Stack;
+
 use datatypes::reference::Address;
 use error::ServError;
-use dictionary::Label;
+use engine::dictionary::Label;
 use clap::Parser;
 use matchit::Router;
-use dictionary::StackDictionary;
-use dictionary::Stack;
 
 type ServResult = Result<ServValue, ServError>;
 

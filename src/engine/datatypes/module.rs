@@ -9,7 +9,7 @@ use crate::ServError;
 use std::iter::Peekable;
 use std::collections::hash_map::Entry;
 
-use crate::dictionary::Address;
+use super::super::dictionary::Address;
 
 use std::collections::HashMap;
 

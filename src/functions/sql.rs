@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use std::sync::Arc;
 
-use crate::dictionary::DatabaseConnection;
+use crate::engine::dictionary::DatabaseConnection;
 
 struct SqliteRenderer(Vec<ServValue>);
 

@@ -4,7 +4,7 @@ use crate::datatypes::module::{ ServModule };
 use crate::datatypes::module;
 use crate::datatypes::value;
 use crate::datatypes::value::ServList;
-use crate::dictionary::Address;
+use crate::engine::dictionary::Address;
 use crate::engine;
 use crate::Stack;
 
@@ -116,7 +116,6 @@ fn get_label(mut input: ServList) -> Result<Address, ServError> {
     	ServValue::Ref(label) => Ok(label),
     	otherwise => Err(ServError::new(500, "definition did not start with a valid label")),
 	}
-
 }
 
 pub fn parse_declaration(parser: &mut Parser, ctx: &mut Stack) -> Result<(Option<Address>, ServList), ServError> {

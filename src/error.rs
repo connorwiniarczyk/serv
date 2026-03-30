@@ -13,7 +13,7 @@ pub enum ServError {
     Io(std::io::Error),
     Utf8(std::str::Utf8Error),
     Fmt(std::fmt::Error),
-    MissingLabel(crate::dictionary::Label),
+    MissingLabel(crate::engine::dictionary::Label),
 
     UnexpectedType(ServType, ServType),
     InsertWithEmptyAddress,

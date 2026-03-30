@@ -6,7 +6,6 @@ use crate::template::Template;
 use crate::Stack;
 use crate::Label;
 use crate::ServModule;
-use crate::dictionary::Address;
 use crate::ServError;
 use crate::ServResult;
 use crate::functions::json;
@@ -14,7 +13,8 @@ use crate::functions::json;
 pub use crate::servstring::ServString;
 pub use crate::servlist::ServList;
 
-use crate::dictionary::DatabaseConnection;
+use super::super::dictionary::Address;
+use super::super::dictionary::DatabaseConnection;
 
 #[derive(Clone)]
 pub enum ServFn {

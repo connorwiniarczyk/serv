@@ -1,9 +1,6 @@
 pub mod cursor;
 pub mod parser;
 
-
-
-
 #[derive(Debug)]
 pub struct ParseError {
     message: String

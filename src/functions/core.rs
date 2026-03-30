@@ -41,8 +41,6 @@ fn uppercase(input: ServValue, scope: &Stack) -> ServResult {
     Ok(input.to_string().to_uppercase().into())
 }
 
-
-
 fn drop(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     Ok(input)
 }
