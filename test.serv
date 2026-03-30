@@ -1,3 +1,4 @@
+serv.port = %{ 3000 + 500 }
 serv.test = 1000 
 
-/ => serv.test
+/ => file {src/main.rs}
