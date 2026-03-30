@@ -70,6 +70,5 @@ pub fn parse_root_from_text(input: &str, ctx: &mut Stack) -> Result<ServModule, 
     let tokens = tokenizer::tokenize(&chars);
     let mut parser = Parser::new(&tokens);
     let ast = parse_module(&mut parser, ctx)?;
-
     Ok(ast)
 }

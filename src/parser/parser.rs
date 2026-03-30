@@ -25,6 +25,11 @@ fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
 	while parser.current()?.kind != TokenKind::TemplateClose {
     	let token = parser.current()?.clone();
     	match token.kind {
+        	TokenKind::TemplateLineBreak => {
+            	elements.push(TemplateElement::Text(token.to_string()));
+            	parser.incr();
+        	},
+
         	TokenKind::TemplateText => {
             	elements.push(TemplateElement::Text(token.to_string()));
             	parser.incr();
