@@ -113,7 +113,7 @@ fn tokenize_expression(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>
 	}
 }
 
-fn tokenize_template(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>, brackets: bool) {
+pub fn tokenize_template(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>, brackets: bool) {
     if brackets {
         assert_eq!(cursor.get(0), Some('{'));
         cursor.incr(1);

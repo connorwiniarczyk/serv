@@ -165,28 +165,26 @@ impl Service<Request<IncomingBody>> for Serv {
 }
 
 fn get_port(scope: &mut Stack) -> Result<u16, ServError> {
-    match engine::resolve_key("serv.port", scope) {
+    match engine::resolve_key("server.port", scope) {
         Ok(val) => {
             Ok(val.call(None, &scope)?.expect_int()?.try_into().unwrap())
         },
         Err(e) => {
-            scope.insert("serv.port", 4000.into());
+            scope.insert("server.port", 4000.into());
             Ok(4000)
         },
     }
 }
 
 fn get_tls_info(scope: &Stack<'static>) -> Option<Arc<rustls::ServerConfig>> {
-    // let key = scope.get("serv.tlskey").ok()?.call(None, scope).expect("Failed running serv.tlskey").to_string();
-    let key = engine::resolve_key("serv.tlskey", scope).ok()?.to_string();
+    let key = engine::resolve_key("server.private_key", scope).ok()?.to_string();
 
     let mut reader = BufReader::new(key.as_bytes());
     let key = rustls_pemfile::private_key(&mut reader)
         .expect("failed to parse private key")
         .expect("failed to find private key");
 
-    // let cert = scope.get("serv.tlscert").ok()?.call(None, scope).expect("Failed running serv.tlscert").to_string();
-    let cert = engine::resolve_key("serv.tlscert", scope).ok()?.to_string();
+    let cert = engine::resolve_key("server.certificate", scope).ok()?.to_string();
 
     let mut reader_cert = BufReader::new(cert.as_bytes());
     let certs = rustls_pemfile::certs(&mut reader_cert)
@@ -214,32 +212,30 @@ pub async fn run_webserver(mut scope: Stack<'static>, router: Router<ServValue>)
         let tls_acceptor = tokio_rustls::TlsAcceptor::from(config);
 
     	loop {
-    		let (tcp_stream, _) = listener.accept().await.unwrap();
+    		let Ok((tcp_stream, _)) = listener.accept().await else {continue};
     		let scope_arc = scope_arc.clone();
     		let router_arc = router_arc.clone();
     		let tls_acceptor = tls_acceptor.clone();
 
     		tokio::task::spawn(async move {
         		let Ok(tls_stream) = tls_acceptor.accept(tcp_stream).await else { panic!() };
-    			http1::Builder::new()
-    				.serve_connection(TokioIo::new(tls_stream), Serv(scope_arc, router_arc))
-    				.await
-    				.unwrap();
+
+        		let mut connection = http1::Builder::new();
+        		let serv_context = Serv(scope_arc, router_arc);
+        		connection.serve_connection(TokioIo::new(tls_stream), serv_context).await;
     		});
     	}
 
 	} else {
-    	println!("starting unencrypted server");
     	loop {
-    		let (tcp_stream, _) = listener.accept().await.unwrap();
-    		let scope_arc = scope_arc.clone();
-    		let router_arc = router_arc.clone();
+    		let Ok((tcp_stream, _)) = listener.accept().await else { continue };
+    		let scope = scope_arc.clone();
+    		let router = router_arc.clone();
 
     		tokio::task::spawn(async move {
-    			http1::Builder::new()
-    				.serve_connection(TokioIo::new(tcp_stream), Serv(scope_arc, router_arc))
-    				.await
-    				.unwrap();
+        		let mut connection = http1::Builder::new();
+        		let serv_context = Serv(scope, router);
+        		connection.serve_connection(TokioIo::new(tcp_stream), serv_context).await;
     		});
     	}
 	}

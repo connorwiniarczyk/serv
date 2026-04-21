@@ -159,6 +159,7 @@ pub fn get_module() -> ServModule {
 	output.insert("*",           ServFn::Core(apply).into());
 	output.insert("uppercase",   ServFn::Core(uppercase).into());
 	output.insert("~",           ServFn::Core(as_template).into());
+	output.insert("template",    ServFn::Core(as_template).into());
 	output.insert("serv",        ServFn::Core(parse_module).into());
     output
 }

@@ -46,13 +46,17 @@ impl std::fmt::Display for ParseError {
 
 
 pub fn parse_template_from_text(input: &str, brackets: bool) -> Result<Template, crate::ServError> {
-    todo!();
-    // let chars: Vec<char> = input.chars().collect();
-    // let tokens = servlexer::tokenize_template(&chars);
-    // let mut parser = Parser::new(&tokens);
-    // let ast = parse_template(&mut parser)?;
+    let chars: Vec<char> = input.chars().collect();
+    let mut cursor = Tokenizer::new(&chars);
+    let mut tokens = Vec::new();
 
-    // Ok(ast)
+    tokenizer::tokenize_template(&mut cursor, &mut tokens, brackets);
+
+    let mut parser = Parser::new(&tokens);
+    parser::parse_template(&mut parser)
+
+    // let output = parser::parse_template(&mut parser)?;
+    // Ok(output)
 }
 
 pub fn parse_expression_from_text(input: &str) -> Result<ServValue, crate::ServError> {

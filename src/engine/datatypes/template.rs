@@ -42,7 +42,7 @@ impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
 
         for elem in input.elements.iter() {
             match elem {
-                TemplateElement::Text(t)     => dest.write_str(t).unwrap(),
+                TemplateElement::Text(t)     => dest.write_str(t)?,
                 TemplateElement::Template(t) => {
                     let mut child = self.clone();
                     child.include_brackets = true;
@@ -51,7 +51,7 @@ impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
 
                 TemplateElement::Expression(t) if self.resolve_expressions => {
                     let input = self.scope.get("in").ok();
-                    let value = t.call(input, &ctx).unwrap();
+                    let value = t.call(input, &ctx)?;
                     match value {
                         ServValue::Module(m) => {ctx.insert_module(m.values)},
                         value => { dest.write_str(&value.to_string()); },
@@ -87,7 +87,7 @@ impl Renderer for LiteralRenderer {
 
         for elem in input.elements.iter() {
             match elem {
-                TemplateElement::Text(t)     => dest.write_str(t).unwrap(),
+                TemplateElement::Text(t)     => dest.write_str(t)?,
                 TemplateElement::Template(t) => {
                     let mut child = self.clone();
                     child.include_brackets = true;
@@ -130,7 +130,7 @@ impl Template {
         let mut output = String::new();
         let mut renderer = DefaultRenderer::new(ctx);
 
-        renderer.render(self, &mut output);
+        renderer.render(self, &mut output)?;
 		Ok(ServValue::Text(output.into()))
     }
 }

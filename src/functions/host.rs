@@ -69,6 +69,14 @@ fn read_file(input: ServValue, scope: &Stack) -> ServResult {
 	Ok(data.as_value())
 }
 
+fn store_to_file(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let arg_value = arg.call(None, scope)?.to_string();
+    let path = std::path::Path::new(&arg_value);
+    std::fs::write(path, input.to_string());
+
+    Ok(input)
+}
+
 fn read_dir(input: ServValue, scope: &Stack) -> ServResult {
     let paths = std::fs::read_dir(input.to_string()).map_err(|_| "invalid path")?;
     let mut output = ServList::new();
@@ -84,6 +92,7 @@ fn read_dir(input: ServValue, scope: &Stack) -> ServResult {
 pub fn get_module() -> ServModule {
     let mut output = ServModule::empty();
 	output.insert("file",       ServFn::Core(read_file).into());
+	output.insert("store",      ServFn::ArgFn(store_to_file).into());
 	output.insert("ls",         ServFn::Core(read_dir).into());
 	output.insert("exec",       ServFn::Core(exec).into());
 	output.insert("exec.pipe",  ServFn::ArgFn(exec_pipe).into());

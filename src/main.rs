@@ -1,8 +1,6 @@
 #![allow(unused)]
 
 mod parser;
-
-
 mod engine;
 mod error;
 mod functions;
@@ -39,26 +37,37 @@ struct CliArgs {
 
 	/// Pass serv code directly as an argument, rather than specifying a file
 	#[arg(short, long)]
-	code: Option<String>,
+	execute: Vec<String>,
 
 	/// The files to parse
-    path: Option<String>,
-
+    path: Vec<String>,
 }
 
 fn get_input(args: &mut CliArgs) -> Result<String, ServError> {
-    if let Some(output) = args.code.take() { return Ok(output) }
+    let mut output = String::new();
+    for line in args.execute.iter() {
+        output.push_str(line.as_str());
+        output.push_str("\n");
+    }
 
-    let path = args.path.take().unwrap_or("main.serv".into());
-    std::fs::read_to_string(&path).map_err(|e| "could not open file".into())
+    if args.path.len() == 0 && args.execute.len() == 0 {
+        args.path.push("main.serv".into());
+    }
+
+    for p in args.path.iter() {
+        let Ok(file_contents) = std::fs::read_to_string(p) else {
+            return Err("could not open file".into());
+        };
+		output.push_str(&file_contents);
+    }
+
+    return Ok(output)
 }
 
 fn populate_defaults(scope: &mut Stack, args: &CliArgs) {
-
-    // if scope.get("serv.port").is_err() {
-    if engine::resolve_key("serv.port", scope).is_err() {
+    if engine::resolve_key("server.port", scope).is_err() {
         let port: i64 = args.port.into();
-        scope.insert("serv.port", port.into());
+        scope.insert("server.port", port.into());
     }
 }
 

@@ -15,7 +15,10 @@ use crate::value::ServList;
 
 fn math_expr(input: ServValue, scope: &Stack) -> ServResult {
     let expression = input.to_string();
-	let res = evalexpr::eval(expression.as_str()).unwrap();
+	let Ok(res) = evalexpr::eval(expression.as_str()) else {
+    	return Err(ServError::new(500, "invalid math expression"))
+	};
+
 	Ok(match res {
 		evalexpr::Value::String(s)  => s.into(),
 		evalexpr::Value::Int(x)     => ServValue::Int(x),

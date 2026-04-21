@@ -27,36 +27,6 @@ impl ServModule {
         }
     }
 
-  //   pub fn deep_insert<'a, I: Iterator<Item = &'a Label>>(&mut self, key: &'a mut Peekable<I>, value: ServValue) {
-		// todo!();
-  //   }
-
-   //  pub fn get(&self, i: &mut impl Iterator<Item=Label>) -> Option<ServValue> {
-   //      let mut active = self;
-   //      while let Some(n) = i.next() {
-   //          let next = active.values.get(&n)?;
-			// match next {
-   //  			ServValue::Module(m)
-			// }
-   //      }
-   //      todo!();
-   //  }
-
-
- //    fn get_internal<'a>(&self, a: &mut impl Iterator<Item=&'a Label>) -> Option<&ServValue> {
- //        todo!();
- //    }
-
-	// pub fn get<K: Into<Address>>(&self, key: K) -> Option<&ServValue> {
- //    	let mut iter = key.into().iter();
- //    	let value = self.values.get(iter.next()?)?;
- //    	return value.get_member(&mut iter)
-	// }
-
-	// fn get_entry_if_module(&mut self, key: &Label) -> Entry<Label, ServValue> {
-	// 	todo!();
-	// }
-
     pub fn insert_internal<'a, I: Iterator<Item=&'a Label>>(&mut self, iter: &mut Peekable<I>, value: ServValue) -> Result<(), ServError> {
         let next = iter.next().unwrap();
         if iter.peek().is_none() {

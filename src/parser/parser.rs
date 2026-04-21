@@ -17,7 +17,7 @@ use crate::error::ServError;
 
 pub type Parser<'a> = super::walker::Walker<'a, TokenKind>;
 
-fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
+pub fn parse_template(parser: &mut Parser) -> Result<Template, ServError> {
     let open = parser.expect(TokenKind::TemplateOpen)?.to_string();
     parser.incr()?;
 
