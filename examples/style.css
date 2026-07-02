@@ -1,0 +1,30 @@
+body {
+    --background-color: #0D1117;
+    --text-primary: #C9D1D9;
+    --text-secondary: #8B949E;
+    --border-color: #30363D;
+    --link-color: #57A6FF;
+    --content-width: 60rem;
+
+    background-color: var(--background-color);
+    color: var(--text-primary);
+
+    font-family: sans-serif;
+    font-size: 1.2em;
+    padding: 1rem;
+
+    max-width: var(--content-width);
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 5rem;
+}
+
+a {
+    color: var(--link-color);
+}
+
+pre {
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	padding: 0.5rem;
+}

@@ -1,0 +1,36 @@
+head = {
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+         crossorigin=""/>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fascinate+Inline&family=Limelight&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css" crossorigin=""/>
+    <script type="text/javascript" src="script.js" crossorigin=""></script>
+</head>
+}
+
+suffix = ? ({th}, {st}, {nd}, {rd}, {th}) modulo 10
+counter = try ( %file {counter.txt}, 0 )
+increment_counter = store {counter.txt} + counter
+
+/script.js => {
+    window.onload = function() {
+        console.log("visitor $counter");
+    }
+}
+
+/ => (increment_counter, {
+<html>
+    $head
+    <body>
+		<h1> You are the $counter$(suffix counter) visitor!
+    </body>
+</html>
+})

@@ -155,6 +155,7 @@ pub fn get_module() -> ServModule {
 	output.insert("using",       ServFn::Meta(using).into());
 	output.insert("let",         ServFn::Meta(using).into());
 	output.insert("!",           ServFn::ArgFn(drop).into());
+	output.insert("drop",        ServFn::ArgFn(drop).into());
 	output.insert("?",           ServFn::ArgFn(choose).into());
 	output.insert("*",           ServFn::Core(apply).into());
 	output.insert("uppercase",   ServFn::Core(uppercase).into());

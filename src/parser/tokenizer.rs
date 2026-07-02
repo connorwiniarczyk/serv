@@ -22,7 +22,6 @@ pub enum TokenKind {
     ModuleSeparator,
 
     Comment,
-    Include,
     At,
 }
 
@@ -99,7 +98,7 @@ fn tokenize_expression(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>
 
 				// include needs to be special since it is executed at parsetime
                 let mut ident = cursor.emit(TokenKind::Identifier);
-                if ident.value == "include" { ident.kind = TokenKind::Include };
+                // if ident.value == "include" { ident.kind = TokenKind::Include };
                 output.push(ident);
             },
             
@@ -180,7 +179,7 @@ fn tokenize_dollar(cursor: &mut Tokenizer, output: &mut Vec<Token<TokenKind>>) {
     }
 
     else {
-		cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.' || x == ':');
+		cursor.incr_while(|x| x.is_alphanumeric() || x == '_' || x == '.' || x == ':' || x == '*');
 		cursor.emit_to(output, TokenKind::Identifier);
     }
 }
@@ -199,7 +198,6 @@ pub fn tokenize<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
 
 // pub fn tokenize_template<'input>(input: &'input [char]) -> Vec<Token<TokenKind>> {
     // todo!();
-
     // let mut cursor = Cursor::new(input);
     // cursor.tokenize_template(false);
     // std::mem::take(&mut cursor.output)

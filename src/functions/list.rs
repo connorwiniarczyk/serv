@@ -7,9 +7,6 @@ use crate::Stack;
 use crate::{Label, ServFn};
 use crate::value::ServList;
 use crate::ServModule;
-
-// use crate::servparser;
-
 use crate::engine;
 
 use std::collections::VecDeque;
@@ -27,6 +24,15 @@ fn list(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     }
 
     Ok(output.into())
+}
+
+fn generate_list(input: ServList, scope: &mut Stack) -> ServResult {
+    let mut output = ServList::new();
+
+    for item in input {
+        output.push_back(item.call(None, scope)?);
+    }
+    Ok(ServValue::List(output))
 }
 
 fn take(mut input: ServList, scope: &mut Stack) -> ServResult {
@@ -129,14 +135,6 @@ fn map(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::List(output))
 }
 
-fn generate_list(input: ServList, scope: &mut Stack) -> ServResult {
-    let mut output = ServList::new();
-
-    for item in input {
-        output.push_back(item.call(None, scope)?);
-    }
-    Ok(ServValue::List(output))
-}
 
 fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
     let ServValue::List(list) = input else {
@@ -160,6 +158,19 @@ fn sum(mut input: ServValue, scope: &Stack) -> ServResult {
 	Ok(output)
 }
 
+fn product(mut input: ServValue, scope: &Stack) -> ServResult {
+    let ServValue::List(list) = input else {
+        return Err(ServError::expected_type(ServType::List, input))
+    };
+
+    let mut output = 1;
+	for value in list {
+    	output *= value.expect_int()?;
+	}
+
+	Ok(ServValue::Int(output))
+}
+
 pub fn get_module() -> ServModule {
     let mut output = ServModule::empty();
 
@@ -173,7 +184,9 @@ pub fn get_module() -> ServModule {
 	output.insert("with",  ServFn::Meta(with).into());
 	output.insert("using", ServFn::Meta(using).into());
 	output.insert("let",   ServFn::Meta(using).into());
-	output.insert("sum",   ServFn::Core(sum).into());
+
+	output.insert("sum",       ServFn::Core(sum).into());
+	output.insert("product",   ServFn::Core(product).into());
 
 	output
 }

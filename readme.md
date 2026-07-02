@@ -1,32 +1,19 @@
 # SERV
 
-Serv is an experimental language for writing web servers.
+Serv is an experimental backend web framework built using its own bespoke scripting language.
+By using a custom language that is tailored to the needs of writing a web server, it is able to virtually eliminate the need for boilerplate and dependencies,
+while also providing quality of life improvements over more traditional web frameworks.
 
-It provides a standard library of "words" that represent common web server tasks,
-such as reading a file, querying a database, rendering a template, and so on, and lets
-you freely combine them into "phrases" to produce more complex behavior. Phrases
-can be mapped directly onto routes to define the server's behavior, or onto new
-words to build increasingly abstract operations. Everything else is handled by
-the interpreter implicitly.
-
-Here is a small example, it shows a web server with 3 routes, one for the root
-which renders a template from a file, one which serves a file, and one which
-serves a string literal. The custom function `visitor_counter`, is more complex,
-combining the parse math (%), increment (+) and store operators to increase the
-value in visitors.txt by one each time it is called.
+Hello world in Serv is one line and looks like this, it creates a server on port 4000 that will reply with the string hello world.
 
 ```
-/ => template file {index.template}
-/styles.css => file {styles.css}
+/ => {hello world}
+```
 
-/script.js => {
-    window.onload = function() {
-        console.log("this website has been visited $visitor_counter times!");
-    }
-}
+A static file server is also one line and looks like this:
 
-#increment and return the value of visitors.txt
-visitor_counter => store {visitors.txt} + %file {visitors.txt}
+```
+/{*f} => file f
 ```
 
 ## Getting Started
@@ -49,22 +36,25 @@ Once your hello world server is running, navigate to
 [http://localhost:4000](http://localhost:4000) to see it working.
 If no argument is given, serv will look for a main.serv file in
 the current directory and run that. Serv will run on port 4000 by default,
-or you can specify a port by defining the `server.port`.
+or you can specify a port by defining `server.port`.
 
-### TLS encryption
+### Server Config
 
-Enabling TLS is as easy as assigning `server.certificate` and `server.private_key`
-in your serv file.
+The server created by serv can be configured by modifying fields in the
+server module. It supports changing the port by assigning server.port,
+and using Https by assigning server.certificate and server.private_key.
 
 ```
-server.port    = 443
+server.port = 443
 server.certificate = file {certfile.pem}
 server.private_key = file {keyfile.pem}
 
 / => {Encrypted Hello World!}
+
+print {listening on port: $server.port}
 ```
 
-## Background
+## Background (Ramble)
 
 Most of the web servers I write end up looking very similar to each other.
 They have a handful of routes, each serving a file or the result of a database
@@ -77,56 +67,51 @@ tool that was more tailored to the tasks my web servers actually do.
 There is a fantastic
 [lecture by Brian Kernighan](https://www.youtube.com/watch?v=Sg4U4r_AgJU)
 about language design which became a huge inspiration for many of the ideas in serv.
-He talks specifically about the process of crafting a language for a specific domain
+He talks specifically about the process of crafting a language for a domain
 such that, if a problem seemed simple in your head, it would be simple to express
 when you wrote the code. The example he gave was Awk for the domain of
-data processing, but it struck me that web servers might deserve such a language too.
+data processing, but it struck me that web servers ought to have such a language too.
 
-## Concepts
+### Concatenative Langauages and Om
 
-A serv expression is made up of a list of words concatenated together, where every
-word is a function that operates on the rest of the expression. This is called
-a *prefix call* notation, and it makes serv somewhat unusual among concatenative languages.
-Expressions generally get evaluated right to left, for example, the following expression
-applies 4 increment operators (+) to 0, and then prints the result.
+Serv falls into a family of languages called [concatenative](https://concatenative.org/wiki/view/Concatenative%20language),
+which are named for the property that expressions are built by concatenating smaller units together into a list.
+Of these, almost all use a *postfix* call notation, where each function operates on what comes before
+it in the program. These languages typically have a single global stack that every function operates on.
 
-```
-print ++++ 0
-```
+Serv works slightly differently, it uses a *prefix* call notation, meaning that every function operates on what comes
+after it in the expression, and rather than operating on a global stack, functions operate on the program itself.
 
-A slightly more complex example might look like this, which creates a list of numbers from
-1 to 10, maps the increment operator onto each one, sums them, and prints the result.
+From what I can tell, only one other langauge shares this property, an experimental language called [Om](https://www.om-language.com/index.html)
+and it was the inspiration for so many of the ideas that ended up in Serv.
 
-```
-print sum map+ count 10
-```
+## Tutorial
 
-### Assigning Routes
-
-Expressions can be assigned to routes with the `=>` or `=` operators (they are interchangeable).
-Routes can be exact, such as `/index.html` or patterns of the form `/literal/{var1}/{var2}/{*rest}`.
-
-See [https://github.com/ibraheemdev/matchit](https://github.com/ibraheemdev/matchit) for more details.
-
-When the server receives a new request, it checks each of the routes that has been assigned,
-and if one matches, it resolves the corresponding expression and responds with the result.
-If the pattern contains a named parameter, it can be used as a word in the expression.
-So for example, a static file server can be written with the following line:
+Every expression in serv is a list of functions concatenated together, where each
+function is an operation on the rest of the list. For example, the below expression
+will simply print the text "hello.md"
 
 ```
-/{*f} => file f
+print {hello.md}
 ```
 
-Expressions can also be assigned to identifiers to create new words. For example:
+If we add the `file` function, it will instead print the contents of hello.md
 
 ```
-plus_two   = ++
-plus_three = +++
-minus_four = ----
-
-# prints "2"
-print minus_four plus_two plus_three 1
+print file {hello.md}
 ```
+
+Finally, if we add the `markdown` function, we will get the contents of hello.md parsed
+as markdown into HTML.
+
+```
+print markdown file {hello.md}
+```
+
+Functions can be chained together in this way to create arbitrarily complex behavior.
+Expressions can be mapped onto http routes to define the endpoints of the server,
+or onto identifiers in order to create new functions. If any expressions are not mapped
+onto a route or identifier, the interpreter will run them in order.
 
 ### Strings
 
@@ -134,55 +119,194 @@ A string is any piece of text enclosed by curly brackets `{}`. Strings are allow
 span multiple lines, and can contain balanced pairs of nested curly brackets without
 escaping. This makes it very easy to embed other languages inside of serv strings.
 
-Every string is also a template, which can embed other words and expressions with
-the `$` character.
+```
+/main.js => {
+    window.onload = function() {
+    	console.log("hello from javascript");
+    }
+}
+```
+
+Serv strings are also templates, and can embed other serv expressions inside
+of them. This can be done with the `$` character followed by a single identifier of
+by an expression enclosed by parantheses.
 
 ```
-print {hello world}
-
 name = {connor}
-print {hello $name}
 
-# prints "hello CONNOR"
-print {hello $(uppercase name)}
+/hello => {hello $name!}
+/HELLO => {hello $(uppercase name)}
 ```
 
-### Metaprogramming
-
-Because words in serv are functions that operate on the remainder of the expression,
-every word can be a metaprogram. There is an implicit function, called resolve,
-which turns each sub expression into a value that can be operated on. Most functions work
-by resolving the remaining expression immediately, and then operating on the result,
-but they are free to do other things with the expression as well.
-
-A good example of a metaprogram is the list function (`|`), rather than resolve the
-remainder of the expression, it constructs a list out of each remaining word.
+Expressions inside of string templates can use the special identifier `*` to reference the remainder
+of their expression, which allows you to use them as functions.
 
 ```
-# prints "18"
-print sum | 5 6 7
+/=> {<html>$*</html>} {<body>$*</body>} {
+    <h1> this is the body </h1>
+    <p>$(lorem 100)</p>
+    <p>$(lorem 100)</p>
+}
 ```
 
-Many functions take 2 or more arguments instead of one. They can do this by popping the
-next word out of the expression and using that as their argument. A good example of this
-is the `map` function, which applies its first argument as a function onto every
-element in a list.
+### Route Patterns
+
+Route definitions are allowed to contain patterns in order to match multiple requests. Patterns
+take the form `/literal/{var1}/{var2}_literal/{*rest}`, where text inside of `{}` brackets is treated
+as a variable that can match arbitrary text. Variables that are matched in this will be added to the
+scope of the matched expression.
 
 ```
-# prints [3, 4, 5]
-print map (++) | 1 2 3
+/hello_{name} => {hello $name}
 ```
 
----
+Variables that begin with a `*` will match across path delimiters, allowing you to request files
+nested in other directories.
 
-```python
+```
+/{*f} => file f
+```
 
-# Write API endpoints directly in SQL
-# serv automatically sanitizes your input, and converts the output to JSON
-sqlite.connect = {:memory:}
-/api/{user}/posts => sqlite.query { SELECT (title, content) FROM posts WHERE user = $user; }
+### Structured Data
 
-# Compute the Fibonnaci sequence
+In addition to serving content, serv also provides tools for working with and serving
+structured data from databases and other sources. Serv currently includes a an `sqlite`
+module with functions for working with sqlite databases.
+
+```
+@include sqlite
+
+# connect to the database file `example.sqlite`
+connect {example.sqlite}
+
+# run some queries to initialize the database
+query {create table if not exists users (id INTEGER PRIMARY KEY, name TEXT UNIQUE);}
+query {insert into users (name) values ('connor');}
+
+/users => query {select name from users;}
+```
+
+If a function returns structured data of any kind, serv will automatically serialize it
+into JSON before sending the response.
+
+```bash
+$ curl localhost:4000/users
+[
+  {
+    "name": "connor",
+    "id": 1
+  }
+]
+
+```
+
+### Modules
+
+The output of the serv parser is a data structure called a module, which is a table mapping
+each route or identifier in the file to its corresponding expression. At the top level, this
+table is used to define the behavior of the web server, but the language also gives you tools
+to generate and use modules inside of expressions. The `serv` function can be used to generate
+a new serv module out of arbitrary text.
+
+```
+@include serv {
+	name = {connor}
+}
+
+/ => name
+```
+
+This allows you to split larger programs into several different files and import them like so:
+
+```
+@include serv file {utils.serv}
+@include serv file {components.serv}
+```
+
+Modules can also be created inline by with parantheses `()`. Expressions can be delimited by
+line breaks, semicolons, or commas. By default, modules created this way are functions that when evaluated,
+create a new scope with each of their assignments, then run each of their unassigned
+expressions in order, returning the result of the last expression. This can be a useful tool for creating
+functions with side effects, or for functions that might need a more complex local scope.
+
+```
+/{*f} => (
+	directory = {/www}
+    print {serving file: $directory/$f};
+    file {$directory/$f};
+)
+```
+
+### Advanced Evaluation
+
+As stated above, each function in a serv expression performs an operation on
+the rest of the expresssion, not necessarily just the result of that expression.
+Most typically, functions in serv work by first evaluating the remaining expression
+into a single value, and then doing an operation on that value, but this is not
+always the case, and many functions perform operations on the list of values
+that follow them before evaluating them.
+
+The simplest example of such a function is the drop function `!` which simply removes the next
+word in the list. It can be used to comment out pieces of an expression.
+
+```
+print !{not evaluated} ++3
+```
+
+The most common type of function in this family is one that uses the next word in the list as an
+additional argument to modify its behavior. For example, the `map` function takes the next function
+out of the expression, evaluates the remainder, and if it evaluates to a list, calls the function
+on each member of that list.
+
+```
+# this will add 2 to every member in the list of numbers from 0 to 4
+# prints [2, 3, 4, 5, 6]
+print map (++) count 5
+```
+
+The `list` function takes a module as an argument and uses it to build a list with a member
+for each expression.
+
+```
+# list builds a list with a member for each expression
+#prints [1, 2, 5, 4]
+print list (1, 2, ++, +) 3
+```
+
+The `try` function takes a module as an argument and runs each expression in order,
+returning the first one to not fail.
+
+```
+/main.css => try (
+	file {custom.css}
+	file {fallback.css}
+)
+```
+
+The choose function (`?`) takes a module as an argument and picks an expression to run
+based on its input. If the input is a number, it will run the nth expression, if the input
+is a boolean, it will run the first expression if true, and the second one if false
+
+```
+suffix = ? ({th}, {st}, {nd}, {rd}, {th}) modulo 10
+print map {$*$suffix } count 10
+```
+
+More complex function patterns are possible as well, but their potential remains mostly
+unexplored.
+
+### Recursion
+
+Functions in serv are allowed to reference themselves in their definition. Many "serious"
+functional languages will brag about their ability to elegantly express recursive concepts
+like the fibonacci sequence in just a few lines of code, and despite it not being super
+relevant for writing web servers, it became important to me to make sure serv could do
+the same. Below are programs for calculating the fibonacci sequence and factorials.
+
+```
 fib = ? (1, 1, sum list (fib-, fib--))
 print map fib count 10
+
+factorial = ? (1, product list ((), factorial-))
+print map factorial count 10
 ```

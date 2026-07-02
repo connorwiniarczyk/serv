@@ -50,7 +50,8 @@ impl<'scope, S: Serializer + Clone> Renderer for DefaultRenderer<'scope, S> {
                 },
 
                 TemplateElement::Expression(t) if self.resolve_expressions => {
-                    let input = self.scope.get("in").ok();
+                    // let input = self.scope.get("in").ok();
+                    let input = self.scope.get("*").ok();
                     let value = t.call(input, &ctx)?;
                     match value {
                         ServValue::Module(m) => {ctx.insert_module(m.values)},

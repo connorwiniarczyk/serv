@@ -25,6 +25,7 @@ pub enum ServFn {
     Expr     (ServList, bool),
 
     Template (Template),
+    SubExpression (crate::ServModule),
 }
 
 impl From<ServFn> for ServValue {
@@ -36,12 +37,12 @@ impl From<ServFn> for ServValue {
 impl std::fmt::Debug for ServFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            // Self::Ident       => f.write_str("Ident"),
-            Self::Core(_)     => f.write_str("Core"),
-            Self::Meta(_)     => f.write_str("Meta"),
-            Self::ArgFn(_)    => f.write_str("ArgFn"),
-            Self::Expr(_, _)  => f.write_str("Expr"),
-            Self::Template(_) => f.write_str("Template "),
+            Self::Core(_)          => f.write_str("Core"),
+            Self::Meta(_)          => f.write_str("Meta"),
+            Self::ArgFn(_)         => f.write_str("ArgFn"),
+            Self::Expr(_, _)       => f.write_str("Expr"),
+            Self::Template(_)      => f.write_str("Template "),
+            Self::SubExpression(_) => f.write_str("Sub Expression"),
         }
     }
 }
@@ -127,11 +128,11 @@ impl ServValue {
     }
 
     pub fn expect_module(self) -> Result<ServModule, ServError> {
-        let ServValue::Module(m) = self else {
-			return Err(ServError::expected_type(ServType::Module, self));
-        };
-
-		Ok(m)
+        match self {
+            ServValue::Module(m) => Ok(m),
+            ServValue::Func(ServFn::SubExpression(m)) => Ok(m),
+            ref otherwise => Err(ServError::expected_type(ServType::Module, self)),
+        }
     }
 
     pub fn expect_ref(self) -> Result<Address, ServError> {

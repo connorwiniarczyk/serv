@@ -70,7 +70,8 @@ fn parse_word(parser: &mut Parser, ctx: &mut Stack) -> Result<ServValue, ServErr
         TokenKind::TemplateOpen => ServValue::Func(ServFn::Template(parse_template(parser)?.into())),
         TokenKind::ModuleOpen   => {
             parser.incr();
-            ServValue::Module(parse_module(parser, ctx)?)
+            let func = ServFn::SubExpression(parse_module(parser, ctx)?);
+            ServValue::Func(func)
         },
         TokenKind::At => {
             parser.incr();
@@ -139,8 +140,27 @@ pub fn parse_declaration(parser: &mut Parser, ctx: &mut Stack) -> Result<(Option
 }
 
 
-fn include(parser: &mut Parser, ctx: &mut Stack) -> Result<(), ServError> {
-    todo!();
+fn include(module: &mut ServModule, parser: &mut Parser, ctx: &mut Stack) -> Result<(), ServError> {
+    let (label, mut expr) = parse_declaration(parser, ctx)?;
+
+    if label.is_some() {
+        return Err(ServError::Empty)
+    };
+
+	if expr.len() == 1 {
+        if let Ok(ServValue::Module(m)) = expr.get(0) {
+            module.values.extend(m.values.clone());
+            return Ok(());
+        }
+	}
+
+    let result = expr.eval(ctx)?;
+    let ServValue::Module(m) = result else {
+        return Err(ServError::new(500, "include statements require a module type"));
+    };
+
+    module.values.extend(m.values);
+    Ok(())
 }
 
 pub fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, ServError> {
@@ -150,21 +170,24 @@ pub fn parse_module(parser: &mut Parser, ctx: &mut Stack) -> Result<ServModule, 
     	if parser.get(0)?.kind == ModuleClose { break };
     	if parser.get(0)?.kind == Comment { continue };
 
-    	// include statements need to be executed at parsetime
-    	if parser.get(0)?.kind == Include {
+    	if parser.get(0)?.kind == At {
         	parser.incr();
-        	let (label, mut expr) = parse_declaration(parser, ctx)?;
-        	if label.is_some() {
-            	return Err(ServError::Empty)
-            	// return Err(ServError::new(500, ""))
-        	};
+        	if parser.get(0)?.kind != TokenKind::Identifier {
+            	return Err(ServError::Empty);
+        	}
 
-        	let result = expr.eval(ctx)?;
-        	let ServValue::Module(m) = result else {
-            	return Err(ServError::new(500, "include statements require a module type"));
-        	};
+        	match parser.get(0)?.value.as_str() {
+            	"include" => {parser.incr(); include(&mut output, parser, ctx)?},
+            	"const"   => {
+                	parser.incr();
+                	let (label, mut expr) = parse_declaration(parser, ctx)?;
+                	let mut value = ServList::new();
+                	value.push(expr.eval(ctx)?);
+                	output.insert_declaration(label, value);
 
-        	output.values.extend(m.values);
+            	},
+            	otherwise => return Err(ServError::Empty),
+        	}
     	}
 
     	let (label, value) = parse_declaration(parser, ctx)?;

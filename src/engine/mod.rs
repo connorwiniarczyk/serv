@@ -40,7 +40,8 @@ pub fn eval(mut phrase: ServList, ctx: &mut Stack) -> Result<ServValue, ServErro
 pub fn resolve(func: ServValue, input: Option<ServValue>, scope: &Stack) -> Result<ServValue, ServError> {
    	match func {
        	ServValue::Ref(ref addr) => resolve(deref(addr, scope)?, input, scope),
-		ServValue::Module(m) => m.clone().call(input, &mut scope.make_child()),
+		ServValue::Module(m) => Ok(ServValue::Module(m)),
+		ServValue::Func(ServFn::SubExpression(m)) => m.call(input, &mut scope.make_child()),
 
        	ServValue::Func(ServFn::Core(f)) => f(input.unwrap_or_default(), scope),
        	ServValue::Func(ServFn::Expr(e, _)) => {
@@ -53,8 +54,7 @@ pub fn resolve(func: ServValue, input: Option<ServValue>, scope: &Stack) -> Resu
        	ServValue::Func(ServFn::Template(t)) => {
            	if let Some(v) = input {
                	let mut child = scope.make_child();
-               	child.insert("in", v.clone());
-               	child.insert("x", v);
+               	child.insert("*", v);
                	t.render(&child)
            	}
 

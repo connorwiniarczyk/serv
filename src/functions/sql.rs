@@ -6,9 +6,6 @@ use crate::ServError;
 use crate::ServModule;
 use crate::ServList;
 
-// use crate::servparser;
-
-
 use crate::template::{Template, TemplateElement, Renderer};
 use crate::template;
 
@@ -139,11 +136,6 @@ fn sqlite_connect(mut input: ServList, ctx: &mut Stack) -> ServResult {
 
     ctx.connection = Some(DatabaseConnection::Sqlite(connection));
     Ok(ServValue::None)
-
- //    let mut output = ServModule::empty();
-	// output.insert("query", ServFn::ArgFn(sqlite_query).into());
-	// output.insert("run",   ServFn::Core(sqlite_exec).into());
-	// Ok(output.into())
 }
 
 pub fn get_module() -> ServModule {

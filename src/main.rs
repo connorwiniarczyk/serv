@@ -77,10 +77,9 @@ async fn main() {
     let input = get_input(&mut args).unwrap();
 
     let mut scope = Stack::empty();
+    scope.insert_module(functions::standard_library().values);
 
     let root_module = parser::parse_root_from_text(&input, &mut scope).unwrap();
-
-    scope.insert_module(functions::standard_library().values);
     scope.insert_module(root_module.values.clone());
 
     populate_defaults(&mut scope, &args);

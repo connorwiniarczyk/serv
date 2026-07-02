@@ -1,0 +1,16 @@
+@include sqlite
+
+print drop ++++
+
+connect {example.sqlite}
+
+print (
+	name = {connor}
+	query {select id from users where name=$name;}
+)
+
+# connect {example.sqlite}
+# query {create table if not exists users (id INTEGER PRIMARY KEY, name TEXT UNIQUE);}
+# query {insert into users (name) values ('connor');}
+
+/users => query {select * from users;}

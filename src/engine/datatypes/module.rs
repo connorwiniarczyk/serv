@@ -67,7 +67,19 @@ impl ServModule {
 
 
     pub fn call(self, input: Option<ServValue>, scope: &mut Stack) -> ServResult {
-		if self.statements.len() == 0 { return Ok(ServValue::Module(self)) }
+		if self.statements.len() == 0 && self.values.len() == 0 {
+    		let Some(output) = input else {return Ok(ServValue::None)};
+    		return Ok(output);
+		}
+
+		if self.statements.len() == 0 {
+    		let mut table = HashMap::new();
+    		for (key, value) in self.values.into_iter() {
+        		table.insert(key.to_string(), value.call(input.clone(), scope)?);
+    		}
+
+    		return Ok(ServValue::Table(table))
+		}
 
 		scope.insert_module(self.values);
         let mut output = ServValue::None;

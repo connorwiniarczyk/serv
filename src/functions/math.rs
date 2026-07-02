@@ -37,6 +37,11 @@ fn decr(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::Int(input.expect_int()? - 1))
 }
 
+fn modulo(arg: ServValue, input: ServValue, scope: &Stack) -> ServResult {
+    let modulo_by = arg.call(None, scope)?.expect_int()?;
+    Ok(ServValue::Int(input.expect_int()? % modulo_by))
+}
+
 fn yes(input: ServValue, scope: &Stack) -> ServResult {
     Ok(ServValue::Bool(true))
 }
@@ -54,6 +59,8 @@ pub fn get_module() -> ServModule {
 	output.insert("+",  ServFn::Core(incr).into());
 	output.insert("-",  ServFn::Core(decr).into());
 	output.insert("%",  ServFn::Core(math_expr).into());
+
+	output.insert("modulo",  ServFn::ArgFn(modulo).into());
 	output.insert("eq", ServFn::ArgFn(equals).into());
 	output.insert("true",  ServFn::Core(yes).into());
 	output.insert("else",  ServFn::Core(yes).into());

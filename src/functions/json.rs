@@ -14,6 +14,8 @@ use crate::ServError;
 use crate::parser::cursor::{ Tokenizer, Token };
 use crate::parser::cursor;
 
+use crate::ServModule;
+
 type Buffer<'b> = &'b mut (dyn std::fmt::Write + 'b);
 
 #[derive(Clone)]
@@ -49,10 +51,13 @@ impl<'a> Serializer for JsonSerializer<'a> {
     			for label in addr.iter().peekable() {
         			dest.write_str(label.as_str())?;
     			}
-			}
-			ServValue::Func(_) => self.write(crate::engine::resolve(value, None, self.scope)?, dest)?,
+			},
 
-			ServValue::Module(t)   => {
+			ServValue::Func(_) => {
+    			self.write(crate::engine::resolve(value, None, self.scope)?, dest)?
+			},
+
+/*			ServValue::Module(t)   => {
     			dest.write_str("module:");
     			self.indent += 1;
     			self.line_break(dest);
@@ -68,8 +73,8 @@ impl<'a> Serializer for JsonSerializer<'a> {
     			}
     			self.indent -= 1;
     			self.line_break(dest);
-			},
-			ServValue::Module(t)   => dest.write_str("module")?,
+			},*/
+			ServValue::Module(t)   => dest.write_str("(...)")?,
 			ServValue::None     => dest.write_str("0")?,
 			ServValue::Bool(b)  => dest.write_str(if b {"true"} else {"false"})?,
 			ServValue::Float(v) => dest.write_str(&v.to_string())?,
@@ -243,11 +248,9 @@ fn parse_json_from_str(input: &str) -> ServValue {
 }
 
 fn json_from(input: ServValue, scope: &Stack) -> ServResult {
-    // println!("{:?}", input.clone().to_string());
     Ok(parse_json_from_str(&input.to_string()))
 }
 
-use crate::ServModule;
 
 pub fn get_module() -> ServModule {
     let mut output = ServModule::empty();
