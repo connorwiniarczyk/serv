@@ -1,4 +1,4 @@
-out = {$name has $number} with @{
-	name = {name}
-	number = +++1
-}
+serv.port = %{ 3000 + 500 }
+serv.test = 1000 
+
+/ => file {src/main.rs}

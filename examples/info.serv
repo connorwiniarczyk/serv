@@ -1,9 +1,0 @@
-@template => {
-<html>
-    <body>
-    $in
-    </body>
-</html>
-}
-
-/ => template markdown file {../readme.md}
