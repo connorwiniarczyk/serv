@@ -72,7 +72,7 @@ such that, if a problem seemed simple in your head, it would be simple to expres
 when you wrote the code. The example he gave was Awk for the domain of
 data processing, but it struck me that web servers ought to have such a language too.
 
-### Concatenative Langauages and Om
+### Concatenative Languages and Om
 
 Serv falls into a family of languages called [concatenative](https://concatenative.org/wiki/view/Concatenative%20language),
 which are named for the property that expressions are built by concatenating smaller units together into a list.
@@ -82,7 +82,7 @@ it in the program. These languages typically have a single global stack that eve
 Serv works slightly differently, it uses a *prefix* call notation, meaning that every function operates on what comes
 after it in the expression, and rather than operating on a global stack, functions operate on the program itself.
 
-From what I can tell, only one other langauge shares this property, an experimental language called [Om](https://www.om-language.com/index.html)
+From what I can tell, only one other language shares this property, an experimental language called [Om](https://www.om-language.com/index.html)
 and it was the inspiration for so many of the ideas that ended up in Serv.
 
 ## Tutorial
@@ -129,7 +129,7 @@ escaping. This makes it very easy to embed other languages inside of serv string
 
 Serv strings are also templates, and can embed other serv expressions inside
 of them. This can be done with the `$` character followed by a single identifier of
-by an expression enclosed by parantheses.
+by an expression enclosed by parentheses.
 
 ```
 name = {connor}
@@ -223,7 +223,7 @@ This allows you to split larger programs into several different files and import
 @include serv file {components.serv}
 ```
 
-Modules can also be created inline by with parantheses `()`. Expressions can be delimited by
+Modules can also be created inline by with parentheses `()`. Expressions can be delimited by
 line breaks, semicolons, or commas. By default, modules created this way are functions that when evaluated,
 create a new scope with each of their assignments, then run each of their unassigned
 expressions in order, returning the result of the last expression. This can be a useful tool for creating
@@ -240,7 +240,7 @@ functions with side effects, or for functions that might need a more complex loc
 ### Advanced Evaluation
 
 As stated above, each function in a serv expression performs an operation on
-the rest of the expresssion, not necessarily just the result of that expression.
+the rest of the expression, not necessarily just the result of that expression.
 Most typically, functions in serv work by first evaluating the remaining expression
 into a single value, and then doing an operation on that value, but this is not
 always the case, and many functions perform operations on the list of values
@@ -299,9 +299,9 @@ unexplored.
 
 Functions in serv are allowed to reference themselves in their definition. Many "serious"
 functional languages will brag about their ability to elegantly express recursive concepts
-like the fibonacci sequence in just a few lines of code, and despite it not being super
+like the Fibonacci sequence in just a few lines of code, and despite it not being super
 relevant for writing web servers, it became important to me to make sure serv could do
-the same. Below are programs for calculating the fibonacci sequence and factorials.
+the same. Below are programs for calculating the Fibonacci sequence and factorials.
 
 ```
 fib = ? (1, 1, sum list (fib-, fib--))
